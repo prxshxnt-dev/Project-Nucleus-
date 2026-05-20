@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} { allow read, write: if false; }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function existing() { return resource.data; }
+    function incoming() { return request.resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'displayName', 'role', 'planId', 'createdAt', 'updatedAt'])
+        && data.email is string && data.email.size() <= 200
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.role in ['guest', 'student', 'admin', 'superadmin']
+        && data.planId in ['free', 'notes', 'lectures', 'premium']
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidUserUpdate(data) {
+      return data.keys().hasAll(['email', 'displayName', 'role', 'planId', 'createdAt', 'updatedAt'])
+        && data.email is string && data.email.size() <= 200
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.role in ['guest', 'student', 'admin', 'superadmin']
+        && data.planId in ['free', 'notes', 'lectures', 'premium']
+        && data.createdAt == existing().createdAt
+        && data.updatedAt == request.time;
+    }
+
+    function isValidMaterial(data) {
+      return data.keys().size() == 8
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.type in ['note', 'lecture', 'test']
+        && data.url is string && data.url.size() <= 1000
+        && data.requiredPlan in ['free', 'notes', 'lectures', 'premium']
+        && data.createdAt == request.time
+        && data.updatedAt == request.time
+        && data.authorId is string && data.authorId == request.auth.uid;
+    }
+
+    function isValidMaterialUpdate(data) {
+        return data.title is string && data.title.size() <= 200
+          && data.description is string && data.description.size() <= 5000
+          && data.type in ['note', 'lecture', 'test']
+          && data.url is string && data.url.size() <= 1000
+          && data.requiredPlan in ['free', 'notes', 'lectures', 'premium']
+          && data.createdAt == existing().createdAt
+          && data.updatedAt == request.time
+          && data.authorId == existing().authorId;
+    }
+
+    function getTier(plan) {
+      return plan == 'premium' ? 3 : (plan == 'lectures' ? 2 : (plan == 'notes' ? 1 : 0));
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      
+      allow create: if isSignedIn() 
+        && isValidId(userId) 
+        && userId == request.auth.uid 
+        && isValidUser(incoming())
+        && (
+          (incoming().role == 'guest' && incoming().planId == 'free') ||
+          (request.auth.token.email == 'meinkxun@gmail.com' && incoming().role == 'superadmin' && incoming().planId == 'premium')
+        );
+
+      allow update: if (
+        isSignedIn() && isValidId(userId) && isValidUserUpdate(incoming()) && (
+          (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
+          (request.auth.token.email == 'meinkxun@gmail.com' && request.auth.uid == userId)
+        )
+      );
+
+      allow delete: if isAdmin(); 
+    }
+
+    match /materials/{materialId} {
+      allow get: if true;
+      allow list: if true;
+      
+      allow create: if isAdmin() 
+        && isValidId(materialId)
+        && isValidMaterial(incoming());
+
+      allow update: if isAdmin()
+        && isValidId(materialId)
+        && isValidMaterialUpdate(incoming())
+        && incoming().diff(existing()).affectedKeys().hasAny(['title', 'description', 'type', 'url', 'requiredPlan', 'updatedAt']);
+
+      allow delete: if isAdmin();
+    }
+
+    match /materials_secure/{materialId} {
+      allow get: if isSignedIn() && (
+        isAdmin() || 
+        getTier(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.planId) >= getTier(get(/databases/$(database)/documents/materials/$(materialId)).data.requiredPlan) ||
+        (materialId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unlockedMaterials)
+      );
+      allow list, create, update, delete: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /mentors/{mentorId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

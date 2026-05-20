@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Nucleus Coaching Centre platform.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The user's email address."
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "admin", "superadmin"],
+          "description": "The user's role."
+        },
+        "planId": {
+          "type": "string",
+          "enum": ["free", "notes", "lectures", "premium"],
+          "description": "The user's active subscription plan."
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["email", "role", "planId", "createdAt", "updatedAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Educational content (Note, Lecture, etc.).",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["note", "lecture", "test"]
+        },
+        "url": {
+          "type": "string"
+        },
+        "requiredPlan": {
+          "type": "string",
+          "enum": ["free", "notes", "lectures", "premium"]
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "authorId": {
+          "type": "string"
+        }
+      },
+      "required": ["title", "description", "type", "requiredPlan", "createdAt", "updatedAt", "authorId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles, roles, and active plans."
+    },
+    "materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Stores educational materials."
+    }
+  }
+}
