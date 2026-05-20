@@ -7,6 +7,8 @@ interface SiteSettings {
   pricePremium?: number;
   
   classPrices?: {
+    '6'?: { notes?: number, lectures?: number, premium?: number };
+    '7'?: { notes?: number, lectures?: number, premium?: number };
     '8'?: { notes?: number, lectures?: number, premium?: number };
     '9'?: { notes?: number, lectures?: number, premium?: number };
     '10'?: { notes?: number, lectures?: number, premium?: number };

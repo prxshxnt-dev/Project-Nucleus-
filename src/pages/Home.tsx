@@ -200,6 +200,8 @@ export default function Home() {
             
             <div className="flex flex-wrap items-center justify-center gap-2 mb-12">
               <button onClick={() => setSelectedClassGroup('all')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedClassGroup === 'all' ? 'bg-[#E5D2A5] text-[#070709]' : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'}`}>All Classes</button>
+              <button onClick={() => setSelectedClassGroup('6')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedClassGroup === '6' ? 'bg-[#E5D2A5] text-[#070709]' : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'}`}>Class 6</button>
+              <button onClick={() => setSelectedClassGroup('7')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedClassGroup === '7' ? 'bg-[#E5D2A5] text-[#070709]' : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'}`}>Class 7</button>
               <button onClick={() => setSelectedClassGroup('8')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedClassGroup === '8' ? 'bg-[#E5D2A5] text-[#070709]' : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'}`}>Class 8</button>
               <button onClick={() => setSelectedClassGroup('9')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedClassGroup === '9' ? 'bg-[#E5D2A5] text-[#070709]' : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'}`}>Class 9</button>
               <button onClick={() => setSelectedClassGroup('10')} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedClassGroup === '10' ? 'bg-[#E5D2A5] text-[#070709]' : 'bg-white/5 border border-white/10 text-white/60 hover:text-white'}`}>Class 10</button>
@@ -213,40 +215,55 @@ export default function Home() {
             {materials.filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup).slice(0, 6).map((mat, i) => {
                const reqTier = planTiers[mat.requiredPlan as keyof typeof planTiers] || 0;
                const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-               const hasAccess = userTier >= reqTier || hasSpecificAccess;
+               const hasAccess = userTier >= reqTier || hasSpecificAccess || mat.type === 'video' || mat.type === 'lecture';
                
                return (
                  <motion.div 
                    key={mat.id}
-                   initial={{ opacity: 0, y: 20 }}
+                   initial={{ opacity: 0, y: 30 }}
                    whileInView={{ opacity: 1, y: 0 }}
                    viewport={{ once: true, margin: "-50px" }}
-                   transition={{ delay: i * 0.1, duration: 0.5 }}
-                   className="relative overflow-hidden rounded-2xl border bg-white/5 border-white/10 p-6 flex flex-col"
+                   transition={{ delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                   className="group relative overflow-hidden rounded-3xl border bg-black/40 border-white/5 hover:border-[#E5D2A5]/30 flex flex-col transition-all duration-500 cursor-pointer shadow-lg hover:shadow-[0_8px_40px_rgba(229,210,165,0.15)]"
+                   onClick={() => hasAccess ? navigate('/dashboard') : document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
                  >
-                   <div className="flex items-center justify-between mb-4">
-                     <div className={`p-3 rounded-xl ${mat.type === 'note' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                       {mat.type === 'note' ? <BookOpen className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                   {mat.thumbnailUrl && (
+                     <div className="w-full h-40 bg-black/50 relative overflow-hidden">
+                       <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
                      </div>
-                     <div className="px-3 py-1 rounded-full bg-white/5 text-xs text-white/50 border border-white/10 uppercase tracking-wider font-medium">
-                       {mat.requiredPlan}
-                     </div>
-                   </div>
-                   <h3 className="font-display text-xl font-medium text-white mb-2">{mat.title}</h3>
-                   <p className="text-white/50 text-sm mb-6 flex-1">{mat.description}</p>
-                   <div className="pt-4 border-t border-white/10 flex items-center justify-between text-white/40 group cursor-pointer hover:text-white transition-colors" onClick={() => hasAccess ? navigate('/dashboard') : document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}>
-                     <div className="flex items-center gap-2 text-sm font-medium">
-                       {hasAccess ? (
-                         <>
-                           <Play className="w-4 h-4" />
-                           <span>View Content</span>
-                         </>
-                       ) : (
-                         <>
-                           <Lock className="w-4 h-4" />
-                           <span>Subscribe to unlock</span>
-                         </>
+                   )}
+                   <div className="absolute inset-0 bg-gradient-to-br from-[#E5D2A5]/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                   
+                   <div className="p-6 flex flex-col flex-1 relative z-10 z-20">
+                     <div className="flex items-center justify-between mb-5">
+                       {!mat.thumbnailUrl && (
+                          <div className={`p-4 rounded-2xl transition-colors duration-500 ${mat.type === 'note' ? 'bg-white/5 text-white/50 group-hover:bg-white/10 group-hover:text-white' : 'bg-[#E5D2A5]/5 text-[#E5D2A5]/50 group-hover:bg-[#E5D2A5]/10 group-hover:text-[#E5D2A5]'}`}>
+                            {mat.type === 'note' ? <BookOpen className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                          </div>
                        )}
+                       <div className={`px-4 py-1.5 rounded-full bg-white/5 text-[10px] text-white/50 border border-white/10 uppercase tracking-widest font-medium group-hover:border-[#E5D2A5]/20 group-hover:text-[#E5D2A5] transition-colors duration-500 ${mat.thumbnailUrl ? 'ml-auto' : ''}`}>
+                         {mat.requiredPlan}
+                       </div>
+                     </div>
+                     <h3 className="font-display text-2xl font-medium text-white mb-3 group-hover:text-[#E5D2A5] transition-colors duration-500 relative z-10">{mat.title}</h3>
+                     <p className="text-white/40 text-sm mb-8 flex-1 leading-relaxed relative z-10">{mat.description}</p>
+                     <div className="pt-5 border-t border-white/5 flex items-center justify-between text-white/30 group border-t-white/10 relative z-10">
+                       <div className="flex items-center gap-2 text-sm font-medium tracking-wide">
+                         {hasAccess ? (
+                           <div className="flex items-center gap-3 text-[#E5D2A5] group-hover:text-[#f4ecd8] transition-colors duration-300">
+                             <div className="p-2 rounded-full bg-[#E5D2A5]/10 group-hover:bg-[#E5D2A5]/20 group-hover:scale-110 transition-all duration-300">
+                               <Play className="w-3.5 h-3.5 fill-current" />
+                             </div>
+                             <span>View Content</span>
+                           </div>
+                         ) : (
+                           <div className="flex items-center gap-3 text-white/40 group-hover:text-white transition-colors duration-300">
+                             <Lock className="w-4 h-4" />
+                             <span>Subscribe to unlock</span>
+                           </div>
+                         )}
+                       </div>
                      </div>
                    </div>
                  </motion.div>
@@ -271,7 +288,7 @@ export default function Home() {
           
           <div className="flex justify-center mb-12 relative z-20">
              <div className="bg-white/5 border border-white/10 rounded-full p-1 inline-flex flex-wrap justify-center gap-1">
-                {['8', '9', '10', '11', '12', 'dropper'].map(cls => (
+                {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map(cls => (
                   <button 
                     key={cls} 
                     onClick={() => setPricingClassGroup(cls)} 

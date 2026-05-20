@@ -56,6 +56,7 @@ export default function AdminDashboard() {
   const [desc, setDesc] = useState('');
   const [type, setType] = useState('note');
   const [url, setUrl] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [plan, setPlan] = useState('free');
   const [classGroup, setClassGroup] = useState('all');
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
@@ -152,6 +153,7 @@ export default function AdminDashboard() {
           title,
           description: desc,
           type,
+          thumbnailUrl,
           requiredPlan: plan,
           classGroup,
           updatedAt: serverTimestamp(),
@@ -163,6 +165,7 @@ export default function AdminDashboard() {
           title,
           description: desc,
           type,
+          thumbnailUrl,
           requiredPlan: plan,
           classGroup,
           authorId: user.uid,
@@ -172,7 +175,7 @@ export default function AdminDashboard() {
         await setDoc(doc(db, 'materials_secure', docRef.id), { url });
       }
       
-      setTitle(''); setDesc(''); setUrl('');
+      setTitle(''); setDesc(''); setUrl(''); setThumbnailUrl('');
       setPlan('free'); setClassGroup('all'); setType('note');
       fetchData();
     } catch (error) {
@@ -184,6 +187,7 @@ export default function AdminDashboard() {
     setEditingMaterialId(mat.id);
     setTitle(mat.title);
     setDesc(mat.description);
+    setThumbnailUrl(mat.thumbnailUrl || '');
     setType(mat.type);
     setPlan(mat.requiredPlan);
     setClassGroup(mat.classGroup || 'all');
@@ -203,7 +207,7 @@ export default function AdminDashboard() {
 
   const handleCancelEditMaterial = () => {
     setEditingMaterialId(null);
-    setTitle(''); setDesc(''); setUrl('');
+    setTitle(''); setDesc(''); setUrl(''); setThumbnailUrl('');
     setPlan('free'); setClassGroup('all'); setType('note');
   };
 
@@ -354,7 +358,7 @@ export default function AdminDashboard() {
                  </div>
                </div>
                
-               {['8', '9', '10', '11', '12', 'dropper'].map(cls => (
+               {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map(cls => (
                  <div key={cls} className="mb-6 p-4 rounded-xl border border-white/10 bg-black/20">
                    <h5 className="text-sm font-medium text-white mb-4 capitalize">Class {cls} Custom Prices (Leave empty to use default)</h5>
                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -482,6 +486,8 @@ export default function AdminDashboard() {
                   </select>
                   <select value={classGroup} onChange={e => setClassGroup(e.target.value)} className="w-full sm:w-1/3 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]">
                     <option value="all">Any Class</option>
+                    <option value="6">Class 6</option>
+                    <option value="7">Class 7</option>
                     <option value="8">Class 8</option>
                     <option value="9">Class 9</option>
                     <option value="10">Class 10</option>
@@ -496,6 +502,7 @@ export default function AdminDashboard() {
                     <option value="premium">Premium Tier</option>
                   </select>
                 </div>
+                <input placeholder="Optional Thumbnail URL (Image link)" value={thumbnailUrl} onChange={e => setThumbnailUrl(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
                 <input required placeholder="Content URL (YouTube/PDF link)" value={url} onChange={e => setUrl(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
                 <div className="flex gap-2">
                   <button type="submit" className="flex-1 py-3 rounded-xl bg-[#E5D2A5] text-[#070709] font-medium hover:bg-[#f4ecd8] transition-colors">

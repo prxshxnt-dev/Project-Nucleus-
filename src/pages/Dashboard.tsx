@@ -7,6 +7,8 @@ import { db } from '../lib/firebase';
 import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useNavigate, Link } from 'react-router-dom';
+import ReactPlayer from 'react-player';
+import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
 
 const planTiers = {
   free: 0,
@@ -46,6 +48,16 @@ export default function Dashboard() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null);
+  const [activeMaterial, setActiveMaterial] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (selectedMaterial) {
+      setActiveMaterial(selectedMaterial);
+    } else {
+      const timer = setTimeout(() => setActiveMaterial(null), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedMaterial]);
   const [secureUrl, setSecureUrl] = useState<string>('');
   const [fetchingUrl, setFetchingUrl] = useState(false);
   const [studyMinutes, setStudyMinutes] = useState(0);
@@ -174,7 +186,7 @@ export default function Dashboard() {
       return;
     }
     const reqTier = planTiers[selectedMaterial.requiredPlan as keyof typeof planTiers];
-    const hasAccess = (userTier >= reqTier) || (user.unlockedMaterials?.includes(selectedMaterial.id));
+    const hasAccess = (userTier >= reqTier) || (user.unlockedMaterials?.includes(selectedMaterial.id)) || selectedMaterial.type === 'video' || selectedMaterial.type === 'lecture';
     
     if (hasAccess) {
       setFetchingUrl(true);
@@ -301,6 +313,8 @@ export default function Dashboard() {
             <h2 className="text-xl font-display font-medium text-white/90">Recent Materials</h2>
             <div className="flex flex-wrap items-center gap-1 sm:gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
                 <button onClick={() => setSelectedClassGroup('all')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === 'all' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>All</button>
+                <button onClick={() => setSelectedClassGroup('6')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '6' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>6</button>
+                <button onClick={() => setSelectedClassGroup('7')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '7' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>7</button>
                 <button onClick={() => setSelectedClassGroup('8')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '8' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>8</button>
                 <button onClick={() => setSelectedClassGroup('9')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '9' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>9</button>
                 <button onClick={() => setSelectedClassGroup('10')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '10' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>10</button>
@@ -334,26 +348,36 @@ export default function Dashboard() {
                     <motion.div 
                       key={mat.id}
                       onClick={() => setSelectedMaterial(mat)}
-                      whileHover={{ scale: 1.01 }}
-                      className={`relative overflow-hidden rounded-2xl border p-5 flex items-center gap-5 transition-colors bg-white/5 border-white/10 hover:bg-white/10 cursor-pointer`}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      whileHover={{ scale: 1.02 }}
+                      className={`group relative overflow-hidden rounded-2xl border p-5 flex items-center gap-5 transition-all duration-300 bg-black/40 border-white/5 hover:border-[#E5D2A5]/30 cursor-pointer shadow-lg hover:shadow-[0_8px_30px_rgba(229,210,165,0.1)]`}
                     >
-                      <div className={`p-4 rounded-xl ${mat.type === 'note' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                        {mat.type === 'note' ? <BookOpen /> : <Video />}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-lg text-white mb-1">{mat.title}</h3>
-                        <p className="text-sm text-white/50 line-clamp-1">{mat.description}</p>
+                      {mat.thumbnailUrl ? (
+                        <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-white/5 relative group-hover:scale-105 transition-transform duration-500">
+                          <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                        </div>
+                      ) : (
+                        <div className={`p-5 rounded-2xl shrink-0 transition-colors duration-300 ${mat.type === 'note' ? 'bg-white/5 text-white/70 group-hover:bg-white/10 group-hover:text-white' : 'bg-[#E5D2A5]/5 text-[#E5D2A5]/70 group-hover:bg-[#E5D2A5]/10 group-hover:text-[#E5D2A5]'}`}>
+                          {mat.type === 'note' ? <BookOpen className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-display font-medium text-lg text-white mb-1.5 truncate group-hover:text-[#E5D2A5] transition-colors">{mat.title}</h3>
+                        <p className="text-sm text-white/50 line-clamp-2 leading-relaxed">{mat.description}</p>
                       </div>
                       
                       {isLocked ? (
-                        <div className="flex flex-col items-end gap-2">
-                           <div className="p-2 rounded-full bg-white/5 text-white/40">
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                           <div className="p-3 rounded-full bg-red-500/10 text-red-400 group-hover:bg-red-500/20 transition-colors">
                              <Lock className="w-4 h-4" />
                            </div>
-                           <span className="text-xs font-medium text-white/30 uppercase tracking-wide">Requires {mat.requiredPlan}</span>
+                           <span className="text-[10px] font-medium text-white/30 uppercase tracking-widest hidden sm:block">Requires {mat.requiredPlan}</span>
                         </div>
                       ) : (
-                         <div className="px-4 py-2 rounded-full bg-white/10 text-white text-sm font-medium">
+                         <div className="shrink-0 px-6 py-2.5 rounded-full bg-white/5 text-white text-sm font-medium border border-white/10 group-hover:bg-gradient-to-r group-hover:from-[#E5D2A5] group-hover:to-[#D4BE8D] group-hover:text-black group-hover:border-transparent group-hover:scale-105 transition-all duration-300 shadow-md">
                            View
                          </div>
                       )}
@@ -516,58 +540,62 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {selectedMaterial && (
-        <Dialog open={!!selectedMaterial} onOpenChange={(open) => !open && setSelectedMaterial(null)}>
-          <DialogContent className="sm:max-w-[800px] bg-[#070709] border border-white/10 text-white p-0 overflow-hidden">
-            <DialogHeader className="p-6 pb-0">
-              <DialogTitle className="text-2xl font-display font-medium text-white flex items-center justify-between">
-                <span>{selectedMaterial.title}</span>
-                {(userTier < planTiers[selectedMaterial.requiredPlan as keyof typeof planTiers] && !user?.unlockedMaterials?.includes(selectedMaterial.id)) && (
-                  <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide bg-white/10 px-3 py-1.5 rounded-full text-white/60">
-                    <Lock className="w-3 h-3" />
-                    Locked
+      <Dialog open={!!selectedMaterial} onOpenChange={(open) => !open && setSelectedMaterial(null)}>
+        <DialogContent className="sm:max-w-[800px] bg-[#070709] border border-white/10 text-white p-0 overflow-hidden">
+          {activeMaterial && (
+            <>
+              <DialogHeader className="p-6 pb-0">
+                <DialogTitle className="text-2xl font-display font-medium text-white flex items-center justify-between">
+                  <span>{activeMaterial.title}</span>
+                  {(userTier < planTiers[activeMaterial.requiredPlan as keyof typeof planTiers] && !user?.unlockedMaterials?.includes(activeMaterial.id)) && (
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide bg-white/10 px-3 py-1.5 rounded-full text-white/60">
+                      <Lock className="w-3 h-3" />
+                      Locked
+                    </div>
+                  )}
+                </DialogTitle>
+                <DialogDescription className="text-white/50 mt-2">
+                  {activeMaterial.description}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className={`w-full ${activeMaterial.type === 'note' ? 'bg-black/50 aspect-auto h-[60vh] md:h-[70vh]' : 'bg-transparent aspect-video p-6 pb-8'} relative flex items-center justify-center`}>
+                {(activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' && Math.max(0, userTier) < planTiers[activeMaterial.requiredPlan as keyof typeof planTiers] && !user?.unlockedMaterials?.includes(activeMaterial.id)) ? (
+                  <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center flex-col p-8 text-center z-10 border-t border-white/5">
+                    <Lock className="w-12 h-12 text-[#E5D2A5] mb-4" />
+                    <h3 className="text-2xl font-display font-medium text-white mb-2">Content Locked</h3>
+                    <p className="text-white/60 mb-6 max-w-md">
+                      Upgrade your plan to {activeMaterial.requiredPlan} to explore this content.
+                    </p>
+                    <button onClick={() => { setSelectedMaterial(null); setViewingPlans(true); }} className="px-6 py-3 rounded-full bg-[#E5D2A5] text-[#070709] font-medium shadow-[0_0_20px_rgba(229,210,165,0.2)] hover:bg-[#f4ecd8] transition-colors">
+                      View Upgrade Plans
+                    </button>
+                  </div>
+                ) : fetchingUrl && activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' ? (
+                  <div className="flex items-center justify-center p-8 bg-black/80 w-full h-full text-white/50 animate-pulse">
+                     Loading secure content...
+                  </div>
+                ) : (activeMaterial.type === 'video' || activeMaterial.type === 'lecture') || ReactPlayer.canPlay(secureUrl || activeMaterial.url) ? (
+                  <CustomVideoPlayer url={secureUrl || activeMaterial.url} playing={!!selectedMaterial} />
+                ) : (
+                  <div className="relative w-full h-full pointer-events-auto">
+                    <iframe
+                      src={getEmbedUrl(secureUrl || activeMaterial.url)}
+                      className={`w-full h-full border-none transition-opacity duration-500 opacity-100`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      sandbox="allow-scripts allow-same-origin allow-presentation"
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
+                    {/* Invisible overlay over the top bar to block clicks on video title/channel profile */}
+                    <div className="absolute top-0 left-0 right-0 h-[80px] bg-transparent z-10 cursor-default" />
                   </div>
                 )}
-              </DialogTitle>
-              <DialogDescription className="text-white/50 mt-2">
-                {selectedMaterial.description}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className={`w-full bg-black/50 ${selectedMaterial.type === 'note' ? 'aspect-auto h-[60vh] md:h-[70vh]' : 'aspect-video'} relative mt-6 flex items-center justify-center`}>
-              {(userTier < planTiers[selectedMaterial.requiredPlan as keyof typeof planTiers] && !user?.unlockedMaterials?.includes(selectedMaterial.id)) ? (
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center flex-col p-8 text-center z-10 border-t border-white/5">
-                  <Lock className="w-12 h-12 text-[#E5D2A5] mb-4" />
-                  <h3 className="text-2xl font-display font-medium text-white mb-2">Content Locked</h3>
-                  <p className="text-white/60 mb-6 max-w-md">
-                    Upgrade your plan to {selectedMaterial.requiredPlan} to explore this content.
-                  </p>
-                  <button onClick={() => { setSelectedMaterial(null); setViewingPlans(true); }} className="px-6 py-3 rounded-full bg-[#E5D2A5] text-[#070709] font-medium shadow-[0_0_20px_rgba(229,210,165,0.2)] hover:bg-[#f4ecd8] transition-colors">
-                    View Upgrade Plans
-                  </button>
-                </div>
-              ) : fetchingUrl ? (
-                <div className="flex items-center justify-center p-8 bg-black/80 w-full h-full text-white/50 animate-pulse">
-                   Loading secure content...
-                </div>
-              ) : (
-                <div className="relative w-full h-full pointer-events-auto">
-                  <iframe
-                    src={getEmbedUrl(secureUrl)}
-                    className={`w-full h-full border-none transition-opacity duration-500 opacity-100`}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    sandbox="allow-scripts allow-same-origin allow-presentation"
-                    onContextMenu={(e) => e.preventDefault()}
-                  />
-                  {/* Invisible overlay over the top bar to block clicks on video title/channel profile */}
-                  <div className="absolute top-0 left-0 right-0 h-[80px] bg-transparent z-10 cursor-default" />
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
