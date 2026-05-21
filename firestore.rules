@@ -25,6 +25,8 @@ service cloud.firestore {
         && data.displayName is string && data.displayName.size() <= 100
         && data.role in ['guest', 'student', 'admin', 'superadmin']
         && data.planId in ['free', 'notes', 'lectures', 'premium']
+        && (!data.keys().hasAny(['classGroup']) || data.classGroup is string)
+        && (!data.keys().hasAny(['unlockedMaterials']) || data.unlockedMaterials is list)
         && data.createdAt == request.time
         && data.updatedAt == request.time;
     }
@@ -35,17 +37,19 @@ service cloud.firestore {
         && data.displayName is string && data.displayName.size() <= 100
         && data.role in ['guest', 'student', 'admin', 'superadmin']
         && data.planId in ['free', 'notes', 'lectures', 'premium']
+        && (!data.keys().hasAny(['classGroup']) || data.classGroup is string)
+        && (!data.keys().hasAny(['unlockedMaterials']) || data.unlockedMaterials is list)
         && data.createdAt == existing().createdAt
         && data.updatedAt == request.time;
     }
 
     function isValidMaterial(data) {
-      return data.keys().size() == 8
-        && data.title is string && data.title.size() <= 200
+      return data.title is string && data.title.size() <= 200
         && data.description is string && data.description.size() <= 5000
         && data.type in ['note', 'lecture', 'test']
-        && data.url is string && data.url.size() <= 1000
-        && data.requiredPlan in ['free', 'notes', 'lectures', 'premium']
+        && (!data.keys().hasAny(['classGroup']) || data.classGroup is string)
+        && (!data.keys().hasAny(['thumbnailUrl']) || data.thumbnailUrl is string)
+        && (!data.keys().hasAny(['requiredPlan']) || data.requiredPlan is string)
         && data.createdAt == request.time
         && data.updatedAt == request.time
         && data.authorId is string && data.authorId == request.auth.uid;
@@ -55,8 +59,9 @@ service cloud.firestore {
         return data.title is string && data.title.size() <= 200
           && data.description is string && data.description.size() <= 5000
           && data.type in ['note', 'lecture', 'test']
-          && data.url is string && data.url.size() <= 1000
-          && data.requiredPlan in ['free', 'notes', 'lectures', 'premium']
+          && (!data.keys().hasAny(['classGroup']) || data.classGroup is string)
+          && (!data.keys().hasAny(['thumbnailUrl']) || data.thumbnailUrl is string)
+          && (!data.keys().hasAny(['requiredPlan']) || data.requiredPlan is string)
           && data.createdAt == existing().createdAt
           && data.updatedAt == request.time
           && data.authorId == existing().authorId;
@@ -81,8 +86,8 @@ service cloud.firestore {
 
       allow update: if (
         isSignedIn() && isValidId(userId) && isValidUserUpdate(incoming()) && (
-          (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
-          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
+          (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'classGroup']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'classGroup', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
           (request.auth.token.email == 'meinkxun@gmail.com' && request.auth.uid == userId)
         )
       );
@@ -101,7 +106,7 @@ service cloud.firestore {
       allow update: if isAdmin()
         && isValidId(materialId)
         && isValidMaterialUpdate(incoming())
-        && incoming().diff(existing()).affectedKeys().hasAny(['title', 'description', 'type', 'url', 'requiredPlan', 'updatedAt']);
+        && incoming().diff(existing()).affectedKeys().hasAny(['title', 'description', 'type', 'url', 'requiredPlan', 'updatedAt', 'classGroup', 'thumbnailUrl']);
 
       allow delete: if isAdmin();
     }
@@ -109,8 +114,7 @@ service cloud.firestore {
     match /materials_secure/{materialId} {
       allow get: if isSignedIn() && (
         isAdmin() || 
-        getTier(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.planId) >= getTier(get(/databases/$(database)/documents/materials/$(materialId)).data.requiredPlan) ||
-        (materialId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unlockedMaterials)
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && materialId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('unlockedMaterials', []))
       );
       allow list, create, update, delete: if isAdmin();
     }

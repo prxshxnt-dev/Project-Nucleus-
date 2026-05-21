@@ -43,7 +43,7 @@ const getEmbedUrl = (url: string) => {
 };
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
+  const { user, loading: authLoading } = useAuthStore();
   const { settings } = useSettingsStore();
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,9 +129,16 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/');
+    }
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
     const fetchMaterials = async () => {
-      // If guest, don't fetch or show materials
-      if (isGuest) {
+      const hasUnlocked = user?.unlockedMaterials && user.unlockedMaterials.length > 0;
+      // If guest and has no explicitly unlocked materials, don't fetch or show materials
+      if (isGuest && !hasUnlocked) {
         setLoading(false);
         return;
       }
@@ -147,7 +154,7 @@ export default function Dashboard() {
       }
     };
     fetchMaterials();
-  }, [isGuest]);
+  }, [isGuest, user?.unlockedMaterials]);
 
   useEffect(() => {
     if (!user || user.role === 'guest') return;
@@ -185,8 +192,9 @@ export default function Dashboard() {
       setSecureUrl('');
       return;
     }
-    const reqTier = planTiers[selectedMaterial.requiredPlan as keyof typeof planTiers];
-    const hasAccess = (userTier >= reqTier) || (user.unlockedMaterials?.includes(selectedMaterial.id)) || selectedMaterial.type === 'video' || selectedMaterial.type === 'lecture';
+    const hasSpecificAccess = user?.unlockedMaterials?.includes(selectedMaterial.id);
+    const hasFullAccess = user?.role === 'admin' || user?.role === 'superadmin';
+    const hasAccess = hasSpecificAccess || hasFullAccess;
     
     if (hasAccess) {
       setFetchingUrl(true);
@@ -206,12 +214,13 @@ export default function Dashboard() {
         });
       }
     }
-  }, [selectedMaterial, user, userTier]);
+  }, [selectedMaterial, user]);
 
   useEffect(() => {
     if (!selectedMaterial || !user) return;
-    const reqTier = planTiers[selectedMaterial.requiredPlan as keyof typeof planTiers];
-    const hasAccess = (userTier >= reqTier) || (user.unlockedMaterials?.includes(selectedMaterial.id));
+    const hasSpecificAccess = user?.unlockedMaterials?.includes(selectedMaterial.id);
+    const hasFullAccess = user?.role === 'admin' || user?.role === 'superadmin';
+    const hasAccess = hasSpecificAccess || hasFullAccess;
     
     if (!hasAccess) return;
 
@@ -264,10 +273,28 @@ export default function Dashboard() {
         transition={{ duration: 0.6 }}
         className="mb-12"
       >
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-display font-medium tracking-tight mb-2">Welcome back, {user.displayName?.split(' ')[0]}.</h1>
-            <p className="text-white/50">{isGuest ? 'Your account is pending activation.' : 'Continue your journey to excellence.'}</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 rounded-full border-2 border-[#E5D2A5]/60 overflow-hidden bg-white/5 flex-shrink-0 flex items-center justify-center p-0.5 shadow-[0_0_15px_rgba(229,210,165,0.15)]">
+              <div className="w-full h-full rounded-full overflow-hidden bg-white/5 flex items-center justify-center">
+                {user.photoURL ? (
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.displayName} 
+                    className="w-full h-full object-cover rounded-full" 
+                    referrerPolicy="no-referrer" 
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-tr from-[#E5D2A5]/30 to-white/5 flex items-center justify-center text-2xl font-semibold text-[#E5D2A5] capitalize font-display">
+                    {user.displayName ? user.displayName.charAt(0) : user.email.charAt(0)}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <h1 className="text-4xl font-display font-medium tracking-tight mb-2">Welcome back, {user.displayName?.split(' ')[0]}.</h1>
+              <p className="text-white/50">{isGuest ? 'Your account is pending activation.' : 'Continue your journey to excellence.'}</p>
+            </div>
           </div>
           
           {!isGuest && (
@@ -298,8 +325,8 @@ export default function Dashboard() {
                   <Trophy className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/50 font-medium tracking-wide uppercase">Your Plan</p>
-                  <p className="text-lg font-medium text-white capitalize">{user.planId === 'free' ? 'Basic' : user.planId}</p>
+                  <p className="text-xs text-white/50 font-medium tracking-wide uppercase">Your Batch</p>
+                  <p className="text-lg font-medium text-white capitalize">{user.classGroup === 'all' || !user.classGroup ? 'Any/All' : `Class ${user.classGroup}`}</p>
                 </div>
               </div>
             </div>
@@ -324,7 +351,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          {isGuest ? (
+          {isGuest && (!user?.unlockedMaterials || user.unlockedMaterials.length === 0) ? (
             <div className="text-center py-12 rounded-2xl bg-white/5 border border-white/10 text-white/50 flex flex-col items-center justify-center">
               <Lock className="w-8 h-8 mb-4 text-[#E5D2A5]" />
               <p>Content is locked.</p>
@@ -339,10 +366,10 @@ export default function Dashboard() {
           ) : (
             materials.length > 0 ? (
               <div className="space-y-4">
-                {materials.filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup).map((mat) => {
-                  const reqTier = planTiers[mat.requiredPlan as keyof typeof planTiers];
+                {materials.filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id)).map((mat) => {
                   const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-                  const isLocked = userTier < reqTier && !hasSpecificAccess;
+                  const hasFullAccess = user?.role === 'admin' || user?.role === 'superadmin';
+                  const isLocked = !hasSpecificAccess && !hasFullAccess;
                   
                   return (
                     <motion.div 
@@ -374,7 +401,7 @@ export default function Dashboard() {
                            <div className="p-3 rounded-full bg-red-500/10 text-red-400 group-hover:bg-red-500/20 transition-colors">
                              <Lock className="w-4 h-4" />
                            </div>
-                           <span className="text-[10px] font-medium text-white/30 uppercase tracking-widest hidden sm:block">Requires {mat.requiredPlan}</span>
+                           <span className="text-[10px] font-medium text-white/30 uppercase tracking-widest hidden sm:block">{mat.classGroup && mat.classGroup !== 'all' ? `Class ${mat.classGroup}` : 'Locked'}</span>
                         </div>
                       ) : (
                          <div className="shrink-0 px-6 py-2.5 rounded-full bg-white/5 text-white text-sm font-medium border border-white/10 group-hover:bg-gradient-to-r group-hover:from-[#E5D2A5] group-hover:to-[#D4BE8D] group-hover:text-black group-hover:border-transparent group-hover:scale-105 transition-all duration-300 shadow-md">
@@ -547,7 +574,7 @@ export default function Dashboard() {
               <DialogHeader className="p-6 pb-0">
                 <DialogTitle className="text-2xl font-display font-medium text-white flex items-center justify-between">
                   <span>{activeMaterial.title}</span>
-                  {(userTier < planTiers[activeMaterial.requiredPlan as keyof typeof planTiers] && !user?.unlockedMaterials?.includes(activeMaterial.id)) && (
+                  {(!user?.unlockedMaterials?.includes(activeMaterial.id) && !(user?.role === 'admin' || user?.role === 'superadmin')) && (
                     <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide bg-white/10 px-3 py-1.5 rounded-full text-white/60">
                       <Lock className="w-3 h-3" />
                       Locked
@@ -558,17 +585,17 @@ export default function Dashboard() {
                   {activeMaterial.description}
                 </DialogDescription>
               </DialogHeader>
-
+ 
               <div className={`w-full ${activeMaterial.type === 'note' ? 'bg-black/50 aspect-auto h-[60vh] md:h-[70vh]' : 'bg-transparent aspect-video p-6 pb-8'} relative flex items-center justify-center`}>
-                {(activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' && Math.max(0, userTier) < planTiers[activeMaterial.requiredPlan as keyof typeof planTiers] && !user?.unlockedMaterials?.includes(activeMaterial.id)) ? (
+                {(!user?.unlockedMaterials?.includes(activeMaterial.id) && !(user?.role === 'admin' || user?.role === 'superadmin')) ? (
                   <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center flex-col p-8 text-center z-10 border-t border-white/5">
                     <Lock className="w-12 h-12 text-[#E5D2A5] mb-4" />
                     <h3 className="text-2xl font-display font-medium text-white mb-2">Content Locked</h3>
-                    <p className="text-white/60 mb-6 max-w-md">
-                      Upgrade your plan to {activeMaterial.requiredPlan} to explore this content.
+                    <p className="text-white/60 mb-6 max-w-sm">
+                      You do not have permission to view this material. Please contact your administrator to grant access to your account.
                     </p>
-                    <button onClick={() => { setSelectedMaterial(null); setViewingPlans(true); }} className="px-6 py-3 rounded-full bg-[#E5D2A5] text-[#070709] font-medium shadow-[0_0_20px_rgba(229,210,165,0.2)] hover:bg-[#f4ecd8] transition-colors">
-                      View Upgrade Plans
+                    <button onClick={() => setSelectedMaterial(null)} className="px-6 py-3 rounded-full bg-white/10 text-white font-medium hover:bg-white/20 transition-colors">
+                      Close
                     </button>
                   </div>
                 ) : fetchingUrl && activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' ? (

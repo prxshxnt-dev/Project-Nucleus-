@@ -1,6 +1,6 @@
-import { motion, useScroll, useTransform } from 'motion/react';
+import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { useEffect, useState, useRef } from 'react';
-import { Play, BookOpen, Video, Lock, Check } from 'lucide-react';
+import { Play, BookOpen, Video, Lock, Check, X } from 'lucide-react';
 import { signInWithGoogle, db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
@@ -9,7 +9,7 @@ import { collection, query, getDocs, limit, orderBy } from 'firebase/firestore';
 
 
 
-function MentorTrack({ mentors, direction = 'left' }: { mentors: any[], direction?: 'left' | 'right' }) {
+function MentorTrack({ mentors, direction = 'left', onSelect }: { mentors: any[], direction?: 'left' | 'right', onSelect: (m: any) => void }) {
   // Duplicate for infinite scroll
   const dupMentors = [...mentors, ...mentors];
   
@@ -19,27 +19,51 @@ function MentorTrack({ mentors, direction = 'left' }: { mentors: any[], directio
         initial={{ x: direction === 'left' ? 0 : '-50%' }}
         animate={{ x: direction === 'left' ? '-50%' : 0 }}
         transition={{ 
-          duration: 20, 
+          duration: 25, 
           ease: 'linear', 
           repeat: Infinity 
         }}
-        className="flex gap-6 px-3 whitespace-nowrap min-w-max"
+        className="flex gap-6 px-3 whitespace-nowrap min-w-max animate-scroll"
       >
         {dupMentors.map((m, i) => (
-          <div key={i} className="group relative w-[280px] h-[360px] rounded-2xl overflow-hidden cursor-pointer">
-            <img 
-              src={m.image} 
-              alt={m.name} 
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ease-out"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
-            <div className="absolute bottom-6 left-6 p-1">
-              <h3 className="font-display font-medium text-lg text-white mb-1">{m.name}</h3>
-              <p className="text-sm text-white/80">{m.role}</p>
+          <div 
+            key={i} 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelect(m);
+            }}
+            className="group relative w-[240px] p-4 bg-white/5 border border-white/10 hover:border-[#E5D2A5]/30 rounded-2xl cursor-pointer transition-all duration-300 flex flex-col gap-3 text-left whitespace-normal shadow-[0_4px_30px_rgba(0,0,0,0.4)] z-30"
+          >
+            {/* Small rectangular shape image with rounded corners */}
+            <div 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelect(m);
+              }}
+              className="w-full h-[150px] rounded-xl overflow-hidden bg-white/5 relative cursor-pointer"
+            >
+              <img 
+                src={m.image} 
+                alt={m.name} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ease-out cursor-pointer"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-300"></div>
             </div>
-            {/* Hover details */}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 backdrop-blur-sm transition-all duration-300 flex items-center justify-center">
-              <button className="px-6 py-2.5 rounded-full bg-white/10 text-white backdrop-blur-md border border-white/20 font-medium text-sm">View Profile</button>
+
+            {/* Teacher basic details */}
+            <div className="flex flex-col flex-1 justify-between min-h-[70px]">
+              <div>
+                <h3 className="font-display font-medium text-base text-white group-hover:text-[#E5D2A5] transition-colors duration-300 line-clamp-1 truncate">{m.name}</h3>
+                <p className="text-xs text-white/50 line-clamp-1 truncate mb-2">{m.role}</p>
+              </div>
+              
+              <div className="text-[11px] text-[#E5D2A5]/80 font-medium flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300 select-none">
+                <span>View profile & exp</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
             </div>
           </div>
         ))}
@@ -67,6 +91,7 @@ export default function Home() {
   const [mentors2, setMentors2] = useState<any[]>([]);
   const [selectedClassGroup, setSelectedClassGroup] = useState<string>('all');
   const [pricingClassGroup, setPricingClassGroup] = useState<string>('11');
+  const [selectedMentor, setSelectedMentor] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchMaterials = async () => {
@@ -212,10 +237,9 @@ export default function Home() {
           </div>
           
           <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {materials.filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup).slice(0, 6).map((mat, i) => {
-               const reqTier = planTiers[mat.requiredPlan as keyof typeof planTiers] || 0;
+            {materials.filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id)).slice(0, 6).map((mat, i) => {
                const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-               const hasAccess = userTier >= reqTier || hasSpecificAccess || mat.type === 'video' || mat.type === 'lecture';
+               const hasAccess = hasSpecificAccess || user?.role === 'admin' || user?.role === 'superadmin';
                
                return (
                  <motion.div 
@@ -225,7 +249,7 @@ export default function Home() {
                    viewport={{ once: true, margin: "-50px" }}
                    transition={{ delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                    className="group relative overflow-hidden rounded-3xl border bg-black/40 border-white/5 hover:border-[#E5D2A5]/30 flex flex-col transition-all duration-500 cursor-pointer shadow-lg hover:shadow-[0_8px_40px_rgba(229,210,165,0.15)]"
-                   onClick={() => hasAccess ? navigate('/dashboard') : document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                   onClick={() => hasAccess ? navigate('/dashboard') : navigate('/dashboard')}
                  >
                    {mat.thumbnailUrl && (
                      <div className="w-full h-40 bg-black/50 relative overflow-hidden">
@@ -243,7 +267,7 @@ export default function Home() {
                           </div>
                        )}
                        <div className={`px-4 py-1.5 rounded-full bg-white/5 text-[10px] text-white/50 border border-white/10 uppercase tracking-widest font-medium group-hover:border-[#E5D2A5]/20 group-hover:text-[#E5D2A5] transition-colors duration-500 ${mat.thumbnailUrl ? 'ml-auto' : ''}`}>
-                         {mat.requiredPlan}
+                         {mat.classGroup === "all" || !mat.classGroup ? "All Classes" : "Class " + mat.classGroup}
                        </div>
                      </div>
                      <h3 className="font-display text-2xl font-medium text-white mb-3 group-hover:text-[#E5D2A5] transition-colors duration-500 relative z-10">{mat.title}</h3>
@@ -260,7 +284,7 @@ export default function Home() {
                          ) : (
                            <div className="flex items-center gap-3 text-white/40 group-hover:text-white transition-colors duration-300">
                              <Lock className="w-4 h-4" />
-                             <span>Subscribe to unlock</span>
+                             <span>Locked</span>
                            </div>
                          )}
                        </div>
@@ -410,9 +434,91 @@ export default function Home() {
           <p className="text-white/50 text-lg max-w-xl">Our faculty comprises the nation's top rankers and distinguished educators. No compromise on quality.</p>
         </div>
         
-        {mentors1.length > 0 && <MentorTrack mentors={mentors1} direction="left" />}
-        {mentors2.length > 0 && <MentorTrack mentors={mentors2} direction="right" />}
+        {mentors1.length > 0 && <MentorTrack mentors={mentors1} direction="left" onSelect={setSelectedMentor} />}
+        {mentors2.length > 0 && <MentorTrack mentors={mentors2} direction="right" onSelect={setSelectedMentor} />}
       </section>
+
+      <AnimatePresence>
+        {selectedMentor && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedMentor(null)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            />
+            
+            {/* Modal Container */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', duration: 0.5 }}
+              className="relative w-full max-w-lg bg-[#0d0d12] border border-white/10 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-10 p-6 md:p-8 flex flex-col gap-6 hover:border-[#E5D2A5]/25 transition-colors duration-300"
+            >
+              {/* Close Button at Top-Right */}
+              <button 
+                onClick={() => setSelectedMentor(null)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors z-20 cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              {/* Header: Small Rounded Square Profile Pic + Name & Specialization */}
+              <div className="flex items-center gap-5">
+                {/* Small rounded square profile picture */}
+                <div className="w-16 h-16 md:w-20 h-20 shrink-0 rounded-xl overflow-hidden border border-white/10 bg-[#0f0f14] flex items-center justify-center shadow-lg">
+                  <img 
+                    src={selectedMentor.image} 
+                    alt={selectedMentor.name} 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                
+                <div className="flex flex-col text-left">
+                  <span className="text-[#E5D2A5] font-display font-medium text-[10px] tracking-widest uppercase mb-1">FACULTY PROFILE</span>
+                  <h3 className="font-display font-semibold text-xl md:text-2xl text-white leading-tight mb-1">{selectedMentor.name}</h3>
+                  <p className="text-white/60 text-xs md:text-sm line-clamp-1">{selectedMentor.role}</p>
+                </div>
+              </div>
+              
+              {/* Exp Badge & Bio */}
+              <div className="space-y-4 border-t border-white/5 pt-4 text-left">
+                {/* Experience */}
+                <div>
+                  <span className="text-white/40 text-[10px] font-display uppercase tracking-wider block mb-1.5">EXPERIENCE</span>
+                  <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#E5D2A5]/10 border border-[#E5D2A5]/20 text-xs text-[#E5D2A5] font-medium">
+                    {selectedMentor.experience || 'Distinguished Educator'}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <span className="text-white/40 text-[10px] font-display uppercase tracking-wider block mb-1">BACKGROUND & BIO</span>
+                  <p className="text-white/75 text-sm leading-relaxed">
+                    {selectedMentor.description || 'Dedicated to inspiring students, breaking down complex principles, and guiding them to stellar success in high-profile competitive examinations.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom Close Button */}
+              <div className="border-t border-white/5 pt-4 flex justify-end">
+                <button 
+                  onClick={() => setSelectedMentor(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white/80 hover:text-white font-medium text-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Close Profile</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {settings.reviewFormUrl && (
         <section id="review" className="py-24 relative z-20 bg-[#070709] border-t border-white/5">

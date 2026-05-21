@@ -22,6 +22,16 @@
           "enum": ["free", "notes", "lectures", "premium"],
           "description": "The user's active subscription plan."
         },
+        "classGroup": {
+          "type": "string",
+          "enum": ["all", "6", "7", "8", "9", "10", "11", "12", "dropper"],
+          "description": "The class/batch of the user."
+        },
+        "unlockedMaterials": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The list of material IDs specifically unlocked for the user."
+        },
         "createdAt": {
           "type": "string"
         },
@@ -53,6 +63,10 @@
           "type": "string",
           "enum": ["free", "notes", "lectures", "premium"]
         },
+        "classGroup": {
+          "type": "string",
+          "enum": ["all", "6", "7", "8", "9", "10", "11", "12", "dropper"]
+        },
         "createdAt": {
           "type": "string"
         },
@@ -63,7 +77,7 @@
           "type": "string"
         }
       },
-      "required": ["title", "description", "type", "requiredPlan", "createdAt", "updatedAt", "authorId"]
+      "required": ["title", "description", "type", "createdAt", "updatedAt", "authorId"]
     }
   },
   "firestore": {

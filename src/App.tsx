@@ -71,6 +71,13 @@ export default function App() {
               displayName: userData.displayName,
               role: userData.role,
               planId: userData.planId,
+              classGroup: userData.classGroup,
+              unlockedMaterials: userData.unlockedMaterials || [],
+              streak: userData.streak || 0,
+              lastStudyDate: userData.lastStudyDate,
+              todayStudyMinutes: userData.todayStudyMinutes,
+              lastStreakDate: userData.lastStreakDate,
+              photoURL: userData.photoURL || firebaseUser.photoURL || null,
             });
           }
           setLoading(false);

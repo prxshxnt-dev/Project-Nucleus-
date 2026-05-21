@@ -8,8 +8,14 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 export default function AdminDashboard() {
-  const { user } = useAuthStore();
+  const { user, loading: authLoading } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/');
+    }
+  }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<'materials' | 'users' | 'mentors' | 'settings'>('materials');
   const [users, setUsers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -65,6 +71,8 @@ export default function AdminDashboard() {
   const [mentorName, setMentorName] = useState('');
   const [mentorRole, setMentorRole] = useState('');
   const [mentorImage, setMentorImage] = useState('');
+  const [mentorExperience, setMentorExperience] = useState('');
+  const [mentorDescription, setMentorDescription] = useState('');
   
   const fetchData = async () => {
     try {
@@ -219,9 +227,12 @@ export default function AdminDashboard() {
         name: mentorName,
         role: mentorRole,
         image: mentorImage,
+        experience: mentorExperience || 'Distinguished educator with vast experience.',
+        description: mentorDescription || 'Dedicated to nurturing students and delivering stellar top-tier results in competitive exams.',
         createdAt: serverTimestamp(),
       });
       setMentorName(''); setMentorRole(''); setMentorImage('');
+      setMentorExperience(''); setMentorDescription('');
       fetchData();
     } catch (error) {
       console.error("Error creating mentor", error);
@@ -480,11 +491,11 @@ export default function AdminDashboard() {
                 <input required placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
                 <textarea required placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5] h-24 resize-none" />
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <select value={type} onChange={e => setType(e.target.value)} className="w-full sm:w-1/3 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]">
+                  <select value={type} onChange={e => setType(e.target.value)} className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]">
                     <option value="note">Notes / PDF</option>
                     <option value="lecture">Lecture / Video</option>
                   </select>
-                  <select value={classGroup} onChange={e => setClassGroup(e.target.value)} className="w-full sm:w-1/3 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]">
+                  <select value={classGroup} onChange={e => setClassGroup(e.target.value)} className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]">
                     <option value="all">Any Class</option>
                     <option value="6">Class 6</option>
                     <option value="7">Class 7</option>
@@ -494,12 +505,6 @@ export default function AdminDashboard() {
                     <option value="11">Class 11</option>
                     <option value="12">Class 12</option>
                     <option value="dropper">Dropper</option>
-                  </select>
-                  <select value={plan} onChange={e => setPlan(e.target.value)} className="w-full sm:w-1/3 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]">
-                    <option value="free">Free</option>
-                    <option value="notes">Notes Tier</option>
-                    <option value="lectures">Lectures Tier</option>
-                    <option value="premium">Premium Tier</option>
                   </select>
                 </div>
                 <input placeholder="Optional Thumbnail URL (Image link)" value={thumbnailUrl} onChange={e => setThumbnailUrl(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
@@ -522,7 +527,7 @@ export default function AdminDashboard() {
                  <div key={mat.id} className="p-4 rounded-xl border border-white/10 bg-white/5 flex items-center justify-between">
                    <div>
                      <h4 className="font-medium text-white">{mat.title}</h4>
-                     <p className="text-xs text-white/50">{mat.type} • Required: {mat.requiredPlan}</p>
+                     <p className="text-xs text-white/50">{mat.type} • Class: {mat.classGroup === 'all' || !mat.classGroup ? 'Any Class' : `Class ${mat.classGroup}`}</p>
                    </div>
                    <div className="flex items-center gap-2">
                      <button onClick={() => handleEditMaterialStart(mat)} className="px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-medium transition-colors">
@@ -547,7 +552,7 @@ export default function AdminDashboard() {
                  <th className="p-4 font-medium text-white/60">Email</th>
                  <th className="p-4 font-medium text-white/60">Streak</th>
                  <th className="p-4 font-medium text-white/60">Role</th>
-                 <th className="p-4 font-medium text-white/60">Plan</th>
+                 <th className="p-4 font-medium text-white/60">Class / Batch</th>
                  <th className="p-4 font-medium text-white/60">Access</th>
                </tr>
              </thead>
@@ -577,13 +582,21 @@ export default function AdminDashboard() {
                    <td className="p-4">
                      <select 
                        className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-sm text-white"
-                       value={u.planId}
-                       onChange={e => handleUpdateUser(u.id, 'planId', e.target.value)}
+                       value={u.classGroup || 'all'}
+                       onChange={e => handleUpdateUser(u.id, 'classGroup', e.target.value)}
                      >
-                       <option value="free">Free</option>
-                       <option value="notes">Notes (₹{priceNotes})</option>
-                       <option value="lectures">Lectures (₹{priceLectures})</option>
-                       <option value="premium">Premium (₹{pricePremium})</option>
+                       <option value="all">Any/All Classes</option>
+                        <option value="6">Class 6</option>
+                        <option value="7">Class 7</option>
+                        <option value="8">Class 8</option>
+                        <option value="9">Class 9</option>
+                        <option value="10">Class 10</option>
+                        <option value="11">Class 11</option>
+                        <option value="12">Class 12</option>
+                        <option value="dropper">Dropper</option>
+                       
+                       
+                       
                      </select>
                    </td>
                    <td className="p-4 flex items-center gap-2">
@@ -613,6 +626,8 @@ export default function AdminDashboard() {
               <form onSubmit={handleCreateMentor} className="space-y-4">
                 <input required placeholder="Name (e.g. Dr. Aryan Sharma)" value={mentorName} onChange={e => setMentorName(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
                 <input required placeholder="Role (e.g. AIIMS Topper)" value={mentorRole} onChange={e => setMentorRole(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
+                <input placeholder="Experience (e.g. 10+ Years Exp, Ex-IITian) [Optional]" value={mentorExperience} onChange={e => setMentorExperience(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
+                <textarea placeholder="Bio/Description [Optional]" value={mentorDescription} onChange={e => setMentorDescription(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5] h-20 resize-none" />
                 <input required placeholder="Image URL (Unsplash link)" value={mentorImage} onChange={e => setMentorImage(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]" />
                 <button type="submit" className="w-full py-3 rounded-xl bg-[#E5D2A5] text-[#070709] font-medium hover:bg-[#f4ecd8] transition-colors">Add Faculty</button>
               </form>
@@ -655,7 +670,7 @@ export default function AdminDashboard() {
                    <div key={mat.id} className="flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5">
                      <div>
                        <h4 className="font-medium text-white">{mat.title}</h4>
-                       <p className="text-xs text-white/50">{mat.type} • Required: {mat.requiredPlan}</p>
+                       <p className="text-xs text-white/50">{mat.type} • Class: {mat.classGroup === 'all' || !mat.classGroup ? 'Any Class' : `Class ${mat.classGroup}`}</p>
                      </div>
                      <button
                        onClick={() => toggleMaterialAccess(managingUser.id, mat.id, managingUser.unlockedMaterials)}

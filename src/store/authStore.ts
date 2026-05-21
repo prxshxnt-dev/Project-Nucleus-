@@ -12,6 +12,7 @@ interface User {
   todayStudyMinutes?: number;
   lastStreakDate?: string;
   classGroup?: string;
+  photoURL?: string | null;
 }
 
 interface AuthState {

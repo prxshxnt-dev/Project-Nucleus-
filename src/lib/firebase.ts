@@ -27,6 +27,9 @@ export const signInWithGoogle = async () => {
         displayName: user.displayName || 'Student',
         role: role,
         planId: planId,
+        classGroup: 'all',
+        unlockedMaterials: [],
+        photoURL: user.photoURL || null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -36,6 +39,8 @@ export const signInWithGoogle = async () => {
         await updateDoc(userRef, {
           role: 'superadmin',
           planId: 'premium',
+          classGroup: 'all',
+          unlockedMaterials: [],
           updatedAt: serverTimestamp(),
         });
       }
