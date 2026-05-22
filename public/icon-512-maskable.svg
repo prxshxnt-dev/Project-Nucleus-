@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="gold-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF3D4"/>
+      <stop offset="60%" stop-color="#E5D2A5"/>
+      <stop offset="100%" stop-color="#b59f6d"/>
+    </radialGradient>
+  </defs>
+  <!-- Background Shield Grid -->
+  <rect width="512" height="512" fill="#070709"/>
+  
+  <!-- Content scaled down so the 10% outer safe zone is empty -->
+  <g transform="translate(51.2, 51.2) scale(0.8)">
+    <g transform="translate(128, 128)">
+      <ellipse cx="128" cy="128" rx="115" ry="46" fill="none" stroke="url(#gold-glow)" stroke-width="6.5" stroke-dasharray="14 7" transform="rotate(-30, 128, 128)" opacity="0.6"/>
+      <ellipse cx="128" cy="128" rx="115" ry="46" fill="none" stroke="url(#gold-glow)" stroke-width="5" transform="rotate(45, 128, 128)" opacity="0.4"/>
+      <circle cx="128" cy="128" r="26" fill="url(#gold-glow)" filter="drop-shadow(0px 0px 20px rgba(229, 210, 165, 0.8))"/>
+      <path d="M 75 52 L 75 204 A 5 5 0 0 0 80 209 L 96 209 A 5 5 0 0 0 101 204 L 101 109 L 155 204 A 5 5 0 0 0 160 209 L 176 209 A 5 5 0 0 0 181 204 L 181 52 A 5 5 0 0 0 176 47 L 160 47 A 5 5 0 0 0 155 52 L 155 147 L 101 52 A 5 5 0 0 0 96 47 L 80 47 A 5 5 0 0 0 75 52 Z" fill="url(#gold-glow)" />
+    </g>
+  </g>
+</svg>

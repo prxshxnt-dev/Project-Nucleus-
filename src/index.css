@@ -1,18 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Space+Grotesk:wght@300..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans-custom, "Inter", ui-sans-serif, system-ui, sans-serif);
+  --font-display: var(--font-display-custom, "Outfit", ui-sans-serif, system-ui, sans-serif);
   
-  --color-background: #070709;
-  --color-foreground: #f2f2f2;
-  --color-primary: #E5D2A5;
-  --color-primary-dark: #b59f6d;
-  --color-muted: #888890;
+  --color-background: var(--background-custom, #070709);
+  --color-foreground: var(--foreground-custom, #f2f2f2);
+  --color-primary: var(--primary-custom, #E5D2A5);
+  --color-primary-dark: var(--primary-dark-custom, #b59f6d);
+  --color-muted: var(--muted-custom, #888890);
+
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-border-color: var(--border-color);
+  --color-card-bg: var(--card-bg);
+  --color-glass-bg: var(--glass-bg);
+  --color-button-text: var(--button-text);
+  --color-navbar-text: var(--navbar-text);
   
-  --animate-fade-in: fade-in 0.5s ease-out;
-  --animate-slide-up: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-fade-in: fade-in var(--animate-duration-modifier, 0.5s) ease-out;
+  --animate-slide-up: slide-up var(--animate-duration-modifier, 0.5s) cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer utilities {
@@ -31,6 +44,20 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
+  font-weight: var(--theme-heading-weight, 600) !important;
+  letter-spacing: var(--theme-heading-tracking, -0.02em) !important;
+  text-transform: var(--theme-heading-case, none) !important;
+  line-height: var(--theme-heading-lh, 1.25) !important;
+  text-shadow: var(--theme-text-shadow, none);
+}
+
+/* Zero-flicker premium transition engine */
+html, body, .theme-card-themed, button, input, select, textarea, span, p, div, svg {
+  transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              backdrop-filter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Lenis Smooth Scroll */
@@ -178,4 +205,74 @@ html.lenis {
   html {
     @apply font-sans;
     }
+}
+
+/* Theme Custom Helpers & CSS Variables overrides */
+:root {
+  --font-sans-custom: "Inter", sans-serif;
+  --font-display-custom: "Outfit", sans-serif;
+  --background-custom: #070709;
+  --foreground-custom: #f2f2f2;
+  --primary-custom: #E5D2A5;
+  --primary-dark-custom: #b59f6d;
+  --muted-custom: #888890;
+
+  /* Smart Contrast Variables Baseline Defaults */
+  --bg-primary: #070709;
+  --bg-secondary: #0e0e12;
+  --text-primary: #f2f2f2;
+  --text-secondary: #a3a3ac;
+  --text-muted: #71717a;
+  --accent-primary: #E5D2A5;
+  --accent-contrast: #070709;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --glass-bg: rgba(255, 255, 255, 0.01);
+  --button-text: #070709;
+  --navbar-text: #f2f2f2;
+
+  --theme-btn-radius: 9999px;
+  --theme-card-radius: 24px;
+  --theme-card-border: rgba(255, 255, 255, 0.1);
+  --theme-card-blur: blur(12px);
+  --theme-anim-intensity: 1;
+  --theme-accent-glow: #E5D2A5;
+  --theme-shadow-glow: 0 0 15px rgba(229, 210, 165, 0.15);
+}
+
+.theme-btn-themed {
+  border-radius: var(--theme-btn-radius) !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-card-themed {
+  border-radius: var(--theme-card-radius) !important;
+  border: 1px solid var(--theme-card-border);
+  backdrop-filter: var(--theme-card-blur);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mesh grid backgrounds */
+.theme-mesh-grid {
+  background-image: 
+    radial-gradient(at 0% 0%, var(--primary-custom) 0, transparent 50%), 
+    radial-gradient(at 50% 100%, var(--primary-dark-custom) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, var(--theme-accent-glow) 0, transparent 50%);
+  background-size: 100% 100%;
+}
+
+/* Security print & screen record protection */
+@media print {
+  body, html, #root {
+    display: none !important;
+    background: #000000 !important;
+  }
+}
+
+/* Disable standard text selection inside materials/lectures for extra security */
+.student-secure-view {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
 }

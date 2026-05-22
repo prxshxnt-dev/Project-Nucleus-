@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "cc.nucleus.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:83:C5:E9:1D:64:33:49:5C:DE:7F:A0:C6:13:B9:AA:A0:0F:AE:22:96:B8:2D:6C:C1:22:21:46:11:AB",
+        "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00"
+      ]
+    }
+  }
+]

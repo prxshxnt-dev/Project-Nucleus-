@@ -2,12 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nucleus</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Nucleus Academy</title>
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#070709" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Nucleus" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    
+    <!-- Android TWA Status Bar/Task Color -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    
+    <!-- Prevent standard double-tap-to-zoom on iOS to enable native feeling double-taps -->
+    <style>
+      body {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: contain; /* Prevent safari bounce effect */
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+              console.log('Nucleus Service Worker registered successfully: ', registration.scope);
+            })
+            .catch((err) => {
+              console.log('Service Worker registration failed: ', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
 

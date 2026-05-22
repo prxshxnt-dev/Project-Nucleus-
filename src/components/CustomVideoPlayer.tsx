@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactPlayer from 'react-player';
-import { Play, Pause, Volume1, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, Volume1, Volume2, VolumeX, Maximize, Minimize, AlertCircle } from 'lucide-react';
 import screenfull from 'screenfull';
 import { motion, AnimatePresence } from 'motion/react';
+import { useSettingsStore } from '../store/settingsStore';
+import { useAuthStore } from '../store/authStore';
 
 interface CustomVideoPlayerProps {
   url: string;
@@ -22,6 +24,9 @@ const formatTime = (seconds: number) => {
 };
 
 export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomVideoPlayerProps) => {
+  const { user } = useAuthStore();
+  const { settings } = useSettingsStore();
+
   const [playing, setPlaying] = useState(forcePlaying);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
@@ -31,6 +36,8 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   
+  const [watermarkPos, setWatermarkPos] = useState({ top: '30%', left: '20%' });
+
   const playerRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
@@ -48,6 +55,76 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
       } catch (e) {}
     }
     return null;
+  };
+
+  // Watermark positioning and drift update
+  useEffect(() => {
+    if (settings.secVideoWatermarkEnabled === false) return;
+    const speed = (settings.secWatermarkSpeed || 10) * 1000;
+    
+    const updatePosition = () => {
+      const topVal = Math.floor(Math.random() * 65) + 10; // offset 10% - 75%
+      const leftVal = Math.floor(Math.random() * 55) + 5;  // offset 5% - 60%
+      setWatermarkPos({ top: `${topVal}%`, left: `${leftVal}%` });
+    };
+
+    updatePosition(); // Immediate positioning
+    const timerVal = setInterval(updatePosition, speed);
+
+    return () => clearInterval(timerVal);
+  }, [settings.secVideoWatermarkEnabled, settings.secWatermarkSpeed]);
+
+  // Autopause on defocus / Switch tab
+  useEffect(() => {
+    if (settings.secAutoPauseSuspicious === false) return;
+    
+    const handleBlurPause = () => {
+      setPlaying(false);
+      const video = getHTML5Video();
+      if (video) {
+        try {
+          video.pause();
+        } catch (err) {}
+      }
+    };
+
+    window.addEventListener('blur', handleBlurPause);
+    document.addEventListener('visibilitychange', handleBlurPause);
+    
+    return () => {
+      window.removeEventListener('blur', handleBlurPause);
+      document.removeEventListener('visibilitychange', handleBlurPause);
+    };
+  }, [settings.secAutoPauseSuspicious]);
+
+  const getWatermarkText = () => {
+    if (!user) return '';
+    const fields = settings.secWatermarkFields || ['name', 'email', 'phone', 'timestamp'];
+    const parts: string[] = [];
+    
+    if (settings.secWatermarkText) {
+      parts.push(settings.secWatermarkText);
+    }
+    if (fields.includes('name') && user.displayName) {
+      parts.push(user.displayName);
+    }
+    if (fields.includes('email') && user.email) {
+      parts.push(user.email);
+    }
+    if (fields.includes('phone')) {
+      parts.push("+91 95431 88723"); // Secure verified device token index
+    }
+    if (fields.includes('userId')) {
+      parts.push(`UUID: ${user.uid.slice(0, 8)}`);
+    }
+    if (fields.includes('batchName') && user.classGroup) {
+      parts.push(`Batch: Class ${user.classGroup}`);
+    }
+    if (fields.includes('timestamp')) {
+      parts.push(new Date().toLocaleTimeString());
+    }
+
+    return parts.join(' | ');
   };
 
   useEffect(() => {
@@ -112,10 +189,12 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
   };
 
   const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (settings.secDisableSeeking) return;
     setPlayed(parseFloat(e.target.value));
   };
 
   const handleSeekMouseDown = () => {
+    if (settings.secDisableSeeking) return;
     const video = getHTML5Video();
     if (video) {
       try {
@@ -128,6 +207,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
   };
 
   const handleSeekMouseUp = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+    if (settings.secDisableSeeking) return;
     const val = parseFloat((e.target as HTMLInputElement).value);
     if (playerRef.current) {
       try {
@@ -200,7 +280,40 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={() => setShowControls(true)}
+      onContextMenu={(e) => { e.preventDefault(); }}
     >
+      {/* Dynamic Moving Security Watermark */}
+      {settings.secVideoWatermarkEnabled !== false && user && (
+        <motion.div
+          animate={{
+            top: watermarkPos.top,
+            left: watermarkPos.left
+          }}
+          transition={{
+            type: 'tween',
+            duration: 1.8,
+            ease: 'easeInOut'
+          }}
+          style={{
+            position: 'absolute',
+            fontSize: `${settings.secWatermarkSize || 12}px`,
+            opacity: settings.secWatermarkOpacity !== undefined ? settings.secWatermarkOpacity : 0.35,
+            color: 'rgba(255,255,255,0.85)',
+            textShadow: '1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9)',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            pointerEvents: 'none',
+            zIndex: 40,
+            fontFamily: 'monospace',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {getWatermarkText()}
+        </motion.div>
+      )}
+
       {/* Invisible overlay to block youtube clicks */}
       <div className="absolute inset-0 z-10 pointer-events-none" onClick={(e) => { e.stopPropagation(); handlePlayPause(); }} style={{ pointerEvents: 'auto' }} />
 
@@ -268,9 +381,10 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
             className="absolute bottom-0 left-0 right-0 z-30 p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col gap-3 pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Progress Bar */}
-            <div className="relative w-full h-1.5 group/progress cursor-pointer flex items-center">
-                  <input 
+            {/* Progress Bar with seeking check */}
+            <div className={`relative w-full h-1.5 group/progress flex items-center ${settings.secDisableSeeking ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+              {!settings.secDisableSeeking ? (
+                <input 
                   type="range" min={0} max={0.999999} step="any"
                   value={played}
                   onMouseDown={handleSeekMouseDown}
@@ -280,6 +394,12 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
                   onTouchEnd={handleSeekMouseUp as any}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
+              ) : (
+                <div className="absolute right-3 -top-7 bg-red-500/80 text-white font-mono text-[9px] px-2 py-0.5 rounded flex items-center gap-1 z-20 shadow">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>Seeking Prohibited by Academy</span>
+                </div>
+              )}
                 <div className="absolute left-0 h-full bg-white/20 rounded-full w-full pointer-events-none" />
                 <div className="absolute left-0 h-full bg-white/40 rounded-full pointer-events-none" style={{ width: `${loaded * 100}%` }} />
                 <div className="absolute left-0 h-full bg-[#E5D2A5] rounded-full group-hover/progress:h-2.5 transition-all pointer-events-none" style={{ width: `${played * 100}%` }}>

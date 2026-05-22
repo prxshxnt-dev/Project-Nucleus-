@@ -71,6 +71,51 @@ service cloud.firestore {
       return plan == 'premium' ? 3 : (plan == 'lectures' ? 2 : (plan == 'notes' ? 1 : 0));
     }
 
+    function isValidActiveDevice(data) {
+      return data.userId is string && data.userId.size() <= 128
+        && data.deviceId is string && data.deviceId.size() <= 128
+        && data.deviceModel is string && data.deviceModel.size() <= 200
+        && data.userAgent is string && data.userAgent.size() <= 500
+        && data.ipAddress is string && data.ipAddress.size() <= 45
+        && data.status in ['active', 'forced_out']
+        && data.createdAt == request.time
+        && data.lastActive == request.time;
+    }
+
+    function isValidActiveDeviceUpdate(data) {
+      return data.userId == existing().userId
+        && data.deviceId == existing().deviceId
+        && data.deviceModel == existing().deviceModel
+        && data.userAgent == existing().userAgent
+        && data.ipAddress == existing().ipAddress
+        && data.status in ['active', 'forced_out']
+        && data.createdAt == existing().createdAt
+        && data.lastActive == request.time;
+    }
+
+    function isValidLoginHistory(data) {
+      return data.userId is string && data.userId.size() <= 128 && data.userId == request.auth.uid
+        && data.email is string && data.email.size() <= 200
+        && data.deviceId is string && data.deviceId.size() <= 128
+        && data.ipAddress is string && data.ipAddress.size() <= 45
+        && data.deviceModel is string && data.deviceModel.size() <= 200
+        && data.status in ['success', 'failure']
+        && data.timestamp == request.time;
+    }
+
+    function isValidViolation(data) {
+      return data.userId is string && data.userId.size() <= 128 && data.userId == request.auth.uid
+        && data.email is string && data.email.size() <= 200
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.violationType is string && data.violationType.size() <= 100
+        && data.detail is string && data.detail.size() <= 1000
+        && data.ipAddress is string && data.ipAddress.size() <= 45
+        && data.batchName is string && data.batchName.size() <= 100
+        && data.status in ['logged', 'reviewed']
+        && data.timestamp == request.time
+        && data.deviceInfo is map;
+    }
+
     match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
@@ -128,6 +173,30 @@ service cloud.firestore {
       allow get: if true;
       allow list: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    match /active_devices/{devId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(devId) && isValidActiveDevice(incoming()) && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          existing().userId == request.auth.uid
+          && isValidActiveDeviceUpdate(incoming())
+          && incoming().userId == existing().userId
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /login_history/{logId} {
+      allow create: if isSignedIn() && isValidId(logId) && isValidLoginHistory(incoming()) && incoming().userId == request.auth.uid;
+      allow read: if isAdmin();
+    }
+
+    match /security_violations/{violId} {
+      allow create: if isSignedIn() && isValidId(violId) && isValidViolation(incoming()) && incoming().userId == request.auth.uid;
+      allow read: if isAdmin();
     }
   }
 }

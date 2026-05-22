@@ -14,6 +14,10 @@ import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import ThemeProvider from './components/ThemeProvider';
+import { SeasonalOverlay } from './components/SeasonalOverlay';
+import ScreenProtector from './components/ScreenProtector';
+import PwaManager from './components/PwaManager';
 
 export default function App() {
   const { setUser, setLoading, user, loading } = useAuthStore();
@@ -97,8 +101,12 @@ export default function App() {
   }, [setUser, setLoading, setSettings]);
 
   return (
-    <div className="min-h-screen bg-[#070709] text-[#f2f2f2] font-sans selection:bg-[#E5D2A5]/30">
+    <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30">
+      <ScreenProtector />
+      <ThemeProvider />
+      <SeasonalOverlay />
       <Navbar />
+      <PwaManager />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />

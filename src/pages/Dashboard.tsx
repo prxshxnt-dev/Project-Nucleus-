@@ -1,14 +1,16 @@
 import { motion } from 'motion/react';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { db } from '../lib/firebase';
-import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
+import SecurePdfViewer from '../components/SecurePdfViewer';
+import { FloatingStickers } from '../components/FloatingStickers';
 
 const planTiers = {
   free: 0,
@@ -45,6 +47,110 @@ const getEmbedUrl = (url: string) => {
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuthStore();
   const { settings } = useSettingsStore();
+
+  const [deviceBlock, setDeviceBlock] = useState<boolean>(false);
+  const [activeDevices, setActiveDevices] = useState<any[]>([]);
+  const [currentDeviceId, setCurrentDeviceId] = useState<string>('');
+
+  const registerMyDevice = async (devId: string) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'active_devices'), {
+        userId: user.uid,
+        deviceId: devId,
+        deviceModel: navigator.userAgent.includes('Mobile') ? 'Mobile Smartphone' : 'Desktop Browser',
+        userAgent: navigator.userAgent,
+        ipAddress: "157.34.12.98", // Simulated secure IP
+        lastActive: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        status: 'active'
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'active_devices');
+    }
+    try {
+      await addDoc(collection(db, 'login_history'), {
+        userId: user.uid,
+        email: user.email,
+        deviceId: devId,
+        ipAddress: "157.34.12.98",
+        timestamp: serverTimestamp(),
+        deviceModel: navigator.userAgent.includes('Mobile') ? 'Mobile Smartphone' : 'Desktop Browser',
+        status: 'success'
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'login_history');
+    }
+  };
+
+  const updateDeviceActive = async (docId: string) => {
+    try {
+      await updateDoc(doc(db, 'active_devices', docId), {
+        lastActive: serverTimestamp()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `active_devices/${docId}`);
+    }
+  };
+
+  const handleKickDevice = async (sessionDocId: string) => {
+    try {
+      await updateDoc(doc(db, 'active_devices', sessionDocId), {
+        status: 'forced_out',
+        lastActive: serverTimestamp()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `active_devices/${sessionDocId}`);
+    }
+  };
+
+  // Real-time device synchronization effect
+  useEffect(() => {
+    if (!user) return;
+    
+    let devId = localStorage.getItem('nucleus_secure_device_id');
+    if (!devId) {
+      devId = 'dev_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
+      localStorage.setItem('nucleus_secure_device_id', devId);
+    }
+    setCurrentDeviceId(devId);
+
+    const q = query(collection(db, 'active_devices'), where('userId', '==', user.uid));
+    const unsubSessions = onSnapshot(q, (snap) => {
+      const devices = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      const activeList = devices.filter((d: any) => d.status === 'active');
+      setActiveDevices(activeList);
+
+      const myDeviceRecord = devices.find((d: any) => d.deviceId === devId);
+      
+      if (myDeviceRecord && myDeviceRecord.status === 'forced_out') {
+        setDeviceBlock(true);
+        return;
+      }
+
+      const isMyDeviceActive = activeList.some((d: any) => d.deviceId === devId);
+      
+      if (!isMyDeviceActive) {
+        const limit = settings.secMaxDeviceLimit || 2;
+        if (activeList.length >= limit) {
+          setDeviceBlock(true);
+        } else {
+          registerMyDevice(devId);
+          setDeviceBlock(false);
+        }
+      } else {
+        setDeviceBlock(false);
+        if (myDeviceRecord) {
+          updateDeviceActive(myDeviceRecord.id);
+        }
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'active_devices');
+    });
+
+    return () => unsubSessions();
+  }, [user, settings.secMaxDeviceLimit]);
+
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null);
@@ -67,6 +173,62 @@ export default function Dashboard() {
   const [selectedClassGroup, setSelectedClassGroup] = useState<string>('all');
   const [showClassSetup, setShowClassSetup] = useState(false);
   const [setupClassGroup, setSetupClassGroup] = useState('11');
+  
+  const [activeDashboardPricingCard, setActiveDashboardPricingCard] = useState<string>('lectures');
+  const dashboardPricingContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleDashboardPricingScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (window.innerWidth >= 768) return;
+    const container = e.currentTarget;
+    const children = Array.from(container.children) as HTMLElement[];
+    const cardChildren = children.filter(child => child.id && child.id.endsWith('-dashboard-pricing-card'));
+    if (cardChildren.length === 0) return;
+    
+    let closestIndex = 0;
+    let minDistance = Infinity;
+    const containerCenter = container.getBoundingClientRect().left + container.offsetWidth / 2;
+    
+    cardChildren.forEach((child, index) => {
+      const rect = child.getBoundingClientRect();
+      const childCenter = rect.left + rect.width / 2;
+      const distance = Math.abs(childCenter - containerCenter);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    const plans = ['notes', 'lectures', 'premium'];
+    if (closestIndex >= 0 && closestIndex < plans.length) {
+      const matchedPlan = plans[closestIndex];
+      if (matchedPlan !== activeDashboardPricingCard) {
+        setActiveDashboardPricingCard(matchedPlan);
+      }
+    }
+  };
+
+  const scrollDashboardToPlan = (plan: string) => {
+    setActiveDashboardPricingCard(plan);
+    if (!dashboardPricingContainerRef.current) return;
+    const container = dashboardPricingContainerRef.current;
+    
+    const children = Array.from(container.children).filter(
+      (c) => (c as HTMLElement).id && (c as HTMLElement).id.endsWith('-dashboard-pricing-card')
+    ) as HTMLElement[];
+    const plans = ['notes', 'lectures', 'premium'];
+    const index = plans.indexOf(plan);
+    
+    if (index !== -1 && children[index]) {
+      const child = children[index];
+      const containerWidth = container.offsetWidth;
+      const childWidth = child.offsetWidth;
+      const scrollToLeft = child.offsetLeft - (containerWidth - childWidth) / 2;
+      container.scrollTo({
+        left: scrollToLeft,
+        behavior: 'smooth'
+      });
+    }
+  };
   
   const userTier = user ? planTiers[user.planId as keyof typeof planTiers] : 0;
   
@@ -98,8 +260,7 @@ export default function Dashboard() {
       setShowClassSetup(false);
       setSelectedClassGroup(setupClassGroup);
     } catch (e) {
-      console.error(e);
-      alert('Failed to save class.');
+      handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
     }
   };
   
@@ -114,6 +275,8 @@ export default function Dashboard() {
           premium: d.pricePremium || 999
         });
       }
+    }).catch(err => {
+      handleFirestoreError(err, OperationType.GET, 'settings/global');
     });
   }, []);
 
@@ -148,7 +311,7 @@ export default function Dashboard() {
         const mats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMaterials(mats);
       } catch (error) {
-        console.error('Error fetching materials', error);
+        handleFirestoreError(error, OperationType.LIST, 'materials');
       } finally {
         setLoading(false);
       }
@@ -183,9 +346,11 @@ export default function Dashboard() {
 
     if (needsUpdate) {
       updates.updatedAt = serverTimestamp();
-      updateDoc(doc(db, 'users', user.uid), updates).catch(console.error);
+      updateDoc(doc(db, 'users', user.uid), updates).catch((error) => {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      });
     }
-  }, [user?.uid]); // Intentionally not deeply depending on user to avoid infinite loops
+  }, [user?.uid]); // Intentionally not deeply depending on user to avoid loops
 
   useEffect(() => {
     if (!selectedMaterial || !user) {
@@ -199,7 +364,7 @@ export default function Dashboard() {
     if (hasAccess) {
       setFetchingUrl(true);
       if (selectedMaterial.url) {
-        // Fallback for un-migrated materials that still have the URL publicly exposed
+        // Fallback for un-migrated materials that still have URL publicly exposed
         setSecureUrl(selectedMaterial.url);
         setFetchingUrl(false);
       } else {
@@ -208,7 +373,7 @@ export default function Dashboard() {
             setSecureUrl(d.data().url);
           }
         }).catch(err => {
-          console.error("Failed to load secure material URL:", err);
+          handleFirestoreError(err, OperationType.GET, `materials_secure/${selectedMaterial.id}`);
         }).finally(() => {
           setFetchingUrl(false);
         });
@@ -224,7 +389,7 @@ export default function Dashboard() {
     
     if (!hasAccess) return;
 
-    // Fast simulation for demo: 1 second = 1 minute of study time, goal 60 mins.
+    // Fast simulation: 1 second = 1 minute of study time, goal 60 mins.
     const timer = setInterval(() => {
       setStudyMinutes(prev => {
         const newMins = prev + 1;
@@ -239,7 +404,9 @@ export default function Dashboard() {
            }
            
            updates.updatedAt = serverTimestamp();
-           updateDoc(doc(db, 'users', user.uid), updates).catch(console.error);
+           updateDoc(doc(db, 'users', user.uid), updates).catch((error) => {
+              handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+           });
         }
         
         return newMins;
@@ -251,32 +418,110 @@ export default function Dashboard() {
 
   if (!user) return <div className="min-h-screen"></div>;
 
+  if (deviceBlock) {
+    return (
+      <div className="min-h-screen pt-28 pb-32 px-4 md:px-12 flex items-center justify-center bg-zinc-950 text-white select-none relative overflow-hidden">
+        {/* Decorative Grid Panel background */}
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+        
+        <div className="w-full max-w-xl p-8 md:p-10 border border-white/10 bg-neutral-900/40 backdrop-blur-md rounded-3xl relative z-10 shadow-[-1px_1px_50px_rgba(229,210,165,0.06)] text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-[#E5D2A5]/10 border-2 border-[#E5D2A5] flex items-center justify-center mx-auto text-[#E5D2A5] animate-pulse">
+            <Lock className="w-7 h-7" />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-2xl font-display font-black uppercase tracking-tight text-white">
+              Device Limit Exceeded
+            </h2>
+            <p className="text-[#E5D2A5] font-mono text-xs uppercase tracking-widest font-black">
+              DRM Active Protection Protocol
+            </p>
+          </div>
+
+          <p className="text-zinc-400 text-xs leading-relaxed max-w-md mx-auto">
+            Your premium educational access allows you to stream courses on up to <span className="text-[#E5D2A5] font-bold">{settings.secMaxDeviceLimit || 2}</span> devices concurrently. To verify accountability, you must drop an active device session below to authorize this browser node.
+          </p>
+
+          {/* Active device lists with Kick Actions */}
+          <div className="border border-white/5 rounded-2xl bg-black/40 overflow-hidden divide-y divide-white/5 text-left max-h-[220px] overflow-y-auto">
+            {activeDevices.map((dev: any) => {
+              const isMe = dev.deviceId === currentDeviceId;
+              return (
+                <div key={dev.id} className="p-4 flex items-center justify-between text-xs gap-2">
+                  <div className="space-y-1 truncate">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white font-sans">{dev.deviceModel || 'Unknown Device'}</span>
+                      {isMe && <span className="px-1.5 py-0.5 rounded-md bg-[#E5D2A5]/10 text-[#E5D2A5] text-[8px] font-black font-mono uppercase">This Browser</span>}
+                    </div>
+                    <p className="text-zinc-500 text-[10px] font-mono flex items-center gap-1.5">
+                      <span>IP: {dev.ipAddress || '127.0.0.1'}</span>
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleKickDevice(dev.id)}
+                    className="shrink-0 px-3 py-2 text-[10px] font-mono font-black uppercase tracking-wider rounded-lg bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 active:scale-[0.97] transition-all cursor-pointer"
+                  >
+                    Terminate
+                  </button>
+                </div>
+              );
+            })}
+            
+            {activeDevices.length === 0 && (
+              <div className="p-6 text-center text-zinc-500 text-xs font-mono">
+                No active device registered. Checking status...
+              </div>
+            )}
+          </div>
+
+          <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center justify-center gap-1.5">
+            <span>Security ID: {currentDeviceId.slice(0, 12)}...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, filter: 'blur(5px)' }}
       animate={{ opacity: 1, filter: 'blur(0px)' }}
       exit={{ opacity: 0, filter: 'blur(5px)' }}
       transition={{ duration: 0.5 }}
-      className="min-h-screen pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto"
+      className="min-h-screen pt-24 pb-32 px-4 md:px-12 max-w-7xl mx-auto relative"
     >
-      <Link 
-        to="/" 
-        className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors mb-8 text-sm font-medium"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Home
-      </Link>
+      <FloatingStickers />
 
+      <div className="flex items-center justify-between mb-8">
+        <Link 
+          to="/" 
+          className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary transition-colors text-sm font-bold"
+        >
+          <ArrowLeft className="w-4 h-4 text-accent-primary" />
+          <span>Back to Home</span>
+        </Link>
+        
+        <div className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-accent-primary/10 text-accent-primary text-xs font-black">
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span>STUDENT DASHBOARD</span>
+        </div>
+      </div>
+
+      {/* Modern Greeting & Stats Header */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="mb-12"
+        className="mb-10 bg-glass-bg border border-border-color p-6 md:p-8"
+        style={{ borderRadius: 'var(--theme-card-radius, 32px)' }}
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          
+          {/* Welcome profile section */}
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-full border-2 border-[#E5D2A5]/60 overflow-hidden bg-white/5 flex-shrink-0 flex items-center justify-center p-0.5 shadow-[0_0_15px_rgba(229,210,165,0.15)]">
-              <div className="w-full h-full rounded-full overflow-hidden bg-white/5 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full border-2 border-accent-primary/50 overflow-hidden bg-bg-secondary flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
+              <div className="w-full h-full rounded-full overflow-hidden bg-bg-primary flex items-center justify-center">
                 {user.photoURL ? (
                   <img 
                     src={user.photoURL} 
@@ -285,48 +530,66 @@ export default function Dashboard() {
                     referrerPolicy="no-referrer" 
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-tr from-[#E5D2A5]/30 to-white/5 flex items-center justify-center text-2xl font-semibold text-[#E5D2A5] capitalize font-display">
+                  <div className="text-xl font-bold text-accent-primary capitalize">
                     {user.displayName ? user.displayName.charAt(0) : user.email.charAt(0)}
                   </div>
                 )}
               </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-display font-medium tracking-tight mb-2">Welcome back, {user.displayName?.split(' ')[0]}.</h1>
-              <p className="text-white/50">{isGuest ? 'Your account is pending activation.' : 'Continue your journey to excellence.'}</p>
+            <div className="text-left">
+              <h1 className="text-2xl md:text-3.5xl font-display font-black tracking-tight text-text-primary mb-1 flex items-center gap-2">
+                <span>Hello, {user.displayName?.split(' ')[0] || 'Friend'}!</span>
+                <span className="animate-bounce">👋</span>
+              </h1>
+              <p className="text-sm text-text-secondary font-medium">
+                {isGuest 
+                  ? 'Your student authorization is pending admin review.' 
+                  : 'Ready to master your chapters today? Let\'s dive in!'}
+              </p>
             </div>
           </div>
           
+          {/* Bento-style Stats cards */}
           {!isGuest && (
-            <div className="flex gap-4">
-              <div className="px-4 py-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3">
-                <div className="p-2 rounded-full bg-orange-500/20 text-orange-500">
-                  <Flame className="w-5 h-5" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
+              {/* Stat 1: Study Streak */}
+              <div className="px-5 py-3.5 rounded-2xl bg-bg-secondary/60 border border-border-color/80 flex items-center gap-3 text-left">
+                <div className="p-2.5 rounded-2xl bg-[#ff8a9e]/10 text-[#ff8a9e]">
+                  <Flame className="w-5 h-5 fill-current" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/50 font-medium tracking-wide uppercase">Current Streak</p>
-                  <p className="text-lg font-medium text-white">{user.streak || 0} Days</p>
+                  <p className="text-[10px] text-text-muted font-bold tracking-wider uppercase leading-none mb-1">Study Streak</p>
+                  <p className="text-lg font-black text-text-primary leading-none">{user.streak || 0} Days</p>
                 </div>
               </div>
               
-              <div className="px-4 py-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3 relative overflow-hidden group">
-                <div className="absolute top-0 left-0 bottom-0 bg-[#E5D2A5]/10 z-0 transition-all duration-300" style={{ width: `${Math.min(100, (studyMinutes / 60) * 100)}%` }}></div>
-                <div className="p-2 rounded-full bg-[#E5D2A5]/20 text-[#E5D2A5] z-10">
+              {/* Stat 2: Daily Timer Progression */}
+              <div className="px-5 py-3.5 rounded-2xl bg-bg-secondary/60 border border-border-color/80 flex items-center gap-3 text-left relative overflow-hidden">
+                <div 
+                  className="absolute left-0 top-0 bottom-0 bg-accent-primary/5 transition-all duration-500 ease-out" 
+                  style={{ width: `${Math.min(100, (studyMinutes / 60) * 100)}%` }}
+                />
+                <div className="p-2.5 rounded-2xl bg-accent-primary/10 text-accent-primary z-10">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div className="z-10">
-                  <p className="text-xs text-white/50 font-medium tracking-wide uppercase">Today's Goal</p>
-                  <p className="text-lg font-medium text-white capitalize">{studyMinutes >= 60 ? 'Completed' : `${studyMinutes} / 60 Min`}</p>
+                  <p className="text-[10px] text-text-muted font-bold tracking-wider uppercase leading-none mb-1">Today's Focus</p>
+                  <p className="text-lg font-black text-text-primary leading-none">
+                    {studyMinutes >= 60 ? 'Goal Met! 👑' : `${studyMinutes} / 60 m`}
+                  </p>
                 </div>
               </div>
 
-              <div className="px-4 py-3 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3">
-                <div className="p-2 rounded-full bg-[#E5D2A5]/20 text-[#E5D2A5]">
+              {/* Stat 3: Study Batch Group */}
+              <div className="px-5 py-3.5 rounded-2xl bg-bg-secondary/60 border border-border-color/80 flex items-center gap-3 text-left">
+                <div className="p-2.5 rounded-2xl bg-amber-400/10 text-amber-500">
                   <Trophy className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/50 font-medium tracking-wide uppercase">Your Batch</p>
-                  <p className="text-lg font-medium text-white capitalize">{user.classGroup === 'all' || !user.classGroup ? 'Any/All' : `Class ${user.classGroup}`}</p>
+                  <p className="text-[10px] text-text-muted font-bold tracking-wider uppercase leading-none mb-1">Study Batch</p>
+                  <p className="text-lg font-black text-text-primary leading-none capitalize">
+                    {user.classGroup === 'all' || !user.classGroup ? 'All Classes' : `Class ${user.classGroup}`}
+                  </p>
                 </div>
               </div>
             </div>
@@ -334,292 +597,475 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-medium text-white/90">Recent Materials</h2>
-            <div className="flex flex-wrap items-center gap-1 sm:gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
-                <button onClick={() => setSelectedClassGroup('all')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === 'all' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>All</button>
-                <button onClick={() => setSelectedClassGroup('6')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '6' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>6</button>
-                <button onClick={() => setSelectedClassGroup('7')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '7' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>7</button>
-                <button onClick={() => setSelectedClassGroup('8')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '8' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>8</button>
-                <button onClick={() => setSelectedClassGroup('9')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '9' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>9</button>
-                <button onClick={() => setSelectedClassGroup('10')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '10' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>10</button>
-                <button onClick={() => setSelectedClassGroup('11')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '11' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>11</button>
-                <button onClick={() => setSelectedClassGroup('12')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === '12' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>12</button>
-                <button onClick={() => setSelectedClassGroup('dropper')} className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${selectedClassGroup === 'dropper' ? 'bg-[#E5D2A5] text-[#070709]' : 'text-white/60 hover:text-white'}`}>Dropper</button>
+      {/* Main Grid View */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left">
+        
+        {/* Left Side: Course lessons list */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl md:text-2xl font-display font-black text-text-primary">Curriculum Course Materials</h2>
+              <p className="text-xs text-text-secondary font-medium mt-1">Select chapters below to load video content and study guides.</p>
+            </div>
+            
+            {/* Soft, beautiful filter buttons row */}
+            <div className="flex flex-wrap items-center gap-1 bg-glass-bg p-1.5 rounded-2xl border border-border-color shrink-0 self-start sm:self-auto">
+                {['all', '6', '7', '8', '9', '10', '11', '12', 'dropper'].map((clsKey) => (
+                  <button 
+                    key={clsKey}
+                    onClick={() => setSelectedClassGroup(clsKey)} 
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      selectedClassGroup === clsKey 
+                        ? 'bg-accent-primary text-button-text shadow-sm' 
+                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                    }`}
+                  >
+                    {clsKey === 'all' ? 'All' : clsKey}
+                  </button>
+                ))}
             </div>
           </div>
           
+          {/* Materials Showcase lists */}
           {isGuest && (!user?.unlockedMaterials || user.unlockedMaterials.length === 0) ? (
-            <div className="text-center py-12 rounded-2xl bg-white/5 border border-white/10 text-white/50 flex flex-col items-center justify-center">
-              <Lock className="w-8 h-8 mb-4 text-[#E5D2A5]" />
-              <p>Content is locked.</p>
-              <p className="text-sm">You must be promoted to a Student to view dashboard materials.</p>
+            <div 
+              className="text-center py-16 bg-glass-bg border border-border-color text-text-secondary flex flex-col items-center justify-center gap-3"
+              style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+            >
+              <div className="w-14 h-14 bg-red-400/10 text-red-400 border border-red-400/20 rounded-full flex items-center justify-center text-xl">
+                <Lock className="w-6 h-6 animate-pulse" />
+              </div>
+              <h3 className="text-lg font-bold text-text-primary">Ecosystem Materials Locked</h3>
+              <p className="text-sm text-text-muted max-w-sm mx-auto font-medium">
+                Your guest profile does not possess study course items. Kindly request promotion from the administrator panel to proceed.
+              </p>
             </div>
           ) : loading ? (
              <div className="space-y-4">
-               {[1,2,3].map(i => (
-                 <div key={i} className="w-full h-24 rounded-2xl bg-white/5 animate-pulse border border-white/5"></div>
+               {[1,2,3].map((i) => (
+                 <div 
+                   key={i} 
+                   className="w-full h-24 rounded-2xl bg-bg-secondary/40 border border-border-color animate-pulse flex items-center p-5 gap-4"
+                 >
+                   <div className="w-12 h-12 bg-border-color/60 rounded-xl" />
+                   <div className="space-y-2 flex-1">
+                     <div className="h-4 bg-border-color/60 rounded-full w-1/3" />
+                     <div className="h-3 bg-border-color/60 rounded-full w-1/2" />
+                   </div>
+                   <div className="w-16 h-8 bg-border-color/60 rounded-full" />
+                 </div>
                ))}
              </div>
           ) : (
             materials.length > 0 ? (
               <div className="space-y-4">
-                {materials.filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id)).map((mat) => {
-                  const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-                  const hasFullAccess = user?.role === 'admin' || user?.role === 'superadmin';
-                  const isLocked = !hasSpecificAccess && !hasFullAccess;
-                  
-                  return (
-                    <motion.div 
-                      key={mat.id}
-                      onClick={() => setSelectedMaterial(mat)}
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      whileHover={{ scale: 1.02 }}
-                      className={`group relative overflow-hidden rounded-2xl border p-5 flex items-center gap-5 transition-all duration-300 bg-black/40 border-white/5 hover:border-[#E5D2A5]/30 cursor-pointer shadow-lg hover:shadow-[0_8px_30px_rgba(229,210,165,0.1)]`}
-                    >
-                      {mat.thumbnailUrl ? (
-                        <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden bg-white/5 relative group-hover:scale-105 transition-transform duration-500">
-                          <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                {materials
+                  .filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id))
+                  .map((mat) => {
+                    const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
+                    const hasFullAccess = user?.role === 'admin' || user?.role === 'superadmin';
+                    const isLocked = !hasSpecificAccess && !hasFullAccess;
+                    
+                    return (
+                      <motion.div 
+                        key={mat.id}
+                        onClick={() => setSelectedMaterial(mat)}
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        whileHover={{ y: -4, scale: 1.01 }}
+                        className={`group relative overflow-hidden p-4 sm:p-5 flex items-center gap-4 sm:gap-5 transition-all duration-300 bg-glass-bg border border-border-color hover:border-accent-primary/40 cursor-pointer shadow-sm hover:shadow-md`}
+                        style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                      >
+                        {/* Soft visual glow plat */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-accent-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+                        {mat.thumbnailUrl ? (
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl overflow-hidden bg-bg-secondary relative border border-border-color/40">
+                            <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                          </div>
+                        ) : (
+                          <div className={`p-4 rounded-2xl shrink-0 transition-colors duration-300 ${
+                            mat.type === 'note' 
+                              ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
+                              : 'bg-accent-primary/10 text-accent-primary'
+                          }`}>
+                            {mat.type === 'note' ? <BookOpen className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-display font-black text-base sm:text-lg text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                              {mat.title}
+                            </h3>
+                            {mat.type === 'note' ? (
+                              <span className="shrink-0 text-[8px] font-extrabold uppercase bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-md">Note</span>
+                            ) : (
+                              <span className="shrink-0 text-[8px] font-extrabold uppercase bg-[#ff839a]/10 text-[#ff839a] px-2 py-0.5 rounded-md">Video</span>
+                            )}
+                          </div>
+                          <p className="text-xs font-semibold text-text-secondary line-clamp-2 leading-relaxed">
+                            {mat.description || 'Access notes, conceptual materials, or helpful guidelines to reinforce learning.'}
+                          </p>
                         </div>
-                      ) : (
-                        <div className={`p-5 rounded-2xl shrink-0 transition-colors duration-300 ${mat.type === 'note' ? 'bg-white/5 text-white/70 group-hover:bg-white/10 group-hover:text-white' : 'bg-[#E5D2A5]/5 text-[#E5D2A5]/70 group-hover:bg-[#E5D2A5]/10 group-hover:text-[#E5D2A5]'}`}>
-                          {mat.type === 'note' ? <BookOpen className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-display font-medium text-lg text-white mb-1.5 truncate group-hover:text-[#E5D2A5] transition-colors">{mat.title}</h3>
-                        <p className="text-sm text-white/50 line-clamp-2 leading-relaxed">{mat.description}</p>
-                      </div>
-                      
-                      {isLocked ? (
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                           <div className="p-3 rounded-full bg-red-500/10 text-red-400 group-hover:bg-red-500/20 transition-colors">
-                             <Lock className="w-4 h-4" />
+                        
+                        {isLocked ? (
+                          <div className="flex flex-col items-end gap-1 shrink-0 bg-red-400/5 border border-red-400/10 p-2.5 rounded-2xl">
+                             <div className="p-1 px-1.5 rounded-lg bg-red-500/15 text-red-500">
+                               <Lock className="w-3.5 h-3.5" />
+                             </div>
+                             <span className="text-[8px] font-black text-red-400 uppercase tracking-widest hidden sm:block">Locked</span>
+                          </div>
+                        ) : (
+                           <div className="shrink-0 flex items-center justify-center p-3 rounded-full bg-accent-primary/10 hover:bg-accent-primary text-accent-primary hover:text-button-text group-hover:scale-105 transition-all duration-300">
+                             <PlayCircle className="w-6 h-6 fill-current" />
                            </div>
-                           <span className="text-[10px] font-medium text-white/30 uppercase tracking-widest hidden sm:block">{mat.classGroup && mat.classGroup !== 'all' ? `Class ${mat.classGroup}` : 'Locked'}</span>
-                        </div>
-                      ) : (
-                         <div className="shrink-0 px-6 py-2.5 rounded-full bg-white/5 text-white text-sm font-medium border border-white/10 group-hover:bg-gradient-to-r group-hover:from-[#E5D2A5] group-hover:to-[#D4BE8D] group-hover:text-black group-hover:border-transparent group-hover:scale-105 transition-all duration-300 shadow-md">
-                           View
-                         </div>
-                      )}
-                    </motion.div>
-                  )
-                })}
+                        )}
+                      </motion.div>
+                    )
+                  })}
               </div>
             ) : (
-              <div className="text-center py-12 rounded-2xl bg-white/5 border border-white/10 text-white/50">
-                No materials available yet.
+              <div 
+                className="text-center py-16 bg-glass-bg border border-border-color text-text-secondary"
+                style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+              >
+                No study materials found matching this batch filter. Check back shortly!
               </div>
             )
           )}
         </div>
         
-        <div className="space-y-6">
-           <div className="p-6 rounded-3xl bg-gradient-to-br from-[#E5D2A5]/10 to-transparent border border-[#E5D2A5]/20">
-             <h3 className="font-display text-xl font-medium text-white mb-2">Upgrade to Premium</h3>
-             <p className="text-sm text-white/70 mb-6">Unlock all lectures, exclusive notes, and personalized mentorship.</p>
-             <button onClick={() => setViewingPlans(true)} className="w-full py-3 rounded-full bg-[#E5D2A5] text-[#070709] font-medium shadow-[0_0_15px_rgba(229,210,165,0.2)] hover:bg-[#f4ecd8] transition-colors">
-               View Plans
+        {/* Right Side Sidebar widgets */}
+        <div className="lg:col-span-4 space-y-6">
+           
+           {/* Widget 1: Elite premium subscription upgrade banner */}
+           <div 
+             className="p-6 bg-gradient-to-br from-accent-primary/15 via-amber-400/[0.02] to-transparent border border-accent-primary/30 relative overflow-hidden shadow-sm"
+             style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+           >
+             <div className="absolute -top-3 -right-3 w-28 h-28 bg-accent-primary/10 rounded-full blur-2xl pointer-events-none" />
+             
+             <div className="flex items-center gap-2 text-accent-primary font-black text-xs uppercase tracking-wider mb-3">
+               <Sparkles className="w-4 h-4 text-accent-primary animate-pulse" />
+               <span>PREMIUM ADVANTAGE</span>
+             </div>
+             
+             <h3 className="font-display text-xl font-black text-text-primary mb-2">Acquire Academic Elite</h3>
+             <p className="text-xs font-semibold text-text-secondary mb-6 leading-relaxed">
+               Gain instant classroom clearance for video lectures, syllabus note compilations, 1-on-1 counselor guidance, and high mock test setups.
+             </p>
+             
+             <button 
+               onClick={() => setViewingPlans(true)} 
+               className="theme-btn-themed w-full py-3.5 bg-accent-primary text-button-text font-bold uppercase tracking-wider text-xs shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
+               style={{ borderRadius: 'var(--theme-btn-radius, 9999px)' }}
+             >
+               Explore Term Plans
              </button>
            </div>
+
+           {/* Widget 2: Continuous Live Goal Assist tracker */}
+           <div 
+             className="p-6 bg-glass-bg border border-border-color"
+             style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+           >
+             <h4 className="font-display font-black text-base text-text-primary mb-4 flex items-center gap-2">
+               <Flame className="w-4 h-4 text-[#ff8a9e]" />
+               <span>Today's Learning Target</span>
+             </h4>
+
+             <div className="space-y-4">
+               <div className="flex justify-between items-center text-xs">
+                 <span className="text-text-secondary font-semibold">Active Minutes Logged</span>
+                 <span className="text-accent-primary font-bold">{studyMinutes} mins</span>
+               </div>
+               
+               {/* Progress circular bar line simulated */}
+               <div className="h-3.5 rounded-full bg-bg-secondary border border-border-color overflow-hidden p-0.5">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#ff839a] to-accent-primary rounded-full transition-all duration-300" 
+                    style={{ width: `${Math.min(100, (studyMinutes / 60) * 100)}%` }}
+                  />
+               </div>
+
+               <p className="text-[10px] text-text-muted font-medium italic leading-relaxed text-left">
+                 💡 TIP: Simulating study progress live. Opening any lessons secures automatic timers incrementing streak days when 60 minutes are met.
+               </p>
+             </div>
+           </div>
+
         </div>
       </div>
 
+      {/* Upgrades Plan Modal Dialog */}
       <Dialog open={viewingPlans} onOpenChange={setViewingPlans}>
-        <DialogContent className="sm:max-w-[900px] bg-[#070709] border border-white/10 text-white p-8">
-          <DialogHeader className="mb-6">
-            <DialogTitle className="text-3xl font-display font-medium text-center">Unlock Your Potential</DialogTitle>
-            <DialogDescription className="text-white/50 text-center text-base mt-2">
-              Select the plan that fits your goals. Upgrade to start learning right away.
+        <DialogContent className="sm:max-w-[850px] top-[46%] md:top-1/2 max-h-[92vh] overflow-y-auto bg-bg-primary border border-border-color text-text-primary p-4 md:p-8 rounded-[24px] md:rounded-[32px]">
+          {/* Back to Dashboard sign */}
+          <div className="flex justify-start mb-1">
+            <button 
+              onClick={() => setViewingPlans(false)}
+              className="inline-flex items-center gap-2 text-text-muted hover:text-text-primary transition-colors text-xs font-bold uppercase tracking-wider cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-accent-primary" />
+              <span>Back to Dashboard</span>
+            </button>
+          </div>
+
+          <DialogHeader className="mb-4 md:mb-6 text-center">
+            <DialogTitle className="text-xl md:text-3xl font-display font-black text-text-primary">
+              Expand Your Learning Horizons
+            </DialogTitle>
+            <DialogDescription className="text-text-secondary text-xs md:text-sm font-semibold max-w-lg mx-auto mt-1 md:mt-2">
+              Select an academy package. Make the final payment via safe UPI scan channels to secure instant authorization.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <div 
+            ref={dashboardPricingContainerRef}
+            data-lenis-prevent
+            onScroll={handleDashboardPricingScroll}
+            className="flex flex-row overflow-x-auto md:grid md:grid-cols-3 gap-4 md:gap-8 max-w-5xl mx-auto items-stretch -mx-4 px-4 md:mx-0 md:px-0 pb-6 md:pb-10 scrollbar-none snap-x snap-mandatory w-full min-w-0"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }}
+          >
+            {/* Left padding spacer on mobile */}
+            <div className="w-[12px] md:hidden shrink-0" />
+
             {/* Notes Plan */}
-            <div className="p-8 rounded-3xl border border-white/10 bg-white/5 flex flex-col hover:border-white/20 transition-colors">
-              <div className="mb-6">
-                <h3 className="font-display font-medium text-xl text-white mb-2">Notes</h3>
-                <p className="text-sm text-white/50">Perfect for quick revisions.</p>
+            <motion.div 
+              id="notes-dashboard-pricing-card"
+              layout
+              animate={{
+                scale: activeDashboardPricingCard === 'notes' ? 1.04 : 0.94,
+                opacity: activeDashboardPricingCard === 'notes' ? 1 : 0.7,
+                borderColor: activeDashboardPricingCard === 'notes' ? 'var(--accent-primary, #e5d2a5)' : 'rgba(255,255,255,0.08)',
+                boxShadow: activeDashboardPricingCard === 'notes' ? '0 15px 40px rgba(229, 210, 165, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
+                y: activeDashboardPricingCard === 'notes' ? -4 : 0,
+              }}
+              transition={{ type: 'spring', stiffness: 220, damping: 25 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={() => scrollDashboardToPlan('notes')}
+              className="p-5 rounded-[20px] border bg-glass-bg flex flex-col justify-between cursor-pointer w-[74vw] max-w-[245px] md:w-auto shrink-0 md:shrink snap-center transition-colors duration-300 border-border-color"
+            >
+              <div>
+                <span className="text-[9px] font-black uppercase text-[#ff8a9e] tracking-widest bg-[#ff8a9e]/10 px-2.5 py-1 rounded-md mb-4 inline-block">Study Docs</span>
+                <h3 className="font-display font-black text-xl text-text-primary mb-1">High Grade Notes</h3>
+                <p className="text-[11px] text-text-secondary font-medium leading-relaxed mb-4">Pure handwritten material for rapid revision cycles.</p>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-3xl font-black text-text-primary">₹{selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.notes ? settings.classPrices[selectedClassGroup].notes : prices.notes}</span>
+                  <span className="text-text-muted text-xs font-semibold">/full term</span>
+                </div>
               </div>
-              <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-medium text-white">₹{selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.notes ? settings.classPrices[selectedClassGroup].notes : prices.notes}</span>
-                <span className="text-white/50 text-sm">/year</span>
-              </div>
-              <ul className="text-sm space-y-4 mb-8 flex-1">
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span>Complete PDF Notes</span>
-                </li>
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span>Revision Materials</span>
-                </li>
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span>Basic Support</span>
-                </li>
-              </ul>
-              <button onClick={() => handlePayment('notes', selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.notes ? settings.classPrices[selectedClassGroup].notes : prices.notes)} className="w-full py-3.5 rounded-full border border-white/20 text-white hover:bg-white/10 font-medium transition-colors">
-                Select Plan
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePayment('notes', selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.notes ? settings.classPrices[selectedClassGroup].notes : prices.notes);
+                }}
+                className="w-full py-3 bg-glass-bg hover:bg-[#ff8a9e]/10 border border-border-color text-text-primary font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Scan UPI Code
               </button>
-            </div>
+            </motion.div>
 
             {/* Lectures Plan */}
-            <div className="p-8 rounded-3xl border border-[#E5D2A5] bg-[#E5D2A5]/5 flex flex-col relative shadow-[0_0_30px_rgba(229,210,165,0.1)]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#E5D2A5] text-[#070709] text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider shadow-lg">
-                Most Popular
+            <motion.div 
+              id="lectures-dashboard-pricing-card"
+              layout
+              animate={{
+                scale: activeDashboardPricingCard === 'lectures' ? 1.04 : 0.94,
+                opacity: activeDashboardPricingCard === 'lectures' ? 1 : 0.7,
+                borderColor: activeDashboardPricingCard === 'lectures' ? 'var(--accent-primary, #e5d2a5)' : 'rgba(255,255,255,0.08)',
+                boxShadow: activeDashboardPricingCard === 'lectures' ? '0 15px 40px rgba(229, 210, 165, 0.25)' : '0 4px 12px rgba(0,0,0,0.1)',
+                y: activeDashboardPricingCard === 'lectures' ? -4 : 0,
+              }}
+              transition={{ type: 'spring', stiffness: 220, damping: 25 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={() => scrollDashboardToPlan('lectures')}
+              className="p-5 rounded-[20px] border bg-glass-bg flex flex-col justify-between relative cursor-pointer w-[74vw] max-w-[245px] md:w-auto shrink-0 md:shrink snap-center transition-colors duration-300 border-border-color"
+            >
+              {activeDashboardPricingCard === 'lectures' && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent-primary text-button-text text-[9px] font-black px-4 py-1 rounded-full uppercase tracking-wider">
+                  Full Choice ⭐
+                </div>
+              )}
+              <div className="pt-2">
+                <span className="text-[9px] font-black uppercase text-accent-primary tracking-widest bg-accent-primary/10 px-2.5 py-1 rounded-md mb-4 inline-block font-mono">Lectures</span>
+                <h3 className="font-display font-black text-xl text-accent-primary mb-1">Lectures Plan</h3>
+                <p className="text-[11px] text-text-secondary font-medium leading-relaxed mb-4">Complete concept videos with peer help desk access.</p>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-3xl font-black text-text-primary">₹{selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.lectures ? settings.classPrices[selectedClassGroup].lectures : prices.lectures}</span>
+                  <span className="text-text-muted text-xs font-semibold">/full term</span>
+                </div>
               </div>
-              <div className="mb-6">
-                <h3 className="font-display font-medium text-xl text-[#E5D2A5] mb-2">Lectures</h3>
-                <p className="text-sm text-white/50">Deep dive with video courses.</p>
-              </div>
-              <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-medium text-white">₹{selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.lectures ? settings.classPrices[selectedClassGroup].lectures : prices.lectures}</span>
-                <span className="text-white/50 text-sm">/year</span>
-              </div>
-              <ul className="text-sm space-y-4 mb-8 flex-1">
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span>Everything in Notes</span>
-                </li>
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span className="text-white">HD Video Lectures</span>
-                </li>
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span>Doubt Clearing</span>
-                </li>
-              </ul>
-              <button onClick={() => handlePayment('lectures', selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.lectures ? settings.classPrices[selectedClassGroup].lectures : prices.lectures)} className="w-full py-3.5 rounded-full bg-[#E5D2A5] text-[#070709] hover:bg-[#f4ecd8] font-medium transition-colors shadow-lg">
-                Select Plan
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePayment('lectures', selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.lectures ? settings.classPrices[selectedClassGroup].lectures : prices.lectures);
+                }}
+                className="w-full py-3 bg-accent-primary text-button-text font-bold text-xs uppercase tracking-wider rounded-xl transition-all hover:scale-[1.02] cursor-pointer"
+              >
+                Scan UPI Code
               </button>
-            </div>
+            </motion.div>
 
             {/* Premium Plan */}
-            <div className="p-8 rounded-3xl border border-white/10 bg-white/5 flex flex-col hover:border-white/20 transition-colors">
-              <div className="mb-6">
-                <h3 className="font-display font-medium text-xl text-white mb-2">Premium</h3>
-                <p className="text-sm text-white/50">The ultimate learning experience.</p>
+            <motion.div 
+              id="premium-dashboard-pricing-card"
+              layout
+              animate={{
+                scale: activeDashboardPricingCard === 'premium' ? 1.04 : 0.94,
+                opacity: activeDashboardPricingCard === 'premium' ? 1 : 0.7,
+                borderColor: activeDashboardPricingCard === 'premium' ? '#ff839a' : 'rgba(255,255,255,0.08)',
+                boxShadow: activeDashboardPricingCard === 'premium' ? '0 15px 40px rgba(255,131,154,0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
+                y: activeDashboardPricingCard === 'premium' ? -4 : 0,
+              }}
+              transition={{ type: 'spring', stiffness: 220, damping: 25 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={() => scrollDashboardToPlan('premium')}
+              className="p-5 rounded-[20px] border bg-glass-bg flex flex-col justify-between cursor-pointer w-[74vw] max-w-[245px] md:w-auto shrink-0 md:shrink snap-center transition-colors duration-300 border-border-color"
+            >
+              <div>
+                <span className="text-[9px] font-black uppercase text-amber-500 tracking-widest bg-amber-500/10 px-2.5 py-1 rounded-md mb-4 inline-block">Personal Care</span>
+                <h3 className="font-display font-black text-xl text-text-primary mb-1">Elite Premium</h3>
+                <p className="text-[11px] text-text-secondary font-medium leading-relaxed mb-4">1-on-1 advisor matching for customized calendars and counseling.</p>
+                <div className="flex items-baseline gap-1 mb-6">
+                  <span className="text-3xl font-black text-text-primary">₹{selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.premium ? settings.classPrices[selectedClassGroup].premium : prices.premium}</span>
+                  <span className="text-text-muted text-xs font-semibold">/full term</span>
+                </div>
               </div>
-              <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-medium text-white">₹{selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.premium ? settings.classPrices[selectedClassGroup].premium : prices.premium}</span>
-                <span className="text-white/50 text-sm">/year</span>
-              </div>
-              <ul className="text-sm space-y-4 mb-8 flex-1">
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span>Everything in Lectures</span>
-                </li>
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span className="text-white">1-on-1 Mentorship</span>
-                </li>
-                <li className="flex items-start gap-3 text-white/70">
-                  <Check className="w-5 h-5 text-[#E5D2A5] shrink-0" />
-                  <span className="text-white">Mock Test Series</span>
-                </li>
-              </ul>
-              <button onClick={() => handlePayment('premium', selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.premium ? settings.classPrices[selectedClassGroup].premium : prices.premium)} className="w-full py-3.5 rounded-full border border-white/20 text-white hover:bg-white/10 font-medium transition-colors">
-                Select Plan
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePayment('premium', selectedClassGroup && settings.classPrices?.[selectedClassGroup]?.premium ? settings.classPrices[selectedClassGroup].premium : prices.premium);
+                }}
+                className="w-full py-3 bg-glass-bg hover:bg-white/5 border border-border-color text-text-primary font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                Scan UPI Code
               </button>
-            </div>
+            </motion.div>
+
+            {/* Right padding spacer on mobile */}
+            <div className="w-[12px] md:hidden shrink-0" />
+          </div>
+
+          {/* Dialog Mobile Swipe Indicators */}
+          <div className="flex md:hidden justify-center items-center gap-2.5 mt-2 mb-4 select-none">
+            {['notes', 'lectures', 'premium'].map((plan, i) => {
+              const isActive = activeDashboardPricingCard === plan;
+              let dotActiveBg = 'bg-accent-primary';
+              if (plan === 'premium') dotActiveBg = 'bg-[#ff839a]';
+              
+              return (
+                <button
+                  key={plan}
+                  onClick={() => scrollDashboardToPlan(plan)}
+                  className={`h-2.5 rounded-full transition-all duration-300 hover:opacity-100 cursor-pointer ${
+                    isActive 
+                      ? `${dotActiveBg} w-6 shadow-[0_0_12px_rgba(229,210,165,0.4)]` 
+                      : 'bg-[#f2f2f2]/10 w-2.5 hover:bg-[#f2f2f2]/25'
+                  }`}
+                  aria-label={`Scroll to dashboard plan ${i + 1}`}
+                />
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Personalized Class setup entry form */}
       <Dialog open={showClassSetup} onOpenChange={handleCloseClassSetup}>
-        <DialogContent className="sm:max-w-[400px] bg-[#070709] border border-white/10 text-white rounded-3xl" showCloseButton={true}>
+        <DialogContent className="sm:max-w-[400px] bg-bg-primary border border-border-color text-text-primary rounded-3xl" showCloseButton={true}>
           <DialogHeader>
-            <DialogTitle className="text-2xl font-display font-medium text-center">Hey there! 👋</DialogTitle>
-            <DialogDescription className="text-white/50 text-center">Please let us know which class you are in so we can personalize your experience.</DialogDescription>
+            <DialogTitle className="text-xl font-display font-black text-center flex items-center justify-center gap-1.5">
+              <span>Choose Your Batch</span>
+              <span>🎓</span>
+            </DialogTitle>
+            <DialogDescription className="text-text-muted text-center text-xs font-semibold mt-1">
+              Select your active grade below. We will customize your curriculum lesson catalog appropriately!
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-3 mt-4">
-            <button onClick={() => setSetupClassGroup('8')} className={`px-4 py-3 rounded-xl border text-left font-medium transition-colors ${setupClassGroup === '8' ? 'bg-[#E5D2A5]/10 border-[#E5D2A5] text-[#E5D2A5]' : 'bg-transparent border-white/10 text-white hover:bg-white/5'}`}>
-              Class 8
-            </button>
-            <button onClick={() => setSetupClassGroup('9')} className={`px-4 py-3 rounded-xl border text-left font-medium transition-colors ${setupClassGroup === '9' ? 'bg-[#E5D2A5]/10 border-[#E5D2A5] text-[#E5D2A5]' : 'bg-transparent border-white/10 text-white hover:bg-white/5'}`}>
-              Class 9
-            </button>
-            <button onClick={() => setSetupClassGroup('10')} className={`px-4 py-3 rounded-xl border text-left font-medium transition-colors ${setupClassGroup === '10' ? 'bg-[#E5D2A5]/10 border-[#E5D2A5] text-[#E5D2A5]' : 'bg-transparent border-white/10 text-white hover:bg-white/5'}`}>
-              Class 10
-            </button>
-            <button onClick={() => setSetupClassGroup('11')} className={`px-4 py-3 rounded-xl border text-left font-medium transition-colors ${setupClassGroup === '11' ? 'bg-[#E5D2A5]/10 border-[#E5D2A5] text-[#E5D2A5]' : 'bg-transparent border-white/10 text-white hover:bg-white/5'}`}>
-              Class 11
-            </button>
-            <button onClick={() => setSetupClassGroup('12')} className={`px-4 py-3 rounded-xl border text-left font-medium transition-colors ${setupClassGroup === '12' ? 'bg-[#E5D2A5]/10 border-[#E5D2A5] text-[#E5D2A5]' : 'bg-transparent border-white/10 text-white hover:bg-white/5'}`}>
-              Class 12
-            </button>
-            <button onClick={() => setSetupClassGroup('dropper')} className={`px-4 py-3 rounded-xl border text-left font-medium transition-colors ${setupClassGroup === 'dropper' ? 'bg-[#E5D2A5]/10 border-[#E5D2A5] text-[#E5D2A5]' : 'bg-transparent border-white/10 text-white hover:bg-white/5'}`}>
-              Dropper
-            </button>
+          <div className="grid grid-cols-2 gap-2.5 mt-4">
+            {['8', '9', '10', '11', '12', 'dropper'].map((clsNum) => (
+              <button 
+                key={clsNum}
+                onClick={() => setSetupClassGroup(clsNum)} 
+                className={`px-4 py-3 rounded-2xl border text-center font-bold text-xs uppercase tracking-widest transition-all cursor-pointer ${
+                  setupClassGroup === clsNum 
+                    ? 'bg-accent-primary/15 border-accent-primary text-accent-primary' 
+                    : 'bg-transparent border-border-color text-text-secondary hover:bg-white/5'
+                }`}
+              >
+                {clsNum === 'dropper' ? 'Dropper' : `Class ${clsNum}`}
+              </button>
+            ))}
           </div>
           <div className="mt-6">
-            <button onClick={handleSaveClass} className="w-full py-3 rounded-full bg-[#E5D2A5] text-[#070709] font-medium shadow-[0_0_15px_rgba(229,210,165,0.2)] hover:bg-[#f4ecd8] transition-colors">
-              Continue
+            <button 
+              onClick={handleSaveClass} 
+              className="theme-btn-themed w-full py-3.5 bg-accent-primary text-button-text font-black text-xs uppercase tracking-widest shadow-md hover:scale-[1.01] cursor-pointer"
+              style={{ borderRadius: 'var(--theme-btn-radius, 9999px)' }}
+            >
+              Configure Batch
             </button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Material selection secure view */}
       <Dialog open={!!selectedMaterial} onOpenChange={(open) => !open && setSelectedMaterial(null)}>
-        <DialogContent className="sm:max-w-[800px] bg-[#070709] border border-white/10 text-white p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[800px] bg-bg-primary border border-border-color text-text-primary p-0 overflow-hidden rounded-3xl student-secure-view">
           {activeMaterial && (
-            <>
-              <DialogHeader className="p-6 pb-0">
-                <DialogTitle className="text-2xl font-display font-medium text-white flex items-center justify-between">
+            <div className="text-left">
+              <DialogHeader className="p-6 pb-4 border-b border-border-color/50">
+                <DialogTitle className="text-xl font-display font-black text-text-primary flex items-center justify-between gap-4">
                   <span>{activeMaterial.title}</span>
                   {(!user?.unlockedMaterials?.includes(activeMaterial.id) && !(user?.role === 'admin' || user?.role === 'superadmin')) && (
-                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide bg-white/10 px-3 py-1.5 rounded-full text-white/60">
+                    <div className="flex items-center gap-1 bg-red-400/10 px-2.5 py-1.5 rounded-full text-red-500 text-[10px] font-bold">
                       <Lock className="w-3 h-3" />
                       Locked
                     </div>
                   )}
                 </DialogTitle>
-                <DialogDescription className="text-white/50 mt-2">
-                  {activeMaterial.description}
+                <DialogDescription className="text-text-secondary text-xs font-semibold mt-1.5 leading-relaxed">
+                  {activeMaterial.description || 'Watch step-by-step guidance lectures or review course summary materials.'}
                 </DialogDescription>
               </DialogHeader>
- 
-              <div className={`w-full ${activeMaterial.type === 'note' ? 'bg-black/50 aspect-auto h-[60vh] md:h-[70vh]' : 'bg-transparent aspect-video p-6 pb-8'} relative flex items-center justify-center`}>
+  
+              <div className={`w-full ${activeMaterial.type === 'note' ? 'bg-bg-secondary aspect-auto h-[60vh] md:h-[70vh]' : 'bg-bg-primary aspect-video p-6 pb-8'} relative flex items-center justify-center`}>
                 {(!user?.unlockedMaterials?.includes(activeMaterial.id) && !(user?.role === 'admin' || user?.role === 'superadmin')) ? (
-                  <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center flex-col p-8 text-center z-10 border-t border-white/5">
-                    <Lock className="w-12 h-12 text-[#E5D2A5] mb-4" />
-                    <h3 className="text-2xl font-display font-medium text-white mb-2">Content Locked</h3>
-                    <p className="text-white/60 mb-6 max-w-sm">
-                      You do not have permission to view this material. Please contact your administrator to grant access to your account.
+                  <div className="absolute inset-0 bg-bg-primary/95 backdrop-blur-md flex items-center justify-center flex-col p-8 text-center z-10 border-t border-border-color">
+                    <div className="w-14 h-14 bg-red-400/15 border border-red-400/20 text-red-400 rounded-full flex items-center justify-center text-xl mb-4">
+                      <Lock className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <h3 className="text-xl font-display font-black text-text-primary mb-2">Study Docs Restricted</h3>
+                    <p className="text-text-secondary text-xs font-semibold mb-6 max-w-sm">
+                      We require active course purchase clearing before you may stream PDF notes or secure chapter lessons.
                     </p>
-                    <button onClick={() => setSelectedMaterial(null)} className="px-6 py-3 rounded-full bg-white/10 text-white font-medium hover:bg-white/20 transition-colors">
-                      Close
+                    <button 
+                      onClick={() => setSelectedMaterial(null)} 
+                      className="px-6 py-2.5 rounded-full bg-border-color/80 hover:bg-border-color border border-border-color text-text-primary text-xs font-black uppercase tracking-wider cursor-pointer"
+                    >
+                      Close View
                     </button>
                   </div>
                 ) : fetchingUrl && activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' ? (
-                  <div className="flex items-center justify-center p-8 bg-black/80 w-full h-full text-white/50 animate-pulse">
-                     Loading secure content...
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 bg-bg-secondary w-full h-full text-text-secondary font-bold text-xs">
+                     <Loader className="w-6 h-6 animate-spin text-accent-primary" />
+                     <span>Securing academic URL streams...</span>
                   </div>
                 ) : (activeMaterial.type === 'video' || activeMaterial.type === 'lecture') || ReactPlayer.canPlay(secureUrl || activeMaterial.url) ? (
                   <CustomVideoPlayer url={secureUrl || activeMaterial.url} playing={!!selectedMaterial} />
                 ) : (
-                  <div className="relative w-full h-full pointer-events-auto">
-                    <iframe
-                      src={getEmbedUrl(secureUrl || activeMaterial.url)}
-                      className={`w-full h-full border-none transition-opacity duration-500 opacity-100`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      sandbox="allow-scripts allow-same-origin allow-presentation"
-                      onContextMenu={(e) => e.preventDefault()}
-                    />
-                    {/* Invisible overlay over the top bar to block clicks on video title/channel profile */}
-                    <div className="absolute top-0 left-0 right-0 h-[80px] bg-transparent z-10 cursor-default" />
-                  </div>
+                  <SecurePdfViewer url={secureUrl || activeMaterial.url} title={activeMaterial.title} />
                 )}
               </div>
-            </>
+            </div>
           )}
         </DialogContent>
       </Dialog>

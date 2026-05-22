@@ -78,6 +78,63 @@
         }
       },
       "required": ["title", "description", "type", "createdAt", "updatedAt", "authorId"]
+    },
+    "ActiveDevice": {
+      "title": "ActiveDevice",
+      "description": "Information about a user active concurrent login session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "deviceModel": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "lastActive": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "forced_out"] }
+      },
+      "required": ["userId", "deviceId", "deviceModel", "userAgent", "ipAddress", "createdAt", "lastActive", "status"]
+    },
+    "LoginHistory": {
+      "title": "LoginHistory",
+      "description": "Dynamic history of user authentications.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "deviceModel": { "type": "string" },
+        "status": { "type": "string", "enum": ["success", "failure"] }
+      },
+      "required": ["userId", "email", "deviceId", "ipAddress", "timestamp", "deviceModel", "status"]
+    },
+    "SecurityViolation": {
+      "title": "SecurityViolation",
+      "description": "Threat assessment records for anti-screenshot and print shortcuts.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "violationType": { "type": "string" },
+        "detail": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "deviceInfo": {
+          "type": "object",
+          "properties": {
+            "userAgent": { "type": "string" },
+            "platform": { "type": "string" },
+            "language": { "type": "string" }
+          },
+          "required": ["userAgent", "platform", "language"]
+        },
+        "batchName": { "type": "string" },
+        "status": { "type": "string", "enum": ["logged", "reviewed"] }
+      },
+      "required": ["userId", "email", "displayName", "violationType", "detail", "timestamp", "ipAddress", "deviceInfo", "batchName", "status"]
     }
   },
   "firestore": {
@@ -88,6 +145,18 @@
     "materials/{materialId}": {
       "schema": { "$ref": "#/entities/Material" },
       "description": "Stores educational materials."
+    },
+    "active_devices/{deviceId}": {
+      "schema": { "$ref": "#/entities/ActiveDevice" },
+      "description": "Syncs client active browsers."
+    },
+    "login_history/{logId}": {
+      "schema": { "$ref": "#/entities/LoginHistory" },
+      "description": "Traces account entry logins."
+    },
+    "security_violations/{violId}": {
+      "schema": { "$ref": "#/entities/SecurityViolation" },
+      "description": "Logs DRM block threats."
     }
   }
 }
