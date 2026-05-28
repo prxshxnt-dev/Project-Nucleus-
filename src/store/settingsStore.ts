@@ -19,6 +19,7 @@ export interface ThemeConfig {
   navbarStyle?: 'glass' | 'floating' | 'solid' | 'minimal';
   dashboardStyle?: 'bento' | 'split' | 'classic' | 'minimalist';
   mobileUiStyle?: 'ios_bottom_tab' | 'compact_list' | 'grid';
+  dockBackgroundStyle?: 'frosted' | 'solid';
   enableManualOverrides?: boolean;
   overrideTextPrimary?: string;
   overrideTextSecondary?: string;
@@ -28,23 +29,28 @@ export interface ThemeConfig {
 export const THEME_PRESETS: Record<string, ThemeConfig> = {
   default: {
     activeTheme: 'default',
-    primaryColor: '#E5D2A5',
-    secondaryColor: '#b59f6d',
-    accentGlowColor: '#E5D2A5',
-    backgroundColor: '#070709',
-    gradientStart: '#E5D2A5',
-    gradientEnd: '#070709',
-    buttonStyle: 'pill',
-    borderRadius: 24,
+    primaryColor: '#F15A29',
+    secondaryColor: '#1F1F1F',
+    accentGlowColor: '#F15A29',
+    backgroundColor: '#FDF5E6',
+    gradientStart: '#F15A29',
+    gradientEnd: '#FDF5E6',
+    buttonStyle: 'rounded',
+    borderRadius: 16,
     fontFamily: 'Outfit',
-    isDarkMode: true,
+    isDarkMode: false,
     animationIntensity: 'normal',
-    glassmorphism: true,
+    glassmorphism: false,
     shadowIntensity: 'soft',
-    stickerPack: 'stars_dots',
-    navbarStyle: 'glass',
-    dashboardStyle: 'bento',
-    mobileUiStyle: 'ios_bottom_tab'
+    stickerPack: 'none',
+    navbarStyle: 'minimal',
+    dashboardStyle: 'minimalist',
+    mobileUiStyle: 'compact_list',
+    dockBackgroundStyle: 'solid',
+    enableManualOverrides: true,
+    overrideTextPrimary: '#1F1F1F',
+    overrideTextSecondary: '#4A4A4A',
+    overrideTextMuted: '#7A7A7A'
   },
   theme2: {
     activeTheme: 'theme2',
@@ -270,6 +276,14 @@ interface SiteSettings {
   aboutCornerImgShape?: 'circle' | 'card';
   aboutCornerBackground?: 'orange_burst' | 'water_spread' | 'none';
 
+  chatbotEnabled?: boolean;
+  chatbotIconUrl?: string;
+
+  aboutTeacherPhotoUrl?: string;
+  aboutTeacherName?: string;
+  aboutTeacherRole?: string;
+  aboutTeacherTagline?: string;
+
   pwaBtnText?: string;
   pwaBtnLink?: string;
 
@@ -278,31 +292,55 @@ interface SiteSettings {
   studySticker1Title?: string;
   studySticker1Subtitle?: string;
   studySticker1Popup?: string;
+  studySticker1Left?: string;
+  studySticker1Top?: string;
+  studySticker1Rotate?: number;
+  studySticker1Show?: boolean;
 
   studySticker2Emoji?: string;
   studySticker2Title?: string;
   studySticker2Subtitle?: string;
   studySticker2Popup?: string;
+  studySticker2Left?: string;
+  studySticker2Top?: string;
+  studySticker2Rotate?: number;
+  studySticker2Show?: boolean;
 
   studySticker3Emoji?: string;
   studySticker3Title?: string;
   studySticker3Subtitle?: string;
   studySticker3Popup?: string;
+  studySticker3Left?: string;
+  studySticker3Top?: string;
+  studySticker3Rotate?: number;
+  studySticker3Show?: boolean;
 
   studySticker4Emoji?: string;
   studySticker4Title?: string;
   studySticker4Subtitle?: string;
   studySticker4Popup?: string;
+  studySticker4Left?: string;
+  studySticker4Top?: string;
+  studySticker4Rotate?: number;
+  studySticker4Show?: boolean;
 
   studySticker5Emoji?: string;
   studySticker5Title?: string;
   studySticker5Subtitle?: string;
   studySticker5Popup?: string;
+  studySticker5Left?: string;
+  studySticker5Top?: string;
+  studySticker5Rotate?: number;
+  studySticker5Show?: boolean;
 
   studySticker6Emoji?: string;
   studySticker6Title?: string;
   studySticker6Subtitle?: string;
   studySticker6Popup?: string;
+  studySticker6Left?: string;
+  studySticker6Top?: string;
+  studySticker6Rotate?: number;
+  studySticker6Show?: boolean;
 
   // Pricing/Payment Cards
   pricingCard1Badge?: string;
@@ -359,6 +397,28 @@ interface SiteSettings {
 
   // --- Device & Access ---
   secMaxDeviceLimit?: number;
+
+  // --- Social Media Section & Controls ---
+  socialSectionTitle?: string;
+  socialSectionSubtitle?: string;
+  socialSectionShow?: boolean;
+  
+  socialInstagramUrl?: string;
+  socialInstagramShow?: boolean;
+  socialYoutubeUrl?: string;
+  socialYoutubeShow?: boolean;
+  socialTelegramUrl?: string;
+  socialTelegramShow?: boolean;
+  socialDiscordUrl?: string;
+  socialDiscordShow?: boolean;
+  socialTwitterUrl?: string;
+  socialTwitterShow?: boolean;
+  socialLinkedinUrl?: string;
+  socialLinkedinShow?: boolean;
+  socialFacebookUrl?: string;
+  socialFacebookShow?: boolean;
+  syllabusSectionName?: string;
+  classSyllabuses?: { [classGroup: string]: string };
 }
 
 interface SettingsState {
@@ -373,6 +433,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   settings: {
     websiteName: 'Nucleus.cc',
     logoText: 'N',
+    syllabusSectionName: 'Syllabus',
+    classSyllabuses: {},
     documentTitle: 'Nucleus - Academic Excellence',
     heroTitle: 'Redefining Academic Excellence.',
     heroSubtitle: 'Experience the highest echelon of coaching. Crafted for ambitious minds, powered by top IITians and Doctors. Welcome to the future of learning.',
@@ -397,9 +459,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     aboutShowMockCard: true,
     aboutMockCardTitle: 'Physics Expert',
     aboutMockCardSubtitle: 'Daily Challenge streak',
-    aboutMockCardValue: '8 Days 🔥',
+    aboutMockCardValue: '8 Days',
     aboutShowIitianBadge: true,
-    aboutIitianBadgeText: 'IITian Led 🚀',
+    aboutIitianBadgeText: 'IITian Led',
     aboutShowLiveDoubts: true,
     aboutLiveDoubtsText: 'Live Doubts Active',
     aboutShowCalculusCard: true,
@@ -411,42 +473,73 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     aboutShowRatingCard: true,
     aboutRatingTitle: '10,000+ Active Students',
     aboutRatingDesc: 'Highly recommended study app',
-    aboutCornerImageUrl: 'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=400',
+    aboutCornerImageUrl: 'auto=format&fit=crop&q=80&w=400',
     aboutCornerImgShape: 'circle',
     aboutCornerBackground: 'water_spread',
+    aboutTeacherPhotoUrl: '',
+    aboutTeacherName: 'Dr. Anand Kumar',
+    aboutTeacherRole: 'Senior Physics Specialist (Ex-IIT)',
+    aboutTeacherTagline: 'Visualizing equations dynamically. Crafting interactive modules for deep analytical development of students.',
     pwaBtnText: 'Install App',
     pwaBtnLink: '',
+
+    chatbotEnabled: false,
+    chatbotIconUrl: '',
 
     // Study sticker default values
     studySticker1Emoji: '📚',
     studySticker1Title: 'STUDY FORCE',
     studySticker1Subtitle: 'Focus Active',
     studySticker1Popup: 'Ignite your study sessions with maximum mental torque! 📚 Keep learning!',
+    studySticker1Left: '2%',
+    studySticker1Top: '22%',
+    studySticker1Rotate: -12,
+    studySticker1Show: true,
 
     studySticker2Emoji: '💡',
     studySticker2Title: 'DEEP FOCUS',
     studySticker2Subtitle: 'Active Sparks',
     studySticker2Popup: 'A single spark of intuition can illuminate any difficult problem! 💡 Stay curious!',
+    studySticker2Left: '4%',
+    studySticker2Top: '76%',
+    studySticker2Rotate: 15,
+    studySticker2Show: true,
 
     studySticker3Emoji: '🎓',
     studySticker3Title: 'AIR 1 GOAL',
     studySticker3Subtitle: 'IIT Selection',
     studySticker3Popup: 'Keep your eyes on the prize. All India Rank 1 starts with persistent everyday discipline! 🎓',
+    studySticker3Left: '47%',
+    studySticker3Top: '12%',
+    studySticker3Rotate: -8,
+    studySticker3Show: true,
 
     studySticker4Emoji: '🎯',
     studySticker4Title: '100% AIM',
     studySticker4Subtitle: 'Perfect Practice',
     studySticker4Popup: 'Accuracy is built by constant deliberate feedback. Refine your aim daily! 🎯',
+    studySticker4Left: '44%',
+    studySticker4Top: '84%',
+    studySticker4Rotate: 10,
+    studySticker4Show: true,
 
     studySticker5Emoji: '☕',
     studySticker5Title: 'NIGHT RUNS',
     studySticker5Subtitle: 'Midnight Session',
     studySticker5Popup: 'The quiet hours are when progress is made. Fuel your academic ambition! ☕',
+    studySticker5Left: '88%',
+    studySticker5Top: '16%',
+    studySticker5Rotate: -14,
+    studySticker5Show: true,
 
     studySticker6Emoji: '🧠',
     studySticker6Title: 'NEURAL GRID',
     studySticker6Subtitle: 'Concept Clear',
     studySticker6Popup: 'Connect the dots, master the formulas, and let neuroplasticity do the rest! 🧠',
+    studySticker6Left: '87%',
+    studySticker6Top: '78%',
+    studySticker6Rotate: 18,
+    studySticker6Show: true,
 
     // Pricing/Payment Cards
     pricingCard1Badge: 'Essential Revision',
@@ -507,7 +600,26 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     secPdfWatermarkRepeated: true,
 
     // --- Device Limit Defaults ---
-    secMaxDeviceLimit: 2
+    secMaxDeviceLimit: 4,
+
+    // --- Social Media Section Default Values ---
+    socialSectionTitle: 'Connect via Socials',
+    socialSectionSubtitle: 'Stay in the loop with live streams, instant tips, sample study papers, and continuous student updates.',
+    socialSectionShow: true,
+    socialInstagramUrl: 'https://instagram.com/nucleus.cc',
+    socialInstagramShow: true,
+    socialYoutubeUrl: 'https://youtube.com/@nucleus',
+    socialYoutubeShow: true,
+    socialTelegramUrl: 'https://t.me/nucleus',
+    socialTelegramShow: true,
+    socialDiscordUrl: 'https://discord.gg/nucleus',
+    socialDiscordShow: true,
+    socialTwitterUrl: 'https://x.com/nucleus',
+    socialTwitterShow: false,
+    socialLinkedinUrl: '',
+    socialLinkedinShow: false,
+    socialFacebookUrl: '',
+    socialFacebookShow: false
   },
   setSettings: (settings) => set({ settings }),
   previewSettings: null,

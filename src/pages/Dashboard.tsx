@@ -4,7 +4,7 @@ import { useSettingsStore } from '../store/settingsStore';
 import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, getDocs, doc, updateDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, setDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -45,7 +45,7 @@ const getEmbedUrl = (url: string) => {
 };
 
 export default function Dashboard() {
-  const { user, loading: authLoading } = useAuthStore();
+  const { user, loading: authLoading, setUser } = useAuthStore();
   const { settings } = useSettingsStore();
 
   const [deviceBlock, setDeviceBlock] = useState<boolean>(false);
@@ -115,6 +115,8 @@ export default function Dashboard() {
     }
     setCurrentDeviceId(devId);
 
+    let lastUpdateTime = 0;
+
     const q = query(collection(db, 'active_devices'), where('userId', '==', user.uid));
     const unsubSessions = onSnapshot(q, (snap) => {
       const devices = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
@@ -123,25 +125,22 @@ export default function Dashboard() {
 
       const myDeviceRecord = devices.find((d: any) => d.deviceId === devId);
       
-      if (myDeviceRecord && myDeviceRecord.status === 'forced_out') {
-        setDeviceBlock(true);
-        return;
-      }
-
       const isMyDeviceActive = activeList.some((d: any) => d.deviceId === devId);
       
+      // Device rate/concurrency limitations are disabled for free, unlimited access
+      setDeviceBlock(false);
+
       if (!isMyDeviceActive) {
-        const limit = settings.secMaxDeviceLimit || 2;
-        if (activeList.length >= limit) {
-          setDeviceBlock(true);
-        } else {
-          registerMyDevice(devId);
-          setDeviceBlock(false);
-        }
+        lastUpdateTime = Date.now();
+        registerMyDevice(devId);
       } else {
-        setDeviceBlock(false);
         if (myDeviceRecord) {
-          updateDeviceActive(myDeviceRecord.id);
+          const now = Date.now();
+          // Rate-limit the heartbeat update to once every 60 seconds to prevent infinite write-trigger-update loop
+          if (now - lastUpdateTime > 60000) {
+            lastUpdateTime = now;
+            updateDeviceActive(myDeviceRecord.id);
+          }
         }
       }
     }, (error) => {
@@ -149,7 +148,7 @@ export default function Dashboard() {
     });
 
     return () => unsubSessions();
-  }, [user, settings.secMaxDeviceLimit]);
+  }, [user?.uid, settings?.secMaxDeviceLimit]);
 
   const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -239,8 +238,9 @@ export default function Dashboard() {
       }
     } else if (user?.classGroup) {
       setSelectedClassGroup(user.classGroup);
+      setSetupClassGroup(user.classGroup);
     }
-  }, [user]);
+  }, [user?.uid, user?.classGroup]);
 
   const handleCloseClassSetup = (open: boolean) => {
     if (!open && user) {
@@ -252,13 +252,20 @@ export default function Dashboard() {
   const handleSaveClass = async () => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         classGroup: setupClassGroup,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
       localStorage.setItem(`hasSeenClassSetup_${user.uid}`, 'true');
-      setShowClassSetup(false);
+      
+      // Update local authStore state instantly so changes display right away
+      setUser({
+        ...user,
+        classGroup: setupClassGroup
+      });
+      
       setSelectedClassGroup(setupClassGroup);
+      setShowClassSetup(false);
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
     }
@@ -317,7 +324,7 @@ export default function Dashboard() {
       }
     };
     fetchMaterials();
-  }, [isGuest, user?.unlockedMaterials]);
+  }, [isGuest, user?.unlockedMaterials?.join(',')]);
 
   useEffect(() => {
     if (!user || user.role === 'guest') return;
@@ -346,7 +353,7 @@ export default function Dashboard() {
 
     if (needsUpdate) {
       updates.updatedAt = serverTimestamp();
-      updateDoc(doc(db, 'users', user.uid), updates).catch((error) => {
+      setDoc(doc(db, 'users', user.uid), updates, { merge: true }).catch((error) => {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       });
     }
@@ -379,7 +386,7 @@ export default function Dashboard() {
         });
       }
     }
-  }, [selectedMaterial, user]);
+  }, [selectedMaterial?.id, selectedMaterial?.url, user?.uid, user?.role, user?.unlockedMaterials?.join(',')]);
 
   useEffect(() => {
     if (!selectedMaterial || !user) return;
@@ -404,7 +411,7 @@ export default function Dashboard() {
            }
            
            updates.updatedAt = serverTimestamp();
-           updateDoc(doc(db, 'users', user.uid), updates).catch((error) => {
+           setDoc(doc(db, 'users', user.uid), updates, { merge: true }).catch((error) => {
               handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
            });
         }
@@ -414,46 +421,46 @@ export default function Dashboard() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [selectedMaterial, userTier, user?.lastStreakDate, user?.streak, user?.uid, user?.unlockedMaterials]);
+  }, [selectedMaterial?.id, userTier, user?.lastStreakDate, user?.streak, user?.uid, user?.unlockedMaterials?.join(',')]);
 
   if (!user) return <div className="min-h-screen"></div>;
 
   if (deviceBlock) {
     return (
-      <div className="min-h-screen pt-28 pb-32 px-4 md:px-12 flex items-center justify-center bg-zinc-950 text-white select-none relative overflow-hidden">
+      <div className="min-h-screen pt-28 pb-32 px-4 md:px-12 flex items-center justify-center bg-background text-foreground select-none relative overflow-hidden">
         {/* Decorative Grid Panel background */}
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(var(--border-color)_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none opacity-30" />
         
-        <div className="w-full max-w-xl p-8 md:p-10 border border-white/10 bg-neutral-900/40 backdrop-blur-md rounded-3xl relative z-10 shadow-[-1px_1px_50px_rgba(229,210,165,0.06)] text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-[#E5D2A5]/10 border-2 border-[#E5D2A5] flex items-center justify-center mx-auto text-[#E5D2A5] animate-pulse">
+        <div className="w-full max-w-xl p-8 md:p-10 border border-border-color bg-card rounded-3xl relative z-10 shadow-lg text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-accent-primary/10 border-2 border-accent-primary flex items-center justify-center mx-auto text-accent-primary animate-pulse">
             <Lock className="w-7 h-7" />
           </div>
           
           <div className="space-y-2">
-            <h2 className="text-2xl font-display font-black uppercase tracking-tight text-white">
+            <h2 className="text-2xl font-display font-black uppercase tracking-tight text-text-primary">
               Device Limit Exceeded
             </h2>
-            <p className="text-[#E5D2A5] font-mono text-xs uppercase tracking-widest font-black">
+            <p className="text-accent-primary font-mono text-xs uppercase tracking-widest font-black">
               DRM Active Protection Protocol
             </p>
           </div>
 
-          <p className="text-zinc-400 text-xs leading-relaxed max-w-md mx-auto">
-            Your premium educational access allows you to stream courses on up to <span className="text-[#E5D2A5] font-bold">{settings.secMaxDeviceLimit || 2}</span> devices concurrently. To verify accountability, you must drop an active device session below to authorize this browser node.
+          <p className="text-text-secondary text-xs leading-relaxed max-w-md mx-auto">
+            Your premium educational access allows you to stream courses on up to <span className="text-accent-primary font-bold">{settings.secMaxDeviceLimit || 2}</span> devices concurrently. To verify accountability, you must drop an active device session below to authorize this browser node.
           </p>
 
           {/* Active device lists with Kick Actions */}
-          <div className="border border-white/5 rounded-2xl bg-black/40 overflow-hidden divide-y divide-white/5 text-left max-h-[220px] overflow-y-auto">
+          <div className="border border-border-color rounded-2xl bg-bg-secondary/40 overflow-hidden divide-y divide-border-color text-left max-h-[220px] overflow-y-auto">
             {activeDevices.map((dev: any) => {
               const isMe = dev.deviceId === currentDeviceId;
               return (
                 <div key={dev.id} className="p-4 flex items-center justify-between text-xs gap-2">
                   <div className="space-y-1 truncate">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white font-sans">{dev.deviceModel || 'Unknown Device'}</span>
-                      {isMe && <span className="px-1.5 py-0.5 rounded-md bg-[#E5D2A5]/10 text-[#E5D2A5] text-[8px] font-black font-mono uppercase">This Browser</span>}
+                      <span className="font-bold text-text-primary font-sans">{dev.deviceModel || 'Unknown Device'}</span>
+                      {isMe && <span className="px-1.5 py-0.5 rounded-md bg-accent-primary/10 text-accent-primary text-[8px] font-black font-mono uppercase">This Browser</span>}
                     </div>
-                    <p className="text-zinc-500 text-[10px] font-mono flex items-center gap-1.5">
+                    <p className="text-text-muted text-[10px] font-mono flex items-center gap-1.5">
                       <span>IP: {dev.ipAddress || '127.0.0.1'}</span>
                     </p>
                   </div>
@@ -581,13 +588,23 @@ export default function Dashboard() {
               </div>
 
               {/* Stat 3: Study Batch Group */}
-              <div className="px-5 py-3.5 rounded-2xl bg-bg-secondary/60 border border-border-color/80 flex items-center gap-3 text-left">
-                <div className="p-2.5 rounded-2xl bg-amber-400/10 text-amber-500">
-                  <Trophy className="w-5 h-5" />
+              <div 
+                onClick={() => {
+                  setSetupClassGroup(user.classGroup || '11');
+                  setShowClassSetup(true);
+                }}
+                className="px-5 py-3.5 rounded-2xl bg-bg-secondary/60 border border-border-color/80 flex items-center gap-3 text-left hover:border-accent-primary/55 hover:bg-bg-secondary cursor-pointer transition-all duration-200 group relative"
+                title="Click to select or modify Class details"
+              >
+                <div className="p-2.5 rounded-2xl bg-amber-400/10 text-amber-500 group-hover:bg-amber-400/20 transition-colors">
+                  <Trophy className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-text-muted font-bold tracking-wider uppercase leading-none mb-1">Study Batch</p>
-                  <p className="text-lg font-black text-text-primary leading-none capitalize">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[10px] text-text-muted font-bold tracking-wider uppercase leading-none">Study Batch</p>
+                    <span className="text-[9px] font-black uppercase text-accent-primary bg-accent-primary/10 px-1 py-0.5 rounded border border-accent-primary/15 tracking-wide">Edit</span>
+                  </div>
+                  <p className="text-lg font-black text-text-primary leading-none capitalize mt-1 text-[#F15A29]">
                     {user.classGroup === 'all' || !user.classGroup ? 'All Classes' : `Class ${user.classGroup}`}
                   </p>
                 </div>
@@ -604,25 +621,52 @@ export default function Dashboard() {
         <div className="lg:col-span-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl md:text-2xl font-display font-black text-text-primary">Curriculum Course Materials</h2>
+              <h2 className="text-xl md:text-2xl font-display font-black text-text-primary">{settings.syllabusSectionName || "Curriculum Course Materials"}</h2>
               <p className="text-xs text-text-secondary font-medium mt-1">Select chapters below to load video content and study guides.</p>
             </div>
             
             {/* Soft, beautiful filter buttons row */}
-            <div className="flex flex-wrap items-center gap-1 bg-glass-bg p-1.5 rounded-2xl border border-border-color shrink-0 self-start sm:self-auto">
-                {['all', '6', '7', '8', '9', '10', '11', '12', 'dropper'].map((clsKey) => (
-                  <button 
-                    key={clsKey}
-                    onClick={() => setSelectedClassGroup(clsKey)} 
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                      selectedClassGroup === clsKey 
-                        ? 'bg-accent-primary text-button-text shadow-sm' 
-                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                    }`}
-                  >
-                    {clsKey === 'all' ? 'All' : clsKey}
-                  </button>
-                ))}
+            <div className="flex flex-col sm:items-end gap-2.5">
+              <div className="flex flex-wrap items-center gap-1 bg-glass-bg p-1.5 rounded-2xl border border-border-color shrink-0 self-start sm:self-auto">
+                  {['all', '6', '7', '8', '9', '10', '11', '12', 'dropper'].map((clsKey) => (
+                    <button 
+                      key={clsKey}
+                      onClick={() => setSelectedClassGroup(clsKey)} 
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        selectedClassGroup === clsKey 
+                          ? 'bg-accent-primary text-button-text shadow-sm' 
+                          : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                      }`}
+                    >
+                      {clsKey === 'all' ? 'All' : clsKey}
+                    </button>
+                  ))}
+              </div>
+
+              {user && selectedClassGroup !== 'all' && selectedClassGroup !== user.classGroup && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={async () => {
+                    try {
+                      await setDoc(doc(db, 'users', user.uid), {
+                        classGroup: selectedClassGroup,
+                        updatedAt: serverTimestamp()
+                      }, { merge: true });
+                      setUser({
+                        ...user,
+                        classGroup: selectedClassGroup
+                      });
+                    } catch (e) {
+                      handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
+                    }
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl text-[10px] uppercase font-black tracking-widest bg-[#F15A29]/15 text-[#F15A29] hover:bg-[#F15A29] hover:text-black border border-[#F15A29]/30 transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto shadow-sm"
+                >
+                  <span>Save Class {selectedClassGroup === 'dropper' ? 'Dropper' : selectedClassGroup} as My Batch</span>
+                  <span>💾</span>
+                </motion.button>
+              )}
             </div>
           </div>
           
@@ -657,84 +701,124 @@ export default function Dashboard() {
                ))}
              </div>
           ) : (
-            materials.length > 0 ? (
-              <div className="space-y-4">
-                {materials
-                  .filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id))
-                  .map((mat) => {
-                    const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-                    const hasFullAccess = user?.role === 'admin' || user?.role === 'superadmin';
-                    const isLocked = !hasSpecificAccess && !hasFullAccess;
-                    
-                    return (
-                      <motion.div 
-                        key={mat.id}
-                        onClick={() => setSelectedMaterial(mat)}
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        whileHover={{ y: -4, scale: 1.01 }}
-                        className={`group relative overflow-hidden p-4 sm:p-5 flex items-center gap-4 sm:gap-5 transition-all duration-300 bg-glass-bg border border-border-color hover:border-accent-primary/40 cursor-pointer shadow-sm hover:shadow-md`}
-                        style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                      >
-                        {/* Soft visual glow plat */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-accent-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            (() => {
+              const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+              const filtered = materials.filter(m => {
+                if (m.isHidden && !isAdmin) return false;
+                return selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id);
+              });
+              
+              if (filtered.length === 0) {
+                return (
+                  <div 
+                    className="text-center py-16 bg-glass-bg border border-border-color text-text-secondary w-full"
+                    style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                  >
+                    No study materials found matching this batch filter. Check back shortly!
+                  </div>
+                );
+              }
+              
+              // Group materials by section
+              const sectionsMap: { [section: string]: any[] } = {};
+              filtered.forEach(m => {
+                const sec = m.section || 'General Curriculum';
+                if (!sectionsMap[sec]) {
+                  sectionsMap[sec] = [];
+                }
+                sectionsMap[sec].push(m);
+              });
+              
+              return (
+                <div className="space-y-10 w-full">
+                  {Object.entries(sectionsMap).map(([sectionName, sectionMats]) => (
+                    <div key={sectionName} className="space-y-4">
+                      {/* Section Separator & Heading */}
+                      <div className="flex items-center gap-3 pt-2">
+                        <h4 className="font-display font-black text-xs uppercase tracking-widest text-accent-primary bg-accent-primary/10 px-3.5 py-1.5 rounded-xl border border-border-color/40 shadow-sm">
+                          {sectionName}
+                        </h4>
+                        <div className="h-[1px] flex-1 bg-gradient-to-r from-border-color/85 to-transparent" />
+                      </div>
+                      
+                      {/* Materials Cards inside this Section */}
+                      <div className="space-y-4">
+                        {sectionMats.map((mat) => {
+                          const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
+                          const hasFullAccess = isAdmin;
+                          const isLocked = !hasSpecificAccess && !hasFullAccess;
+                          
+                          return (
+                            <motion.div 
+                              key={mat.id}
+                              onClick={() => setSelectedMaterial(mat)}
+                              initial={{ opacity: 0, y: 10 }}
+                              whileInView={{ opacity: 1, y: 0 }}
+                              viewport={{ once: true }}
+                              whileHover={{ y: -4, scale: 1.01, boxShadow: "0 10px 25px rgba(241, 90, 41, 0.05)" }}
+                              whileTap={{ scale: 0.99 }}
+                              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                              className={`group relative overflow-hidden p-3.5 sm:p-5 flex flex-col xs:flex-row items-stretch xs:items-center gap-4 sm:gap-5 bg-glass-bg border border-border-color hover:border-accent-primary/40 cursor-pointer shadow-sm transition-colors duration-200`}
+                              style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                            >
+                              {/* Soft visual glow plat */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-accent-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-                        {mat.thumbnailUrl ? (
-                          <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl overflow-hidden bg-bg-secondary relative border border-border-color/40">
-                            <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                          </div>
-                        ) : (
-                          <div className={`p-4 rounded-2xl shrink-0 transition-colors duration-300 ${
-                            mat.type === 'note' 
-                              ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
-                              : 'bg-accent-primary/10 text-accent-primary'
-                          }`}>
-                            {mat.type === 'note' ? <BookOpen className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                          </div>
-                        )}
+                              {mat.thumbnailUrl ? (
+                                <div className="w-full xs:w-20 h-32 xs:h-20 shrink-0 rounded-2xl overflow-hidden bg-bg-secondary relative border border-border-color/40">
+                                  <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+                                </div>
+                              ) : (
+                                <div className={`p-4 rounded-2xl self-start xs:self-auto shrink-0 transition-colors duration-300 ${
+                                  mat.type === 'note' 
+                                    ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
+                                    : 'bg-accent-primary/10 text-accent-primary'
+                                }`}>
+                                  {mat.type === 'note' ? <BookOpen className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                                </div>
+                              )}
 
-                        <div className="flex-1 min-w-0 pr-2">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-display font-black text-base sm:text-lg text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                              {mat.title}
-                            </h3>
-                            {mat.type === 'note' ? (
-                              <span className="shrink-0 text-[8px] font-extrabold uppercase bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-md">Note</span>
-                            ) : (
-                              <span className="shrink-0 text-[8px] font-extrabold uppercase bg-[#ff839a]/10 text-[#ff839a] px-2 py-0.5 rounded-md">Video</span>
-                            )}
-                          </div>
-                          <p className="text-xs font-semibold text-text-secondary line-clamp-2 leading-relaxed">
-                            {mat.description || 'Access notes, conceptual materials, or helpful guidelines to reinforce learning.'}
-                          </p>
-                        </div>
-                        
-                        {isLocked ? (
-                          <div className="flex flex-col items-end gap-1 shrink-0 bg-red-400/5 border border-red-400/10 p-2.5 rounded-2xl">
-                             <div className="p-1 px-1.5 rounded-lg bg-red-500/15 text-red-500">
-                               <Lock className="w-3.5 h-3.5" />
-                             </div>
-                             <span className="text-[8px] font-black text-red-400 uppercase tracking-widest hidden sm:block">Locked</span>
-                          </div>
-                        ) : (
-                           <div className="shrink-0 flex items-center justify-center p-3 rounded-full bg-accent-primary/10 hover:bg-accent-primary text-accent-primary hover:text-button-text group-hover:scale-105 transition-all duration-300">
-                             <PlayCircle className="w-6 h-6 fill-current" />
-                           </div>
-                        )}
-                      </motion.div>
-                    )
-                  })}
-              </div>
-            ) : (
-              <div 
-                className="text-center py-16 bg-glass-bg border border-border-color text-text-secondary"
-                style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-              >
-                No study materials found matching this batch filter. Check back shortly!
-              </div>
-            )
+                              <div className="flex-1 min-w-0 pr-2 text-left">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                  <h3 className="font-display font-black text-base sm:text-lg text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                                    {mat.title}
+                                  </h3>
+                                  {mat.type === 'note' ? (
+                                    <span className="shrink-0 text-[8px] font-extrabold uppercase bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-md">Note</span>
+                                  ) : (
+                                    <span className="shrink-0 text-[8px] font-extrabold uppercase bg-[#ff839a]/10 text-[#ff839a] px-2 py-0.5 rounded-md">Video</span>
+                                  )}
+                                  {mat.isHidden && (
+                                    <span className="shrink-0 text-[8px] font-extrabold uppercase bg-red-400/20 text-red-400 px-2 py-0.5 rounded-md">Hidden</span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-semibold text-text-secondary line-clamp-2 leading-relaxed">
+                                  {mat.description || 'Access notes, conceptual materials, or helpful guidelines to reinforce learning.'}
+                                </p>
+                              </div>
+                              
+                              {isLocked ? (
+                                <div className="flex flex-row xs:flex-col items-center xs:items-end justify-between xs:justify-center gap-1.5 shrink-0 bg-red-400/5 border border-red-400/10 p-2.5 rounded-2xl w-full xs:w-auto mt-2 xs:mt-0">
+                                   <div className="p-1 px-1.5 rounded-lg bg-red-500/15 text-red-500">
+                                     <Lock className="w-3.5 h-3.5" />
+                                   </div>
+                                   <span className="text-[8px] font-black text-red-400 uppercase tracking-widest font-mono">Locked</span>
+                                </div>
+                              ) : (
+                                 <div className="self-end xs:self-auto shrink-0 flex items-center justify-center p-3 rounded-full bg-accent-primary/10 hover:bg-accent-primary text-accent-primary hover:text-button-text group-hover:scale-105 transition-all duration-300 mt-2 xs:mt-0">
+                                   <PlayCircle className="w-6 h-6 fill-current" />
+                                 </div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
           )}
         </div>
         
@@ -792,7 +876,7 @@ export default function Dashboard() {
                </div>
 
                <p className="text-[10px] text-text-muted font-medium italic leading-relaxed text-left">
-                 💡 TIP: Simulating study progress live. Opening any lessons secures automatic timers incrementing streak days when 60 minutes are met.
+                 TIP: Simulating study progress live. Opening any lessons secures automatic timers incrementing streak days when 60 minutes are met.
                </p>
              </div>
            </div>
@@ -891,7 +975,7 @@ export default function Dashboard() {
             >
               {activeDashboardPricingCard === 'lectures' && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-accent-primary text-button-text text-[9px] font-black px-4 py-1 rounded-full uppercase tracking-wider">
-                  Full Choice ⭐
+                  Full Choice
                 </div>
               )}
               <div className="pt-2">
@@ -984,7 +1068,6 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle className="text-xl font-display font-black text-center flex items-center justify-center gap-1.5">
               <span>Choose Your Batch</span>
-              <span>🎓</span>
             </DialogTitle>
             <DialogDescription className="text-text-muted text-center text-xs font-semibold mt-1">
               Select your active grade below. We will customize your curriculum lesson catalog appropriately!

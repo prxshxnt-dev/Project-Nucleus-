@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
@@ -11,21 +11,26 @@ import Lenis from 'lenis';
 // Pages
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
+import Learn from './pages/Learn';
 import AdminDashboard from './pages/AdminDashboard';
+import Login from './pages/Login';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ThemeProvider from './components/ThemeProvider';
 import { SeasonalOverlay } from './components/SeasonalOverlay';
 import ScreenProtector from './components/ScreenProtector';
+import { AIAssistantBot } from './components/AIAssistantBot';
 import PwaManager from './components/PwaManager';
+import LiquidGlassDock from './components/LiquidGlassDock';
 
-export default function App() {
+function AppContent() {
   const { setUser, setLoading, user, loading } = useAuthStore();
   const { setSettings } = useSettingsStore();
   const location = useLocation();
 
   useEffect(() => {
     const lenis = new Lenis();
+    (window as any).lenisInstance = lenis;
 
     function raf(time: number) {
       lenis.raf(time);
@@ -34,8 +39,17 @@ export default function App() {
     requestAnimationFrame(raf);
     return () => {
       lenis.destroy();
+      delete (window as any).lenisInstance;
     };
   }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const lenis = (window as any).lenisInstance;
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     // Fetch global settings
@@ -110,12 +124,25 @@ export default function App() {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/learn" element={<Learn />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
+      <LiquidGlassDock />
+      <AIAssistantBot />
       <Footer />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
   );
 }
 

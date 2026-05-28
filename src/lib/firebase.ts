@@ -35,8 +35,10 @@ export const signInWithGoogle = async () => {
     
     if (!userSnap.exists()) {
       // Create new user profile
-      const role = user.email === 'meinkxun@gmail.com' ? 'superadmin' : 'guest';
-      const planId = user.email === 'meinkxun@gmail.com' ? 'premium' : 'free';
+      const adminEmails = ['meinkxun@gmail.com', 'nucleuscc2026@gmail.com'];
+      const isSuperadmin = user.email ? adminEmails.includes(user.email.toLowerCase().trim()) : false;
+      const role = isSuperadmin ? 'superadmin' : 'guest';
+      const planId = isSuperadmin ? 'premium' : 'free';
       await setDoc(userRef, {
         email: user.email,
         displayName: user.displayName || 'Student',
@@ -49,8 +51,10 @@ export const signInWithGoogle = async () => {
         updatedAt: serverTimestamp(),
       });
     } else {
-      // If user exists and is the superadmin email, but doesn't have the role, upgrade them
-      if (user.email === 'meinkxun@gmail.com' && userSnap.data().role !== 'superadmin') {
+      // If user exists and is a superadmin email, but doesn't have the role, upgrade them
+      const adminEmails = ['meinkxun@gmail.com', 'nucleuscc2026@gmail.com'];
+      const isSuperadmin = user.email ? adminEmails.includes(user.email.toLowerCase().trim()) : false;
+      if (isSuperadmin && userSnap.data().role !== 'superadmin') {
         await updateDoc(userRef, {
           role: 'superadmin',
           planId: 'premium',
@@ -74,8 +78,11 @@ export const signInWithGoogle = async () => {
 
 export const logout = async () => {
   try {
-    const isConfirmed = window.confirm("Are you sure you want to log out? Any unsaved learning flow might be completed.");
-    if (!isConfirmed) return;
+    // Instantly update client-side auth state to null to eliminate any delays
+    useAuthStore.getState().setUser(null);
+    useAuthStore.getState().setLoading(false);
+    
+    // Perform Firebase signOut asynchronously
     await signOut(auth);
   } catch (error) {
     console.error('Error signing out', error);
@@ -83,13 +90,28 @@ export const logout = async () => {
 };
 
 async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'users', 'ping_connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration: the client is offline.");
-    } else {
-      console.debug("Firestore connection check diagnostic information:", error);
+  // Wait 1.5s for initial connection handshake to establish
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  
+  let attempts = 3;
+  while (attempts > 0) {
+    try {
+      await getDocFromServer(doc(db, 'users', 'ping_connection'));
+      console.log("Firestore connection check: Connected successfully.");
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('the client is offline')) {
+        attempts--;
+        if (attempts === 0) {
+          console.error("Please check your Firebase configuration: the client is offline.");
+        } else {
+          // Wait 2 seconds before retrying
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      } else {
+        console.debug("Firestore connection check diagnostic information:", error);
+        return;
+      }
     }
   }
 }

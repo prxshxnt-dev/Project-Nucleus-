@@ -146,8 +146,16 @@ export default function Home() {
   const [pricingClassGroup, setPricingClassGroup] = useState<string>('11');
   const [activeStickerId, setActiveStickerId] = useState<string | null>(null);
   const [activePricingCard, setActivePricingCard] = useState<string | null>('lectures');
+  const [showTeacherBox, setShowTeacherBox] = useState(false);
 
   useEffect(() => {
+    // Explicitly scroll to top on mount to ensure landing page starts at the header
+    window.scrollTo(0, 0);
+    const lenis = (window as any).lenisInstance;
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+    }
+
     const fetchMaterials = async () => {
       try {
         const q = query(collection(db, 'materials'), orderBy('createdAt', 'desc'), limit(6));
@@ -190,7 +198,7 @@ export default function Home() {
     if (user) {
        navigate(user.role === 'admin' || user.role === 'superadmin' ? '/admin' : '/dashboard');
     } else {
-       signInWithGoogle();
+       navigate('/login');
     }
   };
 
@@ -207,8 +215,7 @@ export default function Home() {
   const handlePayment = (planName: string, amount: number) => {
     if (!settings.upiId) return alert('UPI ID not configured by admin. Please contact support.');
     if (!user) {
-      alert("Please sign in first to proceed with payment.");
-      signInWithGoogle();
+      navigate('/login');
       return;
     }
     const note = `Class: ${pricingClassGroup} | Plan: ${planName} | Email: ${user.email}`;
@@ -265,10 +272,10 @@ export default function Home() {
           <div className="absolute top-16 xs:top-20 sm:top-24 right-4 xs:right-6 lg:right-12 z-30 w-24 h-24 xs:w-28 xs:h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 xl:w-52 xl:h-52 pointer-events-auto">
             {/* Pop Splash / Water Spill Background Effect */}
             {settings.aboutCornerBackground !== "none" && (
-              <div className="absolute inset-0 pointer-events-none scale-140 z-0 select-none animate-pulse" style={{ animationDuration: '4s' }}>
+              <div className="absolute inset-0 pointer-events-none scale-140 z-0 select-none" style={{ animationDuration: '4s' }}>
                 {settings.aboutCornerBackground === "water_spread" ? (
                   // WATER SPREAD - smooth organic irregular liquid spread flat spill pattern
-                  <svg viewBox="0 0 100 100" className="w-full h-full text-[#ff7a00] fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(255,122,0,0.5)]">
+                  <svg viewBox="0 0 100 100" className="w-full h-full text-accent-primary fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(241,90,41,0.35)]">
                     <path d="M50 8 C68 5, 87 14, 91 32 C95 48, 81 56, 85 70 C89 84, 69 94, 50 90 C31 86, 12 84, 8 66 C4 48, 16 40, 14 26 C12 11, 32 11, 50 8 Z" />
                     {/* Scattered uneven water drop splatters of varying sizes */}
                     <circle cx="86" cy="18" r="4" />
@@ -282,12 +289,12 @@ export default function Home() {
                   </svg>
                 ) : (
                   // BALLOON BURST POP - high energy spiking blast with splattered dots
-                  <svg viewBox="0 0 100 100" className="w-full h-full text-[#ff7a00] fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(255,122,0,0.5)]">
+                  <svg viewBox="0 0 100 100" className="w-full h-full text-accent-primary fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(241,90,41,0.35)]">
                     <path d="M50 14 C64 6, 79 10, 85 24 C91 38, 96 48, 88 64 C80 80, 70 88, 54 90 C38 92, 22 84, 15 72 C8 60, 5 40, 14 26 C23 12, 36 22, 50 14 Z" />
                     {/* Popping spike rays */}
-                    <line x1="50" y1="14" x2="52" y2="2" stroke="#ff7a00" strokeWidth="2" strokeLinecap="round" />
-                    <line x1="85" y1="24" x2="96" y2="15" stroke="#ff7a00" strokeWidth="1.5" strokeLinecap="round" />
-                    <line x1="88" y1="64" x2="98" y2="72" stroke="#ff7a00" strokeWidth="2" strokeLinecap="round" />
+                    <line x1="50" y1="14" x2="52" y2="2" stroke="var(--accent-primary)" strokeWidth="2" strokeLinecap="round" />
+                    <line x1="85" y1="24" x2="96" y2="15" stroke="var(--accent-primary)" strokeWidth="1.5" strokeLinecap="round" />
+                    <line x1="88" y1="64" x2="98" y2="72" stroke="var(--accent-primary)" strokeWidth="2" strokeLinecap="round" />
                     {/* Splattered droplets */}
                     <circle cx="85" cy="12" r="3.5" />
                     <circle cx="95" cy="32" r="2.5" />
@@ -303,27 +310,27 @@ export default function Home() {
               </div>
             )}
 
-            {/* Configurable Image Frame / Circular Profile Element */}
-            <motion.div 
-              whileHover={{ scale: 1.05, rotate: 1.5 }}
-              className={`absolute inset-1 bg-zinc-950/95 p-1 border border-[#ff7a00]/40 overflow-hidden shadow-2xl z-10 flex flex-col items-center justify-center text-center backdrop-blur-md ${
+            {/* Configurable Image Frame / Circular Profile Element - static, no animations */}
+            <div 
+              className={`absolute inset-1 bg-zinc-950/95 p-1 border border-accent-primary/40 overflow-hidden shadow-2xl z-10 flex flex-col items-center justify-center text-center backdrop-blur-md ${
                 settings.aboutCornerImgShape === "circle" ? "rounded-full" : "rounded-2xl sm:rounded-[28px]"
               }`}
             >
-              <div className={`relative w-full h-full overflow-hidden group ${
+              <div className={`relative w-full h-full overflow-hidden ${
                 settings.aboutCornerImgShape === "circle" ? "rounded-full" : "rounded-xl sm:rounded-[22px]"
               }`}>
                 <img 
-                  src={settings.aboutCornerImageUrl || "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=400"} 
+                  src={settings.aboutCornerImageUrl || "auto=format&fit=crop&q=80&w=400"} 
                   alt="Custom corner branding"
-                  className="w-full h-full object-cover brightness-95 group-hover:brightness-110 transition-all duration-300"
+                  className="w-full h-full object-cover brightness-95"
                   referrerPolicy="no-referrer"
+                  style={{ filter: "url(#logo-theme-tint)" }}
                 />
                 
                 {/* Visual Glass highlights */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/10 pointer-events-none" />
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
 
@@ -336,9 +343,10 @@ export default function Home() {
               title: settings.studySticker1Title || "STUDY FORCE",
               subtitle: settings.studySticker1Subtitle || "Focus Active",
               popup: settings.studySticker1Popup || "Ignite your study sessions with maximum mental torque! 📚 Keep learning!",
-              left: "2%",
-              top: "22%",
-              rotate: -12,
+              left: settings.studySticker1Left !== undefined ? settings.studySticker1Left : "2%",
+              top: settings.studySticker1Top !== undefined ? settings.studySticker1Top : "22%",
+              rotate: settings.studySticker1Rotate !== undefined ? settings.studySticker1Rotate : -12,
+              show: settings.studySticker1Show !== false,
               duration: 5.2,
               themeColor: "text-accent-primary border-accent-primary/30 shadow-accent-primary/5 bg-accent-primary/5",
               delay: 0,
@@ -350,9 +358,10 @@ export default function Home() {
               title: settings.studySticker2Title || "DEEP FOCUS",
               subtitle: settings.studySticker2Subtitle || "Active Sparks",
               popup: settings.studySticker2Popup || "A single spark of intuition can illuminate any difficult problem! 💡 Stay curious!",
-              left: "4%",
-              top: "76%",
-              rotate: 15,
+              left: settings.studySticker2Left !== undefined ? settings.studySticker2Left : "4%",
+              top: settings.studySticker2Top !== undefined ? settings.studySticker2Top : "76%",
+              rotate: settings.studySticker2Rotate !== undefined ? settings.studySticker2Rotate : 15,
+              show: settings.studySticker2Show !== false,
               duration: 6.0,
               themeColor: "text-amber-400 border-amber-400/30 shadow-amber-400/5 bg-amber-400/5",
               delay: 0.4,
@@ -364,9 +373,10 @@ export default function Home() {
               title: settings.studySticker3Title || "AIR 1 GOAL",
               subtitle: settings.studySticker3Subtitle || "IIT Selection",
               popup: settings.studySticker3Popup || "Keep your eyes on the prize. All India Rank 1 starts with persistent everyday discipline! 🎓",
-              left: "47%",
-              top: "12%",
-              rotate: -8,
+              left: settings.studySticker3Left !== undefined ? settings.studySticker3Left : "47%",
+              top: settings.studySticker3Top !== undefined ? settings.studySticker3Top : "12%",
+              rotate: settings.studySticker3Rotate !== undefined ? settings.studySticker3Rotate : -8,
+              show: settings.studySticker3Show !== false,
               duration: 4.8,
               themeColor: "text-indigo-400 border-indigo-400/30 shadow-indigo-400/5 bg-indigo-400/5",
               delay: 0.8,
@@ -378,9 +388,10 @@ export default function Home() {
               title: settings.studySticker4Title || "100% AIM",
               subtitle: settings.studySticker4Subtitle || "Perfect Practice",
               popup: settings.studySticker4Popup || "Accuracy is built by constant deliberate feedback. Refine your aim daily! 🎯",
-              left: "44%",
-              top: "84%",
-              rotate: 10,
+              left: settings.studySticker4Left !== undefined ? settings.studySticker4Left : "44%",
+              top: settings.studySticker4Top !== undefined ? settings.studySticker4Top : "84%",
+              rotate: settings.studySticker4Rotate !== undefined ? settings.studySticker4Rotate : 10,
+              show: settings.studySticker4Show !== false,
               duration: 5.5,
               themeColor: "text-rose-400 border-rose-400/30 shadow-rose-400/5 bg-rose-400/5",
               delay: 1.2,
@@ -392,9 +403,10 @@ export default function Home() {
               title: settings.studySticker5Title || "NIGHT RUNS",
               subtitle: settings.studySticker5Subtitle || "Midnight Session",
               popup: settings.studySticker5Popup || "The quiet hours are when progress is made. Fuel your academic ambition! ☕",
-              left: "88%",
-              top: "16%",
-              rotate: -14,
+              left: settings.studySticker5Left !== undefined ? settings.studySticker5Left : "88%",
+              top: settings.studySticker5Top !== undefined ? settings.studySticker5Top : "16%",
+              rotate: settings.studySticker5Rotate !== undefined ? settings.studySticker5Rotate : -14,
+              show: settings.studySticker5Show !== false,
               duration: 5.0,
               themeColor: "text-emerald-400 border-emerald-400/30 shadow-emerald-400/5 bg-emerald-400/5",
               delay: 0.2,
@@ -406,15 +418,16 @@ export default function Home() {
               title: settings.studySticker6Title || "NEURAL GRID",
               subtitle: settings.studySticker6Subtitle || "Concept Clear",
               popup: settings.studySticker6Popup || "Connect the dots, master the formulas, and let neuroplasticity do the rest! 🧠",
-              left: "87%",
-              top: "78%",
-              rotate: 18,
+              left: settings.studySticker6Left !== undefined ? settings.studySticker6Left : "87%",
+              top: settings.studySticker6Top !== undefined ? settings.studySticker6Top : "78%",
+              rotate: settings.studySticker6Rotate !== undefined ? settings.studySticker6Rotate : 18,
+              show: settings.studySticker6Show !== false,
               duration: 5.8,
               themeColor: "text-[#ff839a] border-[#ff839a]/30 shadow-[#ff839a]/5 bg-[#ff839a]/5",
               delay: 1.6,
               align: "right",
             }
-          ].map((st) => {
+          ].filter(st => st.show).map((st) => {
             const isActive = activeStickerId === st.id;
             return (
               <motion.div
@@ -427,7 +440,7 @@ export default function Home() {
                   e.stopPropagation();
                   setActiveStickerId(isActive ? null : st.id);
                 }}
-                className={`absolute pointer-events-auto cursor-pointer select-none hidden lg:flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl border backdrop-blur-md transition-all duration-300 group ${
+                className={`absolute pointer-events-auto cursor-pointer select-none flex items-center gap-1.5 xs:gap-2.5 px-2 py-1.5 xs:px-3.5 xs:py-2.5 rounded-xl xs:rounded-2xl border backdrop-blur-md transition-all duration-300 group ${
                   isActive 
                     ? "shadow-[0_0_35px_rgba(229,210,165,0.45)] ring-2 ring-accent-primary brightness-110 z-40 scale-110" 
                     : "shadow-lg z-20"
@@ -437,28 +450,16 @@ export default function Home() {
                   top: st.top,
                   borderColor: isActive ? "var(--color-accent-primary, #E5D2A5)" : "var(--theme-border-color, rgba(255,255,255,0.08))"
                 }}
-                initial={{ opacity: 0, scale: 0.8, y: 15 }}
+                initial={false}
                 animate={{
                   opacity: isActive ? 1 : 0.9,
                   scale: isActive ? 1.12 : 1,
-                  y: isActive ? 0 : [0, -10, 0],
-                  rotate: isActive ? 0 : [st.rotate, st.rotate + 3, st.rotate - 3, st.rotate]
+                  y: 0,
+                  rotate: isActive ? 0 : st.rotate
                 }}
                 transition={{
-                  opacity: { duration: 0.3 },
-                  scale: { duration: 0.3 },
-                  y: isActive ? { duration: 0.3 } : {
-                    repeat: Infinity,
-                    duration: st.duration,
-                    ease: "easeInOut",
-                    delay: st.delay
-                  },
-                  rotate: isActive ? { duration: 0.3 } : {
-                    repeat: Infinity,
-                    duration: st.duration * 1.1,
-                    ease: "easeInOut",
-                    delay: st.delay
-                  }
+                  duration: 0.2,
+                  ease: "easeOut"
                 }}
                 whileHover={{
                   scale: isActive ? 1.15 : 1.08,
@@ -468,27 +469,27 @@ export default function Home() {
                 }}
               >
                 {/* Sticker Die-cut background bloom effect */}
-                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${st.themeColor} ${isActive ? 'opacity-40' : 'opacity-20 group-hover:opacity-40'} transition-opacity duration-300 pointer-events-none`} />
+                <div className={`absolute inset-0 rounded-xl xs:rounded-2xl bg-gradient-to-br ${st.themeColor} ${isActive ? 'opacity-40' : 'opacity-20 group-hover:opacity-40'} transition-opacity duration-300 pointer-events-none`} />
                 
                 {/* Big bold study emoji */}
-                <span className="text-xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)] select-none">
+                <span className="text-sm xs:text-base md:text-xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)] select-none">
                   {st.emoji}
                 </span>
 
                 {/* Precise miniature labels */}
                 <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-black tracking-widest leading-none font-mono uppercase text-text-primary group-hover:text-accent-primary transition-colors duration-300">
+                  <span className="text-[7.5px] xs:text-[8px] sm:text-[10px] font-black tracking-widest leading-none font-mono uppercase text-text-primary group-hover:text-accent-primary transition-colors duration-300">
                     {st.title}
                   </span>
-                  <span className="text-[8px] text-text-muted font-sans font-medium mt-0.5 whitespace-nowrap">
+                  <span className="text-[6.5px] xs:text-[7px] sm:text-[8px] text-text-muted font-sans font-medium mt-0.5 whitespace-nowrap">
                     {st.subtitle}
                   </span>
                 </div>
 
                 {/* Inner highlight glass overlay */}
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
+                <div className="absolute inset-0 rounded-xl xs:rounded-2xl bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none" />
                 {/* High contrast die-cut outline effect */}
-                <div className="absolute -inset-0.5 rounded-[18px] border border-white/5 pointer-events-none group-hover:border-accent-primary/20 transition-colors" />
+                <div className="absolute -inset-0.5 rounded-[14px] xs:rounded-[18px] border border-white/5 pointer-events-none group-hover:border-accent-primary/20 transition-colors" />
 
                 {/* Popup motivator balloon Speech Bubble */}
                 <AnimatePresence>
@@ -498,7 +499,7 @@ export default function Home() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.85, y: -10 }}
                       transition={{ type: "spring", stiffness: 350, damping: 18 }}
-                      className={`absolute top-full mt-4 w-72 p-4 rounded-2xl border border-accent-primary/30 bg-zinc-950/95 backdrop-blur-xl shadow-2xl text-left cursor-default pointer-events-auto ${
+                      className={`absolute top-full mt-4 w-52 sm:w-72 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-accent-primary/30 bg-zinc-950/95 backdrop-blur-xl shadow-2xl text-left cursor-default pointer-events-auto ${
                         st.align === "left" 
                           ? "left-0" 
                           : st.align === "right" 
@@ -625,26 +626,99 @@ export default function Home() {
                 {/* Simulated course progress widget */}
                 <div className="space-y-4">
                   {/* Streak Card Widget */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-accent-primary/10 to-amber-500/10 border border-accent-primary/20 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-full bg-amber-400 text-button-text">
-                        <Trophy className="w-5 h-5 fill-current" />
+                  {showTeacherBox ? (
+                    <motion.div 
+                      layout
+                      initial={{ opacity: 0, scale: 0.9, rotate: 0 }}
+                      animate={{ opacity: 1, scale: 1, rotate: -4 }}
+                      exit={{ opacity: 0, scale: 0.9, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTeacherBox(false);
+                      }}
+                      className="relative w-full p-6 bg-zinc-950 border border-border-color cursor-pointer select-none overflow-hidden flex flex-col items-center justify-between text-center group"
+                      style={{ borderRadius: '32px' }}
+                    >
+                      {/* Black Water Splash in Background */}
+                      <div className="absolute inset-0 z-0 opacity-100 flex items-center justify-center filter drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)] pointer-events-none">
+                        <svg viewBox="0 0 100 100" className="w-[125%] h-[125%] text-black fill-current transform scale-125 rotate-[15deg]">
+                          <path d="M50 15 C65 10, 85 5, 90 25 C95 45, 80 50, 88 72 C96 94, 65 92, 48 85 C31 78, 5 80, 10 55 C15 30, 35 20, 50 15 Z" />
+                          <circle cx="85" cy="15" r="3" />
+                          <circle cx="94" cy="40" r="2.5" />
+                          <circle cx="80" cy="80" r="3.2" />
+                          <circle cx="50" cy="94" r="3.5" />
+                          <circle cx="15" cy="75" r="2.8" />
+                          <circle cx="6" cy="45" r="4" />
+                          <circle cx="12" cy="18" r="3.2" />
+                        </svg>
                       </div>
-                      <div className="text-left">
-                        <h4 className="font-bold text-sm text-text-primary leading-tight">
-                          {settings.aboutMockCardTitle || 'Physics Expert'}
-                        </h4>
-                        <p className="text-[10px] text-text-muted">
-                          {settings.aboutMockCardSubtitle || 'Daily Challenge streak'}
-                        </p>
+
+                      {/* Content on Top */}
+                      <div className="relative z-10 w-full h-full flex flex-col items-center justify-between gap-4">
+                        {/* Teacher Photo */}
+                        <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-accent-primary/50 shadow-md transform rotate-3 group-hover:rotate-0 transition-transform duration-300 flex items-center justify-center bg-zinc-900">
+                          {settings.aboutTeacherPhotoUrl ? (
+                            <img 
+                              src={settings.aboutTeacherPhotoUrl} 
+                              alt={settings.aboutTeacherName || "Dr. Anand Kumar"} 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center p-1.5 text-center bg-black/60">
+                              <span className="text-[10px] font-bold text-[#E5D2A5] block">NO PHOTO</span>
+                              <span className="text-[7px] text-zinc-500 font-mono leading-none mt-1 uppercase scale-90">Paste URL in Admin Panel</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Teacher Data */}
+                        <div className="space-y-1">
+                          <h4 className="font-display font-black text-sm text-accent-primary tracking-tight leading-tight">
+                            {settings.aboutTeacherName || "Dr. Anand Kumar"}
+                          </h4>
+                          <p className="text-[10px] font-mono text-text-primary px-2.5 py-0.5 rounded-full bg-accent-primary/10 inline-block">
+                            {settings.aboutTeacherRole || "Senior Physics Specialist (Ex-IIT)"}
+                          </p>
+                          <p className="text-[10px] text-text-muted mt-2 font-medium leading-relaxed max-w-[240px] mx-auto italic">
+                            "{settings.aboutTeacherTagline || "Visualizing equations dynamically. Crafting interactive modules for deep analytical development of students."}"
+                          </p>
+                        </div>
+
+                        <span className="text-[9px] font-mono uppercase tracking-widest text-[#ff839a] block animate-pulse">
+                          ✦ Click to return ✦
+                        </span>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTeacherBox(true);
+                      }}
+                      className="p-4 rounded-2xl bg-gradient-to-r from-accent-primary/10 to-amber-500/10 border border-accent-primary/25 hover:border-accent-primary/50 transition-all duration-300 hover:scale-[1.01] flex items-center justify-between cursor-pointer select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-full bg-amber-400 text-button-text">
+                          <Trophy className="w-5 h-5 fill-current" />
+                        </div>
+                        <div className="text-left">
+                          <h4 className="font-bold text-sm text-text-primary leading-tight">
+                            {settings.aboutMockCardTitle || 'Physics Expert'}
+                          </h4>
+                          <p className="text-[10px] text-text-muted">
+                            {settings.aboutMockCardSubtitle || 'Daily Challenge streak'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-black text-accent-primary font-display">
+                          {settings.aboutMockCardValue || '8 Days'}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xl font-black text-accent-primary font-display">
-                        {settings.aboutMockCardValue || '8 Days 🔥'}
-                      </span>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Math progress capsule */}
                   <div 
@@ -698,7 +772,7 @@ export default function Home() {
                 }}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{settings.aboutIitianBadgeText || 'IITian Led 🚀'}</span>
+                <span>{settings.aboutIitianBadgeText || 'IITian Led'}</span>
               </motion.div>
 
               <motion.div 
@@ -780,7 +854,13 @@ export default function Home() {
                      whileHover={{ y: -8, scale: 1.015 }}
                      className="group relative overflow-hidden rounded-[32px] border bg-glass-bg border-border-color hover:border-accent-primary/40 flex flex-col transition-all duration-300 cursor-pointer shadow-sm hover:shadow-2xl"
                      style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
-                     onClick={() => navigate('/dashboard')}
+                     onClick={() => {
+                       if (!user) {
+                         alert("login first to unlock this");
+                       } else {
+                         navigate('/learn');
+                       }
+                     }}
                    >
                      {/* Gradient background sheen */}
                      <div className="absolute inset-0 bg-gradient-to-tr from-accent-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
@@ -925,7 +1005,7 @@ export default function Home() {
             >
               {activePricingCard === 'notes' && (
                 <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 bg-accent-primary text-button-text text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-wider shadow-md border border-white/20">
-                  Active Revision 🚀
+                  Active Revision
                 </div>
               )}
               <div className="mb-6 pt-2">
@@ -992,7 +1072,7 @@ export default function Home() {
             >
               {activePricingCard === 'lectures' && (
                 <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 bg-accent-primary text-button-text text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-wider shadow-md border border-white/20">
-                  Most Popular Choice 🚀
+                  Most Popular Choice
                 </div>
               )}
               <div className="mb-6 pt-2">
@@ -1135,6 +1215,194 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Dynamic Animated Social Media Section */}
+      {settings.socialSectionShow !== false && (
+        <section id="social-connect" className="py-20 relative z-20">
+          <div className="max-w-7xl mx-auto px-6 text-left">
+            <div className="inline-flex px-3 py-1 rounded-full bg-accent-primary/10 text-accent-primary text-[10px] font-black uppercase tracking-widest mb-4">
+              Join our Community
+            </div>
+            <h2 className="text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary mb-4 leading-normal">
+              {settings.socialSectionTitle || 'Connect via Socials'}
+            </h2>
+            <p className="text-text-secondary text-base md:text-lg max-w-2xl font-semibold leading-relaxed mb-12">
+              {settings.socialSectionSubtitle || 'Stay in the loop with live streams, instant tips, sample study papers, and continuous student updates.'}
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              {/* Instagram Card */}
+              {settings.socialInstagramShow !== false && settings.socialInstagramUrl && (
+                <motion.a
+                  href={settings.socialInstagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#E1306C]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(225,48,108,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#E1306C]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#E1306C]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">Instagram</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Join our student circle</p>
+                  </div>
+                </motion.a>
+              )}
+
+              {/* YouTube Card */}
+              {settings.socialYoutubeShow !== false && settings.socialYoutubeUrl && (
+                <motion.a
+                  href={settings.socialYoutubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#FF0000]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(255,0,0,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF0000]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#FF0000]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FF0000] to-[#cc0000] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M23.498 6.163a3.003 3.003 0 00-2.11-2.11C19.53 3.545 12 3.545 12 3.545s-7.53 0-9.388.508a3.003 3.003 0 00-2.11 2.11C0 8.017 0 12 0 12s0 3.983.502 5.837a3.003 3.003 0 002.11 2.11c1.858.507 9.388.507 9.388.507s7.53 0 9.388-.507a3.003 3.003 0 002.11-2.11C24 15.983 24 12 24 12s0-3.983-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">YouTube</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Concept lectures & streams</p>
+                  </div>
+                </motion.a>
+              )}
+
+              {/* Telegram Card */}
+              {settings.socialTelegramShow !== false && settings.socialTelegramUrl && (
+                <motion.a
+                  href={settings.socialTelegramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#26A5E4]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(38,165,228,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#26A5E4]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#26A5E4]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2AABEE] to-[#229ED9] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M11.944 0C5.344 0 0 5.344 0 11.944c0 5.622 3.88 10.35 9.126 11.66.12.022.241.033.364.033.432 0 .822-.213 1.042-.564.218-.344.228-.776.028-1.129-.1-.177-1.353-2.39-1.93-3.414l7.636-6.6a.417.417 0 00-.097-.704.425.425 0 00-.336-.01l-10.232 4.14-3.64-1.22c-.44-.148-.415-.758.04-1.002L21.3 2.115c.421-.225.93.072.93.551l-.014 16.48c-.012.879-1.04 1.344-1.688.75l-4.704-4.305-2.614 2.502-.45 3.332c-.06.44-.44.77-.881.77h-.012c-.5 0-.91-.41-.91-.91V16.89M8.374 13.916l1.9-1.39 6.84-5.1" stroke="currentColor" strokeWidth="0.5" fill="none"/>
+                      <path d="M21.933 2.593L2.1 10.1c-.482.193-.478.895.006 1.077l5.053 1.583 1.7 5.253c.123.38.567.557.915.351l2.955-1.75 4.966 3.7c.433.323.993.078 1.085-.43l3.223-16.79c.105-.544-.403-.984-.973-.751z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">Telegram</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Instant notes PDF drops</p>
+                  </div>
+                </motion.a>
+              )}
+
+              {/* Discord Card */}
+              {settings.socialDiscordShow !== false && settings.socialDiscordUrl && (
+                <motion.a
+                  href={settings.socialDiscordUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#5865F2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(88,101,242,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#5865F2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#5865F2]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5865F2] to-[#404eed] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25c-.015-.022-.043-.037-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.093 13.093 0 01-1.873-.894.077.077 0 01-.008-.128c.126-.093.252-.19.372-.287a.075.075 0 01.077-.011c3.92 1.793 8.18 1.793 12.061 0a.073.073 0 01.078.009c.12.099.246.195.373.289a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.894.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.156-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.156 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.156-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.156 2.418z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">Discord</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Live voice doubt lobbies</p>
+                  </div>
+                </motion.a>
+              )}
+
+              {/* Twitter Card */}
+              {settings.socialTwitterShow !== false && settings.socialTwitterUrl && (
+                <motion.a
+                  href={settings.socialTwitterUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#1DA1F2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(29,161,242,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#1DA1F2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#1DA1F2]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1DA1F2] to-[#0d8ddb] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">Twitter (X)</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Curriculum announcements</p>
+                  </div>
+                </motion.a>
+              )}
+
+              {/* LinkedIn Card */}
+              {settings.socialLinkedinShow !== false && settings.socialLinkedinUrl && (
+                <motion.a
+                  href={settings.socialLinkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#0A66C2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(10,102,194,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#0A66C2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#0A66C2]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-[#0A66C2] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M22.23 0H1.77C.8 0 0 .77 0 1.72v20.56C0 23.23.8 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.2 0 22.23 0zM7.12 20.45H3.56V9H7.12v11.45zM5.34 7.43c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06 1.14 0 2.06.92 2.06 2.06 0 1.14-.92 2.06-2.06 2.06zm15.11 13.02h-3.56v-5.6c0-1.34-.03-3.05-1.86-3.05-1.86 0-2.14 1.45-2.14 2.95v5.7h-3.56V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">LinkedIn</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Academic faculty profiles</p>
+                  </div>
+                </motion.a>
+              )}
+
+              {/* Facebook Card */}
+              {settings.socialFacebookShow !== false && settings.socialFacebookUrl && (
+                <motion.a
+                  href={settings.socialFacebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#1877F2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(24,119,242,0.15)]"
+                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#1877F2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#1877F2]/20 transition-all duration-300" />
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1877F2] to-[#166fe5] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
+                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-black text-lg text-text-primary">Facebook</h3>
+                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Parents & mentors network</p>
+                  </div>
+                </motion.a>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Mentor Showcase */}
       <section id="teachers" className="py-24 relative z-20 bg-bg-secondary/20 rounded-[40px] md:rounded-[60px] border-t border-b border-border-color">
         <div className="max-w-7xl mx-auto px-6 mb-16 text-left">
@@ -1186,10 +1454,7 @@ export default function Home() {
                   <input required type="email" id="email" name="email" className="w-full px-5 py-3 rounded-2xl bg-bg-secondary/40 border border-border-color text-text-primary text-sm font-semibold focus:outline-none focus:border-accent-primary/60 transition-colors" />
                 </div>
               </div>
-              <div className="text-left">
-                <label htmlFor="message" className="block text-xs uppercase tracking-wider font-bold text-text-secondary mb-2">Your Thoughts</label>
-                <textarea required id="message" name="message" className="w-full px-5 py-3 rounded-2xl bg-bg-secondary/40 border border-border-color text-text-primary text-sm font-semibold focus:outline-none focus:border-accent-primary/60 h-36 resize-none transition-colors" placeholder="Message content goes here..."></textarea>
-              </div>
+
               <div className="text-center pt-2">
                 <button 
                   type="submit" 

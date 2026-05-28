@@ -10,9 +10,14 @@ export default function Footer() {
         <div className="max-w-xs">
           <Link to="/" className="flex items-center gap-2 mb-4 group">
             {settings.logoImage ? (
-              <img src={settings.logoImage} alt="Logo" className="h-8 object-contain" />
+              <img 
+                src={settings.logoImage} 
+                alt="Logo" 
+                className="h-8 object-contain" 
+                style={{ filter: "url(#logo-theme-tint)" }}
+              />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-[#E5D2A5] flex items-center justify-center text-[#070709] font-display font-bold text-lg">
+              <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-button-text font-display font-bold text-lg">
                 {settings.logoText || 'N'}
               </div>
             )}

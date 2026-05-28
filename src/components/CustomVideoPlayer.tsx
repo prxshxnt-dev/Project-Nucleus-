@@ -23,6 +23,80 @@ const formatTime = (seconds: number) => {
   return `${mm}:${ss}`;
 };
 
+interface VdoCipherData {
+  otp: string;
+  playbackInfo: string;
+}
+
+export function parseVdoCipher(input: string): VdoCipherData | null {
+  if (!input) return null;
+  const clean = input.trim();
+
+  // 1. Try to match script params pattern: ("OTP", "PLAYBACK_INFO")
+  const scriptRegex = /\("([^"]+)"\s*,\s*"([^"]+)"\)/;
+  const match = clean.match(scriptRegex);
+  if (match) {
+    return {
+      otp: match[1],
+      playbackInfo: match[2]
+    };
+  }
+
+  // 2. Try match iframe src query params
+  if (clean.includes('vdocipher.com')) {
+    try {
+      const urlObj = new URL(clean.startsWith('http') ? clean : 'https://' + clean);
+      const otp = urlObj.searchParams.get('otp');
+      const playbackInfo = urlObj.searchParams.get('playbackInfo');
+      if (otp && playbackInfo) {
+        return { otp, playbackInfo };
+      }
+    } catch (e) {}
+  }
+
+  // 3. Try match "OTP:VideoID" or "OTP:playbackInfo" or "OTP,VideoID"
+  const delimiter = clean.includes(':') ? ':' : (clean.includes(',') ? ',' : null);
+  if (delimiter) {
+    const parts = clean.split(delimiter);
+    if (parts.length === 2) {
+      const part1 = parts[0].trim();
+      const part2 = parts[1].trim();
+      if (part2.startsWith('eyJ')) {
+        return { otp: part1, playbackInfo: part2 };
+      } else {
+        try {
+          const playbackInfo = btoa(JSON.stringify({ videoId: part2 }));
+          return { otp: part1, playbackInfo };
+        } catch (e) {}
+      }
+    }
+  }
+
+  // 4. Try matching pure 32-character hex video ID
+  const isHex32 = /^[a-f0-9]{32}$/i.test(clean);
+  if (isHex32) {
+    const defaultOtp = "20160313versASE3232eH3WNzjJ53F4LtZu0PqHyIs0HUEjwSgUvWfiX1ZRcNeHJ";
+    try {
+      const playbackInfo = btoa(JSON.stringify({ videoId: clean }));
+      return { otp: defaultOtp, playbackInfo };
+    } catch (e) {}
+  }
+
+  // 5. Try parsing raw JSON (e.g., {"videoId": "..."})
+  if (clean.startsWith('{') && clean.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (parsed.videoId) {
+        const otp = parsed.otp || "20160313versASE3232eH3WNzjJ53F4LtZu0PqHyIs0HUEjwSgUvWfiX1ZRcNeHJ";
+        const playbackInfo = btoa(JSON.stringify({ videoId: parsed.videoId }));
+        return { otp, playbackInfo };
+      }
+    } catch (e) {}
+  }
+
+  return null;
+}
+
 export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomVideoPlayerProps) => {
   const { user } = useAuthStore();
   const { settings } = useSettingsStore();
@@ -272,6 +346,63 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
         setShowControls(false);
     }
   };
+
+  const vdoData = parseVdoCipher(url);
+
+  if (vdoData) {
+    return (
+      <div 
+        ref={playerContainerRef} 
+        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+        onContextMenu={(e) => { e.preventDefault(); }}
+      >
+        {/* Dynamic Moving Security Watermark */}
+        {settings.secVideoWatermarkEnabled !== false && user && (
+          <motion.div
+            animate={{
+              top: watermarkPos.top,
+              left: watermarkPos.left
+            }}
+            transition={{
+              type: 'tween',
+              duration: 1.8,
+              ease: 'easeInOut'
+            }}
+            style={{
+              position: 'absolute',
+              fontSize: `${settings.secWatermarkSize || 12}px`,
+              opacity: settings.secWatermarkOpacity !== undefined ? settings.secWatermarkOpacity : 0.35,
+              color: 'rgba(255,255,255,0.85)',
+              textShadow: '1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9)',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(0,0,0,0.2)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              pointerEvents: 'none',
+              zIndex: 40,
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {getWatermarkText()}
+          </motion.div>
+        )}
+
+        <iframe
+          src={`https://player.vdocipher.com/v2/?otp=${vdoData.otp}&playbackInfo=${vdoData.playbackInfo}`}
+          style={{
+            height: '100%',
+            width: '100%',
+            border: '0',
+          }}
+          className="w-full aspect-video"
+          allow="encrypted-media"
+          allowFullScreen
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    );
+  }
 
   return (
     <div 

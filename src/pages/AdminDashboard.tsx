@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "../store/authStore";
 import { db } from "../lib/firebase";
+import { apiGateway, APITelemetryLog } from "../lib/apiGateway";
 import {
   collection,
   query,
@@ -12,9 +13,13 @@ import {
   serverTimestamp,
   getDoc,
   setDoc,
+  onSnapshot,
+  arrayUnion,
+  orderBy,
 } from "firebase/firestore";
 import { motion } from "motion/react";
-import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle } from "lucide-react";
+import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare } from "lucide-react";
+import Markdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -28,6 +33,7 @@ import {
   THEME_PRESETS,
   ThemeConfig,
 } from "../store/settingsStore";
+import { SyllabusRenderer, getDefaultSyllabus } from "../components/SyllabusRenderer";
 
 const PRESET_INFO: Record<
   string,
@@ -36,7 +42,7 @@ const PRESET_INFO: Record<
   default: {
     name: "1. Default Luxury Gold",
     desc: "Slate-dark baseline aesthetic framing core learning workflows. Refined typography alongside luxurious bronze and pale gold accents.",
-    colors: ["#070709", "#E5D2A5", "#b59f6d"],
+    colors: ["#070709", "var(--primary-custom, #F15A29)", "#b59f6d"],
   },
   theme2: {
     name: "2. Cyber Oracle Flame",
@@ -118,6 +124,14 @@ function calculateContrastRatio(hex1: string, hex2: string): number {
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuthStore();
   const navigate = useNavigate();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -125,11 +139,163 @@ export default function AdminDashboard() {
     }
   }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<
-    "materials" | "users" | "mentors" | "settings" | "appearance" | "security"
+    "materials" | "users" | "mentors" | "settings" | "appearance" | "security" | "syllabus" | "support_chats"
   >("materials");
   const [users, setUsers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [mentors, setMentors] = useState<any[]>([]);
+
+  // Support / Live Mentorship Chats States & Real-Time Sync
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [adminMessageText, setAdminMessageText] = useState("");
+
+  useEffect(() => {
+    const isAuthorizedAdmin = user?.role === "admin" || user?.role === "superadmin" || (user?.email && ["meinkxun@gmail.com", "nucleuscc2026@gmail.com"].includes(user.email.toLowerCase().trim()));
+    if (!isAuthorizedAdmin) return;
+
+    const q = query(collection(db, "chatbot_sessions"), orderBy("updatedAt", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetched: any[] = [];
+      snapshot.forEach((doc) => {
+        fetched.push({ id: doc.id, ...doc.data() });
+      });
+      setSessions(fetched);
+    }, (err) => {
+      console.error("Error subscribing to chatbot_sessions:", err);
+    });
+
+    return () => unsub();
+  }, [user]);
+
+  // Support Chats functions
+  const handleSendAdminMessage = async () => {
+    if (!activeSessionId || !adminMessageText.trim()) return;
+
+    const currentText = adminMessageText.trim();
+    setAdminMessageText("");
+
+    const newAdminMessage = {
+      id: "msg_" + Date.now(),
+      role: "assistant" as const, // Rendered standard role matching chatbot or advisor
+      content: currentText,
+      timestamp: new Date().toISOString(),
+      senderName: user?.displayName || "Teacher (Faculty)"
+    };
+
+    const sessionRef = doc(db, "chatbot_sessions", activeSessionId);
+    try {
+      await updateDoc(sessionRef, {
+        messages: arrayUnion(newAdminMessage),
+        unreadByUser: true,
+        unreadByAdmin: false,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error("Failed to append admin message:", err);
+      alert("Failed to send message: " + String(err));
+    }
+  };
+
+  const handleJoinChat = async (sessionId: string) => {
+    const sessionRef = doc(db, "chatbot_sessions", sessionId);
+    try {
+      const systemMessage = {
+        id: "msg_join_" + Date.now(),
+        role: "teacher" as const,
+        content: "👋 The teacher has joined the chat and you can ask whatever you want to ask freely",
+        timestamp: new Date().toISOString(),
+        senderName: "System"
+      };
+
+      await updateDoc(sessionRef, {
+        teacherJoined: true,
+        unreadByUser: true,
+        updatedAt: new Date().toISOString(),
+        messages: arrayUnion(systemMessage)
+      });
+    } catch (err) {
+      console.error("Failed to join chat:", err);
+      alert("Failed to join chat: " + String(err));
+    }
+  };
+
+  const handleLeaveChat = async (sessionId: string) => {
+    if (!window.confirm("Pause live teacher mentorship and let AI assistant resume?")) return;
+    const sessionRef = doc(db, "chatbot_sessions", sessionId);
+    try {
+      const systemMessage = {
+        id: "msg_leave_" + Date.now(),
+        role: "teacher" as const,
+        content: "🤖 Live mentorship session paused. Nucleus AI Assistant has resumed helping.",
+        timestamp: new Date().toISOString(),
+        senderName: "System"
+      };
+
+      await updateDoc(sessionRef, {
+        teacherJoined: false,
+        unreadByUser: true,
+        updatedAt: new Date().toISOString(),
+        messages: arrayUnion(systemMessage)
+      });
+    } catch (err) {
+      console.error("Failed to leave chat:", err);
+    }
+  };
+
+  const handleEndChat = async (sessionId: string) => {
+    if (!window.confirm("End and permanently delete this chat session? This action is irreversible.")) return;
+    const sessionRef = doc(db, "chatbot_sessions", sessionId);
+    try {
+      const systemMessage = {
+        id: "msg_end_" + Date.now(),
+        role: "assistant" as const,
+        content: "Thanks for asking your queries! Hopefully your queries have been resolved. ✨",
+        timestamp: new Date().toISOString(),
+        senderName: "Highly Targeted Mentorship Ai"
+      };
+
+      await updateDoc(sessionRef, {
+        teacherJoined: false,
+        unreadByUser: true,
+        updatedAt: new Date().toISOString(),
+        messages: arrayUnion(systemMessage)
+      });
+
+      // Give a tiny delay for the message update to be visible to the student
+      setTimeout(async () => {
+        try {
+          await deleteDoc(sessionRef);
+          if (activeSessionId === sessionId) {
+            setActiveSessionId(null);
+          }
+        } catch (err) {
+          console.error("Failed to delete chat session:", err);
+        }
+      }, 1500);
+    } catch (err) {
+      console.error("Failed to end chat:", err);
+      alert("Failed to end chat: " + String(err));
+    }
+  };
+
+  const handleDeleteChatSession = async (sessionId: string) => {
+    if (!window.confirm("Are you sure you want to delete this student chat session? This action is irreversible.")) return;
+    try {
+      await deleteDoc(doc(db, "chatbot_sessions", sessionId));
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete chat session:", err);
+    }
+  };
+
+  // Syllabus form states
+  const [syllabusSectionName, setSyllabusSectionName] = useState("Syllabus");
+  const [classSyllabuses, setClassSyllabuses] = useState<Record<string, string>>({});
+  const [isSavingSyllabus, setIsSavingSyllabus] = useState(false);
+  const [syllabusEditClass, setSyllabusEditClass] = useState("11");
 
   // Settings Form
   const [upiId, setUpiId] = useState("");
@@ -216,6 +382,7 @@ export default function AdminDashboard() {
       try {
         const docRef = doc(db, "settings", "global");
         const snap = await getDoc(docRef);
+        if (!isMountedRef.current) return;
         if (snap.exists()) {
           const d = snap.data();
           setSecVideoDownloads(d.secVideoDownloadsEnabled ?? false);
@@ -247,6 +414,7 @@ export default function AdminDashboard() {
         }
 
         const violSnap = await getDocs(collection(db, "security_violations"));
+        if (!isMountedRef.current) return;
         const list = violSnap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() }));
         list.sort((a: any, b: any) => {
           const tA = a.timestamp?.seconds || 0;
@@ -256,12 +424,15 @@ export default function AdminDashboard() {
         setViolations(list);
 
         const devSnap = await getDocs(collection(db, "active_devices"));
+        if (!isMountedRef.current) return;
         const devList = devSnap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() }));
         setActiveSessions(devList);
       } catch (err) {
         console.error("Error loading security state:", err);
       } finally {
-        setSecurityTabLoading(false);
+        if (isMountedRef.current) {
+          setSecurityTabLoading(false);
+        }
       }
     };
 
@@ -330,9 +501,9 @@ export default function AdminDashboard() {
   const [aboutShowMockCard, setAboutShowMockCard] = useState(true);
   const [aboutMockCardTitle, setAboutMockCardTitle] = useState("Physics Expert");
   const [aboutMockCardSubtitle, setAboutMockCardSubtitle] = useState("Daily Challenge streak");
-  const [aboutMockCardValue, setAboutMockCardValue] = useState("8 Days 🔥");
+  const [aboutMockCardValue, setAboutMockCardValue] = useState("8 Days");
   const [aboutShowIitianBadge, setAboutShowIitianBadge] = useState(true);
-  const [aboutIitianBadgeText, setAboutIitianBadgeText] = useState("IITian Led 🚀");
+  const [aboutIitianBadgeText, setAboutIitianBadgeText] = useState("IITian Led");
   const [aboutShowLiveDoubts, setAboutShowLiveDoubts] = useState(true);
   const [aboutLiveDoubtsText, setAboutLiveDoubtsText] = useState("Live Doubts Active");
   const [aboutShowCalculusCard, setAboutShowCalculusCard] = useState(true);
@@ -347,39 +518,98 @@ export default function AdminDashboard() {
   const [aboutCornerImageUrl, setAboutCornerImageUrl] = useState("https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=400");
   const [aboutCornerImgShape, setAboutCornerImgShape] = useState<"circle" | "card">("circle");
   const [aboutCornerBackground, setAboutCornerBackground] = useState<"orange_burst" | "water_spread" | "none">("water_spread");
+  const [aboutTeacherPhotoUrl, setAboutTeacherPhotoUrl] = useState("");
+  const [aboutTeacherName, setAboutTeacherName] = useState("Dr. Anand Kumar");
+  const [aboutTeacherRole, setAboutTeacherRole] = useState("Senior Physics Specialist (Ex-IIT)");
+  const [aboutTeacherTagline, setAboutTeacherTagline] = useState("Visualizing complex equations. Crafting interactive modules for deep analytical development.");
   const [pwaBtnText, setPwaBtnText] = useState("Install App");
   const [pwaBtnLink, setPwaBtnLink] = useState("");
+
+  // Customizable Social Media states
+  const [socialSectionTitle, setSocialSectionTitle] = useState("Connect via Socials");
+  const [socialSectionSubtitle, setSocialSectionSubtitle] = useState("Stay in the loop with live streams, instant tips, sample study papers, and continuous student updates.");
+  const [socialSectionShow, setSocialSectionShow] = useState(true);
+
+  const [socialInstagramUrl, setSocialInstagramUrl] = useState("https://instagram.com/nucleus.cc");
+  const [socialInstagramShow, setSocialInstagramShow] = useState(true);
+  const [socialYoutubeUrl, setSocialYoutubeUrl] = useState("https://youtube.com/@nucleus");
+  const [socialYoutubeShow, setSocialYoutubeShow] = useState(true);
+  const [socialTelegramUrl, setSocialTelegramUrl] = useState("https://t.me/nucleus");
+  const [socialTelegramShow, setSocialTelegramShow] = useState(true);
+  const [socialDiscordUrl, setSocialDiscordUrl] = useState("https://discord.gg/nucleus");
+  const [socialDiscordShow, setSocialDiscordShow] = useState(true);
+  const [socialTwitterUrl, setSocialTwitterUrl] = useState("https://x.com/nucleus");
+  const [socialTwitterShow, setSocialTwitterShow] = useState(false);
+  const [socialLinkedinUrl, setSocialLinkedinUrl] = useState("");
+  const [socialLinkedinShow, setSocialLinkedinShow] = useState(false);
+  const [socialFacebookUrl, setSocialFacebookUrl] = useState("");
+  const [socialFacebookShow, setSocialFacebookShow] = useState(false);
+
+  // AI Chatbot Assistant States
+  const [chatbotEnabled, setChatbotEnabled] = useState(false);
+  const [chatbotIconUrl, setChatbotIconUrl] = useState("");
+  const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "grok">("gemini");
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiModel, setAiModel] = useState("gemini-3.5-flash");
+  const [aiLogs, setAiLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isSavingAiSettings, setIsSavingAiSettings] = useState(false);
 
   // Customizable Study Stickers States
   const [studySticker1Emoji, setStudySticker1Emoji] = useState("📚");
   const [studySticker1Title, setStudySticker1Title] = useState("STUDY FORCE");
   const [studySticker1Subtitle, setStudySticker1Subtitle] = useState("Focus Active");
   const [studySticker1Popup, setStudySticker1Popup] = useState("Ignite your study sessions with maximum mental torque! 📚 Keep learning!");
+  const [studySticker1Left, setStudySticker1Left] = useState("2%");
+  const [studySticker1Top, setStudySticker1Top] = useState("22%");
+  const [studySticker1Rotate, setStudySticker1Rotate] = useState(-12);
+  const [studySticker1Show, setStudySticker1Show] = useState(true);
 
   const [studySticker2Emoji, setStudySticker2Emoji] = useState("💡");
   const [studySticker2Title, setStudySticker2Title] = useState("DEEP FOCUS");
   const [studySticker2Subtitle, setStudySticker2Subtitle] = useState("Active Sparks");
   const [studySticker2Popup, setStudySticker2Popup] = useState("A single spark of intuition can illuminate any difficult problem! 💡 Stay curious!");
+  const [studySticker2Left, setStudySticker2Left] = useState("4%");
+  const [studySticker2Top, setStudySticker2Top] = useState("76%");
+  const [studySticker2Rotate, setStudySticker2Rotate] = useState(15);
+  const [studySticker2Show, setStudySticker2Show] = useState(true);
 
   const [studySticker3Emoji, setStudySticker3Emoji] = useState("🎓");
   const [studySticker3Title, setStudySticker3Title] = useState("AIR 1 GOAL");
   const [studySticker3Subtitle, setStudySticker3Subtitle] = useState("IIT Selection");
   const [studySticker3Popup, setStudySticker3Popup] = useState("Keep your eyes on the prize. All India Rank 1 starts with persistent everyday discipline! 🎓");
+  const [studySticker3Left, setStudySticker3Left] = useState("47%");
+  const [studySticker3Top, setStudySticker3Top] = useState("12%");
+  const [studySticker3Rotate, setStudySticker3Rotate] = useState(-8);
+  const [studySticker3Show, setStudySticker3Show] = useState(true);
 
   const [studySticker4Emoji, setStudySticker4Emoji] = useState("🎯");
   const [studySticker4Title, setStudySticker4Title] = useState("100% AIM");
   const [studySticker4Subtitle, setStudySticker4Subtitle] = useState("Perfect Practice");
   const [studySticker4Popup, setStudySticker4Popup] = useState("Accuracy is built by constant deliberate feedback. Refine your aim daily! 🎯");
+  const [studySticker4Left, setStudySticker4Left] = useState("44%");
+  const [studySticker4Top, setStudySticker4Top] = useState("84%");
+  const [studySticker4Rotate, setStudySticker4Rotate] = useState(10);
+  const [studySticker4Show, setStudySticker4Show] = useState(true);
 
   const [studySticker5Emoji, setStudySticker5Emoji] = useState("☕");
   const [studySticker5Title, setStudySticker5Title] = useState("NIGHT RUNS");
   const [studySticker5Subtitle, setStudySticker5Subtitle] = useState("Midnight Session");
   const [studySticker5Popup, setStudySticker5Popup] = useState("The quiet hours are when progress is made. Fuel your academic ambition! ☕");
+  const [studySticker5Left, setStudySticker5Left] = useState("88%");
+  const [studySticker5Top, setStudySticker5Top] = useState("16%");
+  const [studySticker5Rotate, setStudySticker5Rotate] = useState(-14);
+  const [studySticker5Show, setStudySticker5Show] = useState(true);
 
   const [studySticker6Emoji, setStudySticker6Emoji] = useState("🧠");
   const [studySticker6Title, setStudySticker6Title] = useState("NEURAL GRID");
   const [studySticker6Subtitle, setStudySticker6Subtitle] = useState("Concept Clear");
   const [studySticker6Popup, setStudySticker6Popup] = useState("Connect the dots, master the formulas, and let neuroplasticity do the rest! 🧠");
+  const [studySticker6Left, setStudySticker6Left] = useState("87%");
+  const [studySticker6Top, setStudySticker6Top] = useState("78%");
+  const [studySticker6Rotate, setStudySticker6Rotate] = useState(18);
+  const [studySticker6Show, setStudySticker6Show] = useState(true);
 
   // Premium Pricing Cards States
   const [pricingCard1Badge, setPricingCard1Badge] = useState("Essential Revision");
@@ -408,6 +638,8 @@ export default function AdminDashboard() {
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(
     null,
   );
+  const [section, setSection] = useState("General");
+  const [isHidden, setIsHidden] = useState(false);
 
   // Mentor Form
   const [mentorName, setMentorName] = useState("");
@@ -419,11 +651,11 @@ export default function AdminDashboard() {
 
   // Real-Time UI Theme Switching & Builder States
   const [appearanceTheme, setAppearanceTheme] = useState<string>("default");
-  const [primaryColor, setPrimaryColor] = useState("#E5D2A5");
+  const [primaryColor, setPrimaryColor] = useState("var(--primary-custom, #F15A29)");
   const [secondaryColor, setSecondaryColor] = useState("#b59f6d");
-  const [accentGlowColor, setAccentGlowColor] = useState("#E5D2A5");
+  const [accentGlowColor, setAccentGlowColor] = useState("var(--primary-custom, #F15A29)");
   const [backgroundColor, setBackgroundColor] = useState("#070709");
-  const [gradientStart, setGradientStart] = useState("#E5D2A5");
+  const [gradientStart, setGradientStart] = useState("var(--primary-custom, #F15A29)");
   const [gradientEnd, setGradientEnd] = useState("#070709");
   const [buttonStyle, setButtonStyle] = useState<"pill" | "rounded" | "square">(
     "pill",
@@ -473,6 +705,9 @@ export default function AdminDashboard() {
   const [mobileUiStyle, setMobileUiStyle] = useState<
     "ios_bottom_tab" | "compact_list" | "grid"
   >("ios_bottom_tab");
+  const [dockBackgroundStyle, setDockBackgroundStyle] = useState<
+    "frosted" | "solid"
+  >("frosted");
 
   // Custom Preset Lists, Scheduler & Overlay states
   const [customPresetName, setCustomPresetName] = useState("");
@@ -495,18 +730,24 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const uSnap = await getDocs(query(collection(db, "users")));
-      setUsers(uSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const usersList = await apiGateway.users.list();
+      if (!isMountedRef.current) return;
+      setUsers(usersList);
 
-      const mSnap = await getDocs(query(collection(db, "materials")));
-      setMaterials(mSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const materialsList = await apiGateway.materials.list();
+      if (!isMountedRef.current) return;
+      setMaterials(materialsList);
 
-      const mentorSnap = await getDocs(query(collection(db, "mentors")));
-      setMentors(mentorSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const mentorsList = await apiGateway.mentors.list();
+      if (!isMountedRef.current) return;
+      setMentors(mentorsList);
 
-      const settingsSnap = await getDoc(doc(db, "settings", "global"));
-      if (settingsSnap.exists()) {
-        const d = settingsSnap.data();
+      const globalSettings = await apiGateway.settings.getGlobal();
+      if (!isMountedRef.current) return;
+      if (globalSettings) {
+        const d = globalSettings;
+        setSyllabusSectionName(d.syllabusSectionName || "Syllabus");
+        setClassSyllabuses(d.classSyllabuses || {});
         setUpiId(d.upiId || "");
         setPriceNotes(d.priceNotes || 99);
         setPriceLectures(d.priceLectures || 499);
@@ -549,9 +790,9 @@ export default function AdminDashboard() {
           setAboutShowMockCard(d.aboutShowMockCard !== undefined ? d.aboutShowMockCard : true);
           setAboutMockCardTitle(d.aboutMockCardTitle || "Physics Expert");
           setAboutMockCardSubtitle(d.aboutMockCardSubtitle || "Daily Challenge streak");
-          setAboutMockCardValue(d.aboutMockCardValue || "8 Days 🔥");
+          setAboutMockCardValue(d.aboutMockCardValue || "8 Days");
           setAboutShowIitianBadge(d.aboutShowIitianBadge !== undefined ? d.aboutShowIitianBadge : true);
-          setAboutIitianBadgeText(d.aboutIitianBadgeText || "IITian Led 🚀");
+          setAboutIitianBadgeText(d.aboutIitianBadgeText || "IITian Led");
           setAboutShowLiveDoubts(d.aboutShowLiveDoubts !== undefined ? d.aboutShowLiveDoubts : true);
           setAboutLiveDoubtsText(d.aboutLiveDoubtsText || "Live Doubts Active");
           setAboutShowCalculusCard(d.aboutShowCalculusCard !== undefined ? d.aboutShowCalculusCard : true);
@@ -566,38 +807,84 @@ export default function AdminDashboard() {
           setAboutCornerImageUrl(d.aboutCornerImageUrl || "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=400");
           setAboutCornerImgShape(d.aboutCornerImgShape || "circle");
           setAboutCornerBackground(d.aboutCornerBackground || "water_spread");
+          setAboutTeacherPhotoUrl(d.aboutTeacherPhotoUrl || "");
+          setAboutTeacherName(d.aboutTeacherName || "Dr. Anand Kumar");
+          setAboutTeacherRole(d.aboutTeacherRole || "Senior Physics Specialist (Ex-IIT)");
+          setAboutTeacherTagline(d.aboutTeacherTagline || "Visualizing complex equations. Crafting interactive modules for deep analytical development.");
           setPwaBtnText(d.pwaBtnText || "Install App");
           setPwaBtnLink(d.pwaBtnLink || "");
+
+          setSocialSectionTitle(d.socialSectionTitle || "Connect via Socials");
+          setSocialSectionSubtitle(d.socialSectionSubtitle || "Stay in the loop with live streams, instant tips, sample study papers, and continuous student updates.");
+          setSocialSectionShow(d.socialSectionShow !== undefined ? d.socialSectionShow : true);
+          setSocialInstagramUrl(d.socialInstagramUrl !== undefined ? d.socialInstagramUrl : "https://instagram.com/nucleus.cc");
+          setSocialInstagramShow(d.socialInstagramShow !== undefined ? d.socialInstagramShow : true);
+          setSocialYoutubeUrl(d.socialYoutubeUrl !== undefined ? d.socialYoutubeUrl : "https://youtube.com/@nucleus");
+          setSocialYoutubeShow(d.socialYoutubeShow !== undefined ? d.socialYoutubeShow : true);
+          setSocialTelegramUrl(d.socialTelegramUrl !== undefined ? d.socialTelegramUrl : "https://t.me/nucleus");
+          setSocialTelegramShow(d.socialTelegramShow !== undefined ? d.socialTelegramShow : true);
+          setSocialDiscordUrl(d.socialDiscordUrl !== undefined ? d.socialDiscordUrl : "https://discord.gg/nucleus");
+          setSocialDiscordShow(d.socialDiscordShow !== undefined ? d.socialDiscordShow : true);
+          setSocialTwitterUrl(d.socialTwitterUrl !== undefined ? d.socialTwitterUrl : "https://x.com/nucleus");
+          setSocialTwitterShow(d.socialTwitterShow !== undefined ? d.socialTwitterShow : false);
+          setSocialLinkedinUrl(d.socialLinkedinUrl !== undefined ? d.socialLinkedinUrl : "");
+          setSocialLinkedinShow(d.socialLinkedinShow !== undefined ? d.socialLinkedinShow : false);
+          setSocialFacebookUrl(d.socialFacebookUrl !== undefined ? d.socialFacebookUrl : "");
+          setSocialFacebookShow(d.socialFacebookShow !== undefined ? d.socialFacebookShow : false);
 
           setStudySticker1Emoji(d.studySticker1Emoji || "📚");
           setStudySticker1Title(d.studySticker1Title || "STUDY FORCE");
           setStudySticker1Subtitle(d.studySticker1Subtitle || "Focus Active");
           setStudySticker1Popup(d.studySticker1Popup || "Ignite your study sessions with maximum mental torque! 📚 Keep learning!");
+          setStudySticker1Left(d.studySticker1Left !== undefined ? d.studySticker1Left : "2%");
+          setStudySticker1Top(d.studySticker1Top !== undefined ? d.studySticker1Top : "22%");
+          setStudySticker1Rotate(d.studySticker1Rotate !== undefined ? d.studySticker1Rotate : -12);
+          setStudySticker1Show(d.studySticker1Show !== undefined ? d.studySticker1Show : true);
 
           setStudySticker2Emoji(d.studySticker2Emoji || "💡");
           setStudySticker2Title(d.studySticker2Title || "DEEP FOCUS");
           setStudySticker2Subtitle(d.studySticker2Subtitle || "Active Sparks");
           setStudySticker2Popup(d.studySticker2Popup || "A single spark of intuition can illuminate any difficult problem! 💡 Stay curious!");
+          setStudySticker2Left(d.studySticker2Left !== undefined ? d.studySticker2Left : "4%");
+          setStudySticker2Top(d.studySticker2Top !== undefined ? d.studySticker2Top : "76%");
+          setStudySticker2Rotate(d.studySticker2Rotate !== undefined ? d.studySticker2Rotate : 15);
+          setStudySticker2Show(d.studySticker2Show !== undefined ? d.studySticker2Show : true);
 
           setStudySticker3Emoji(d.studySticker3Emoji || "🎓");
           setStudySticker3Title(d.studySticker3Title || "AIR 1 GOAL");
           setStudySticker3Subtitle(d.studySticker3Subtitle || "IIT Selection");
           setStudySticker3Popup(d.studySticker3Popup || "Keep your eyes on the prize. All India Rank 1 starts with persistent everyday discipline! 🎓");
+          setStudySticker3Left(d.studySticker3Left !== undefined ? d.studySticker3Left : "47%");
+          setStudySticker3Top(d.studySticker3Top !== undefined ? d.studySticker3Top : "12%");
+          setStudySticker3Rotate(d.studySticker3Rotate !== undefined ? d.studySticker3Rotate : -8);
+          setStudySticker3Show(d.studySticker3Show !== undefined ? d.studySticker3Show : true);
 
           setStudySticker4Emoji(d.studySticker4Emoji || "🎯");
           setStudySticker4Title(d.studySticker4Title || "100% AIM");
           setStudySticker4Subtitle(d.studySticker4Subtitle || "Perfect Practice");
           setStudySticker4Popup(d.studySticker4Popup || "Accuracy is built by constant deliberate feedback. Refine your aim daily! 🎯");
+          setStudySticker4Left(d.studySticker4Left !== undefined ? d.studySticker4Left : "44%");
+          setStudySticker4Top(d.studySticker4Top !== undefined ? d.studySticker4Top : "84%");
+          setStudySticker4Rotate(d.studySticker4Rotate !== undefined ? d.studySticker4Rotate : 10);
+          setStudySticker4Show(d.studySticker4Show !== undefined ? d.studySticker4Show : true);
 
           setStudySticker5Emoji(d.studySticker5Emoji || "☕");
           setStudySticker5Title(d.studySticker5Title || "NIGHT RUNS");
           setStudySticker5Subtitle(d.studySticker5Subtitle || "Midnight Session");
           setStudySticker5Popup(d.studySticker5Popup || "The quiet hours are when progress is made. Fuel your academic ambition! ☕");
+          setStudySticker5Left(d.studySticker5Left !== undefined ? d.studySticker5Left : "88%");
+          setStudySticker5Top(d.studySticker5Top !== undefined ? d.studySticker5Top : "16%");
+          setStudySticker5Rotate(d.studySticker5Rotate !== undefined ? d.studySticker5Rotate : -14);
+          setStudySticker5Show(d.studySticker5Show !== undefined ? d.studySticker5Show : true);
 
           setStudySticker6Emoji(d.studySticker6Emoji || "🧠");
           setStudySticker6Title(d.studySticker6Title || "NEURAL GRID");
           setStudySticker6Subtitle(d.studySticker6Subtitle || "Concept Clear");
           setStudySticker6Popup(d.studySticker6Popup || "Connect the dots, master the formulas, and let neuroplasticity do the rest! 🧠");
+          setStudySticker6Left(d.studySticker6Left !== undefined ? d.studySticker6Left : "87%");
+          setStudySticker6Top(d.studySticker6Top !== undefined ? d.studySticker6Top : "78%");
+          setStudySticker6Rotate(d.studySticker6Rotate !== undefined ? d.studySticker6Rotate : 18);
+          setStudySticker6Show(d.studySticker6Show !== undefined ? d.studySticker6Show : true);
 
           setPricingCard1Badge(d.pricingCard1Badge || "Essential Revision");
           setPricingCard1Title(d.pricingCard1Title || "High Grade Notes");
@@ -637,6 +924,7 @@ export default function AdminDashboard() {
           if (tc.navbarStyle) setNavbarStyle(tc.navbarStyle);
           if (tc.dashboardStyle) setDashboardStyle(tc.dashboardStyle);
           if (tc.mobileUiStyle) setMobileUiStyle(tc.mobileUiStyle);
+          if (tc.dockBackgroundStyle) setDockBackgroundStyle(tc.dockBackgroundStyle);
           if (tc.enableManualOverrides !== undefined)
             setEnableManualOverrides(tc.enableManualOverrides);
           if (tc.overrideTextPrimary) setOverrideTextPrimary(tc.overrideTextPrimary);
@@ -651,6 +939,22 @@ export default function AdminDashboard() {
           if (sch.endTime) setScheduleEndTime(sch.endTime);
           if (sch.themeId) setScheduleThemeId(sch.themeId);
         }
+        if (d.chatbotEnabled !== undefined) setChatbotEnabled(d.chatbotEnabled);
+        if (d.chatbotIconUrl !== undefined) setChatbotIconUrl(d.chatbotIconUrl);
+      }
+
+      // Fetch AI chatbot secure config
+      try {
+        const aiDocRef = doc(db, "settings", "secure_bot");
+        const aiDocSnap = await getDoc(aiDocRef);
+        if (aiDocSnap.exists()) {
+          const aiData = aiDocSnap.data();
+          if (aiData.provider) setAiProvider(aiData.provider);
+          if (aiData.apiKey) setAiApiKey(aiData.apiKey);
+          if (aiData.model) setAiModel(aiData.model);
+        }
+      } catch (aiErr) {
+        console.error("Error loading secure AI config:", aiErr);
       }
     } catch (e) {
       console.error(e);
@@ -679,6 +983,7 @@ export default function AdminDashboard() {
         navbarStyle,
         dashboardStyle,
         mobileUiStyle,
+        dockBackgroundStyle,
         enableManualOverrides,
         overrideTextPrimary,
         overrideTextSecondary,
@@ -716,6 +1021,7 @@ export default function AdminDashboard() {
     navbarStyle,
     dashboardStyle,
     mobileUiStyle,
+    dockBackgroundStyle,
     enableManualOverrides,
     overrideTextPrimary,
     overrideTextSecondary,
@@ -768,6 +1074,7 @@ export default function AdminDashboard() {
     if (preset.navbarStyle) setNavbarStyle(preset.navbarStyle);
     if (preset.dashboardStyle) setDashboardStyle(preset.dashboardStyle);
     if (preset.mobileUiStyle) setMobileUiStyle(preset.mobileUiStyle);
+    setDockBackgroundStyle(preset.dockBackgroundStyle || "frosted");
 
     // Sync manual contrast overrides
     setEnableManualOverrides(preset.enableManualOverrides || false);
@@ -777,8 +1084,8 @@ export default function AdminDashboard() {
   };
 
   const handleSaveDraft = async () => {
-    if (user?.role !== "superadmin")
-      return alert("Only Super Admin can update designs.");
+    if (user?.role !== "superadmin" && user?.role !== "admin")
+      return alert("Only administrators can update designs.");
     const drafts: ThemeConfig = {
       activeTheme: appearanceTheme,
       primaryColor,
@@ -798,6 +1105,7 @@ export default function AdminDashboard() {
       navbarStyle,
       dashboardStyle,
       mobileUiStyle,
+      dockBackgroundStyle,
       enableManualOverrides,
       overrideTextPrimary,
       overrideTextSecondary,
@@ -819,8 +1127,8 @@ export default function AdminDashboard() {
   };
 
   const handlePublishTheme = async () => {
-    if (user?.role !== "superadmin")
-      return alert("Only Super Admin can publish themes.");
+    if (user?.role !== "superadmin" && user?.role !== "admin")
+      return alert("Only administrators can publish themes.");
     const liveConfig: ThemeConfig = {
       activeTheme: appearanceTheme,
       primaryColor,
@@ -840,6 +1148,7 @@ export default function AdminDashboard() {
       navbarStyle,
       dashboardStyle,
       mobileUiStyle,
+      dockBackgroundStyle,
       enableManualOverrides,
       overrideTextPrimary,
       overrideTextSecondary,
@@ -899,6 +1208,7 @@ export default function AdminDashboard() {
         navbarStyle,
         dashboardStyle,
         mobileUiStyle,
+        dockBackgroundStyle,
         enableManualOverrides,
         overrideTextPrimary,
         overrideTextSecondary,
@@ -936,6 +1246,7 @@ export default function AdminDashboard() {
       navbarStyle,
       dashboardStyle,
       mobileUiStyle,
+      dockBackgroundStyle,
       enableManualOverrides,
       overrideTextPrimary,
       overrideTextSecondary,
@@ -977,6 +1288,7 @@ export default function AdminDashboard() {
       if (imported.navbarStyle) setNavbarStyle(imported.navbarStyle);
       if (imported.dashboardStyle) setDashboardStyle(imported.dashboardStyle);
       if (imported.mobileUiStyle) setMobileUiStyle(imported.mobileUiStyle);
+      if (imported.dockBackgroundStyle) setDockBackgroundStyle(imported.dockBackgroundStyle);
 
       if (imported.enableManualOverrides !== undefined)
         setEnableManualOverrides(imported.enableManualOverrides);
@@ -997,8 +1309,8 @@ export default function AdminDashboard() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user?.role !== "superadmin")
-      return alert("Only Super Admin can update settings.");
+    if (user?.role !== "superadmin" && user?.role !== "admin")
+      return alert("Only administrators can update settings.");
     try {
       await setDoc(
         doc(db, "settings", "global"),
@@ -1052,32 +1364,77 @@ export default function AdminDashboard() {
           aboutCornerImageUrl,
           aboutCornerImgShape,
           aboutCornerBackground,
+          aboutTeacherPhotoUrl,
+          aboutTeacherName,
+          aboutTeacherRole,
+          aboutTeacherTagline,
           pwaBtnText,
           pwaBtnLink,
+          socialSectionTitle,
+          socialSectionSubtitle,
+          socialSectionShow,
+          socialInstagramUrl,
+          socialInstagramShow,
+          socialYoutubeUrl,
+          socialYoutubeShow,
+          socialTelegramUrl,
+          socialTelegramShow,
+          socialDiscordUrl,
+          socialDiscordShow,
+          socialTwitterUrl,
+          socialTwitterShow,
+          socialLinkedinUrl,
+          socialLinkedinShow,
+          socialFacebookUrl,
+          socialFacebookShow,
           studySticker1Emoji,
           studySticker1Title,
           studySticker1Subtitle,
           studySticker1Popup,
+          studySticker1Left,
+          studySticker1Top,
+          studySticker1Rotate,
+          studySticker1Show,
           studySticker2Emoji,
           studySticker2Title,
           studySticker2Subtitle,
           studySticker2Popup,
+          studySticker2Left,
+          studySticker2Top,
+          studySticker2Rotate,
+          studySticker2Show,
           studySticker3Emoji,
           studySticker3Title,
           studySticker3Subtitle,
           studySticker3Popup,
+          studySticker3Left,
+          studySticker3Top,
+          studySticker3Rotate,
+          studySticker3Show,
           studySticker4Emoji,
           studySticker4Title,
           studySticker4Subtitle,
           studySticker4Popup,
+          studySticker4Left,
+          studySticker4Top,
+          studySticker4Rotate,
+          studySticker4Show,
           studySticker5Emoji,
           studySticker5Title,
           studySticker5Subtitle,
           studySticker5Popup,
+          studySticker5Left,
+          studySticker5Top,
+          studySticker5Rotate,
+          studySticker5Show,
           studySticker6Emoji,
           studySticker6Title,
           studySticker6Subtitle,
           studySticker6Popup,
+          studySticker6Left,
+          studySticker6Top,
+          studySticker6Rotate,
+          studySticker6Show,
           pricingCard1Badge,
           pricingCard1Title,
           pricingCard1Desc,
@@ -1090,6 +1447,10 @@ export default function AdminDashboard() {
           pricingCard3Title,
           pricingCard3Desc,
           pricingCard3Features,
+          syllabusSectionName,
+          classSyllabuses,
+          chatbotEnabled,
+          chatbotIconUrl,
         },
         { merge: true },
       );
@@ -1097,6 +1458,91 @@ export default function AdminDashboard() {
     } catch (e) {
       console.error(e);
       alert("Failed to save settings.");
+    }
+  };
+
+  const handleSaveAiSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      alert("Only administrators can update AI Assistant settings.");
+      return;
+    }
+    setIsSavingAiSettings(true);
+    try {
+      await setDoc(
+        doc(db, "settings", "secure_bot"),
+        {
+          provider: aiProvider,
+          apiKey: aiApiKey,
+          model: aiModel,
+        },
+        { merge: true }
+      );
+
+      // Save to server backup cache to overcome backend service account cross-project IAM bounds
+      try {
+        await fetch("/api/chatbot/config", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: aiProvider,
+            apiKey: aiApiKey,
+            model: aiModel,
+            userEmail: user?.email,
+          }),
+        });
+      } catch (backupErr) {
+        console.error("Failed to update backend config backup:", backupErr);
+      }
+
+      alert("AI Assistant config updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to save AI settings: " + err.message);
+    } finally {
+      setIsSavingAiSettings(false);
+    }
+  };
+
+  const fetchAiLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const res = await fetch("/api/chatbot/logs");
+      if (res.ok) {
+        const data = await res.json();
+        setAiLogs(data.logs || []);
+      }
+    } catch (e) {
+      console.error("Error fetching AI logs:", e);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleSaveSyllabusSettings = async () => {
+    if (!user) return;
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      alert("Only administrators can update syllabus data.");
+      return;
+    }
+    try {
+      setIsSavingSyllabus(true);
+      await setDoc(
+        doc(db, "settings", "global"),
+        {
+          syllabusSectionName,
+          classSyllabuses,
+        },
+        { merge: true },
+      );
+      alert("Syllabus configuration updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to save syllabus: " + err.message);
+    } finally {
+      setIsSavingSyllabus(false);
     }
   };
 
@@ -1112,6 +1558,8 @@ export default function AdminDashboard() {
           thumbnailUrl,
           requiredPlan: plan,
           classGroup,
+          section: section || "General",
+          isHidden: isHidden || false,
           updatedAt: serverTimestamp(),
         });
         await setDoc(doc(db, "materials_secure", editingMaterialId), { url });
@@ -1124,6 +1572,8 @@ export default function AdminDashboard() {
           thumbnailUrl,
           requiredPlan: plan,
           classGroup,
+          section: section || "General",
+          isHidden: isHidden || false,
           authorId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -1138,6 +1588,8 @@ export default function AdminDashboard() {
       setPlan("free");
       setClassGroup("all");
       setType("note");
+      setSection("General");
+      setIsHidden(false);
       fetchData();
     } catch (error) {
       console.error("Error creating/updating material", error);
@@ -1152,6 +1604,8 @@ export default function AdminDashboard() {
     setType(mat.type);
     setPlan(mat.requiredPlan);
     setClassGroup(mat.classGroup || "all");
+    setSection(mat.section || "General");
+    setIsHidden(mat.isHidden || false);
     try {
       const docSnap = await getDoc(doc(db, "materials_secure", mat.id));
       if (docSnap.exists()) {
@@ -1175,6 +1629,8 @@ export default function AdminDashboard() {
     setPlan("free");
     setClassGroup("all");
     setType("note");
+    setSection("General");
+    setIsHidden(false);
   };
 
   const handleCreateMentor = async (e: React.FormEvent) => {
@@ -1295,12 +1751,97 @@ export default function AdminDashboard() {
 
   return (
     <motion.div
+      id="admin-panel-container"
       initial={{ opacity: 0, filter: "blur(5px)" }}
       animate={{ opacity: 1, filter: "blur(0px)" }}
       exit={{ opacity: 0, filter: "blur(5px)" }}
       transition={{ duration: 0.5 }}
       className="min-h-screen pt-24 pb-32 px-6 md:px-12 max-w-7xl mx-auto"
     >
+      <style>{`
+        body, html, #root {
+          background-color: #000000 !important;
+        }
+        #admin-panel-container {
+          --primary-custom: #F15A29;
+          background-color: #000000 !important;
+        }
+        #admin-panel-container h1,
+        #admin-panel-container h2,
+        #admin-panel-container h3,
+        #admin-panel-container h4,
+        #admin-panel-container h5,
+        #admin-panel-container h6,
+        #admin-panel-container p,
+        #admin-panel-container span,
+        #admin-panel-container strong,
+        #admin-panel-container label,
+        #admin-panel-container legend,
+        #admin-panel-container caption,
+        #admin-panel-container th,
+        #admin-panel-container td,
+        #admin-panel-container li,
+        #admin-panel-container a,
+        #admin-panel-container :not(.bg-primary):not([class*="bg-primary"]) > svg {
+          color: var(--color-primary, #F15A29) !important;
+        }
+
+        /* Black text for solid primary-colored surfaces */
+        #admin-panel-container .bg-primary,
+        #admin-panel-container [class*="bg-primary"],
+        #admin-panel-container button.bg-primary,
+        #admin-panel-container button[class*="bg-primary"],
+        #admin-panel-container .bg-primary *,
+        #admin-panel-container [class*="bg-primary"] * {
+          color: #000000 !important;
+          fill: #000000 !important;
+        }
+
+        /* Subcontainers, forms, and tables background to deep black for maximum premium look */
+        #admin-panel-container div[class*="bg-white/5"],
+        #admin-panel-container div[class*="bg-white/10"],
+        #admin-panel-container div[class*="bg-black/"],
+        #admin-panel-container div[class*="bg-zinc-"],
+        #admin-panel-container div.bg-zinc-900\\/60,
+        #admin-panel-container .bg-white\\/5,
+        #admin-panel-container .bg-white\\/10,
+        #admin-panel-container .bg-black\\/40,
+        #admin-panel-container .bg-black\\/50 {
+          background-color: #000000 !important;
+          border-color: rgba(241, 90, 41, 0.25) !important;
+        }
+
+        /* Input controls and buttons */
+        #admin-panel-container input,
+        #admin-panel-container textarea,
+        #admin-panel-container select {
+          background-color: #000000 !important;
+          color: var(--color-primary, #F15A29) !important;
+          border-color: rgba(241, 90, 41, 0.4) !important;
+        }
+        #admin-panel-container input::placeholder,
+        #admin-panel-container textarea::placeholder {
+          color: rgba(241, 90, 41, 0.45) !important;
+        }
+        #admin-panel-container input:focus,
+        #admin-panel-container textarea:focus,
+        #admin-panel-container select:focus {
+          border-color: var(--color-primary, #F15A29) !important;
+          box-shadow: 0 0 0 2px rgba(241, 90, 41, 0.15) !important;
+        }
+
+        /* Adjust all border utilities to use fine-grained theme orange */
+        #admin-panel-container .border,
+        #admin-panel-container [class*="border-white/"],
+        #admin-panel-container [class*="border-dashed"] {
+          border-color: rgba(241, 90, 41, 0.2) !important;
+        }
+        
+        #admin-translucent-tab-bar {
+          background-color: #000000 !important;
+          border-color: rgba(241, 90, 41, 0.3) !important;
+        }
+      `}</style>
       <button
         onClick={() => navigate("/dashboard")}
         className="mb-8 flex items-center gap-2 text-white/50 hover:text-white transition-colors"
@@ -1311,52 +1852,115 @@ export default function AdminDashboard() {
 
       <h1 className="text-4xl font-display font-medium mb-8">Admin Control</h1>
 
-      <div className="flex gap-4 border-b border-white/5 mb-8">
+      {/* iOS-Style Solid Translucent Navigation Bar */}
+      <div 
+        id="admin-translucent-tab-bar" 
+        className="w-full bg-zinc-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 mb-8 shadow-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
         <button
+          id="tab-btn-materials"
           onClick={() => setActiveTab("materials")}
-          className={`pb-4 px-2 font-medium transition-colors border-b-2 ${activeTab === "materials" ? "border-[#E5D2A5] text-[#E5D2A5]" : "border-transparent text-white/50 hover:text-white"}`}
+          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === "materials"
+              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+              : "text-white/60 hover:text-white hover:bg-white/5"
+          }`}
         >
           Content Engine
         </button>
         <button
+          id="tab-btn-users"
           onClick={() => setActiveTab("users")}
-          className={`pb-4 px-2 font-medium transition-colors border-b-2 ${activeTab === "users" ? "border-[#E5D2A5] text-[#E5D2A5]" : "border-transparent text-white/50 hover:text-white"}`}
+          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === "users"
+              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+              : "text-white/60 hover:text-white hover:bg-white/5"
+          }`}
         >
           Student Roster
         </button>
         <button
+          id="tab-btn-mentors"
           onClick={() => setActiveTab("mentors")}
-          className={`pb-4 px-2 font-medium transition-colors border-b-2 ${activeTab === "mentors" ? "border-[#E5D2A5] text-[#E5D2A5]" : "border-transparent text-white/50 hover:text-white"}`}
+          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === "mentors"
+              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+              : "text-white/60 hover:text-white hover:bg-white/5"
+          }`}
         >
           Faculty / Mentors
         </button>
-        {user?.role === "superadmin" && (
+        {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
+            id="tab-btn-appearance"
             onClick={() => setActiveTab("appearance")}
-            className={`pb-4 px-2 font-medium transition-colors border-b-2 ${activeTab === "appearance" ? "border-primary text-primary" : "border-transparent text-white/50 hover:text-white"}`}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "appearance"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
           >
             🎨 Appearance
           </button>
         )}
-        {user?.role === "superadmin" && (
+        {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
+            id="tab-btn-settings"
             onClick={() => setActiveTab("settings")}
-            className={`pb-4 px-2 font-medium transition-colors border-b-2 ${activeTab === "settings" ? "border-[#E5D2A5] text-[#E5D2A5]" : "border-transparent text-white/50 hover:text-white"}`}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "settings"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
           >
             Settings
           </button>
         )}
-        {user?.role === "superadmin" && (
+        {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
+            id="tab-btn-syllabus"
+            onClick={() => setActiveTab("syllabus")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "syllabus"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            📚 Syllabus Planner
+          </button>
+        )}
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-support-chats"
+            onClick={() => setActiveTab("support_chats")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "support_chats"
+                ? "bg-[#E5D2A5] text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <span>💬 Live Chats</span>
+            {sessions.some(s => s.unreadByAdmin) && (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            )}
+          </button>
+        )}
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-security"
             onClick={() => setActiveTab("security")}
-            className={`pb-4 px-2 font-medium transition-colors border-b-2 ${activeTab === "security" ? "border-red-500 text-red-500" : "border-transparent text-white/50 hover:text-white"}`}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "security"
+                ? "bg-red-500 text-white shadow-md font-bold scale-[1.02]"
+                : "text-red-400/80 hover:text-red-300 hover:bg-red-500/10"
+            }`}
           >
             🛡️ Security Center
           </button>
         )}
       </div>
 
-      {activeTab === "appearance" && user?.role === "superadmin" && (
+      {activeTab === "appearance" && (user?.role === "superadmin" || user?.role === "admin") && (
         <div className="space-y-8 max-w-6xl animate-fade-in">
           {/* Real-time preview system header */}
           <div className="border border-primary/20 bg-primary/5 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -2128,6 +2732,30 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               </div>
+
+              {/* LiquidGlassDock Background Style */}
+              <div className="border-t border-white/5 pt-4">
+                <label className="block text-xs font-medium text-white/60 mb-2 font-display flex items-center justify-between">
+                  <span>LiquidGlassDock Background Style</span>
+                  <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-mono uppercase tracking-widest scale-90">Dock Style</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["frosted", "solid"] as const).map((style) => (
+                    <button
+                      key={style}
+                      type="button"
+                      onClick={() => setDockBackgroundStyle(style)}
+                      className={`py-1.5 px-1 capitalize rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                        dockBackgroundStyle === style
+                          ? "bg-primary text-black border-primary font-bold"
+                          : "bg-black/20 border-white/5 text-white/60 hover:border-white/10"
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2361,14 +2989,14 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {activeTab === "settings" && user?.role === "superadmin" && (
+      {activeTab === "settings" && (user?.role === "superadmin" || user?.role === "admin") && (
         <div className="max-w-4xl border border-white/10 p-6 rounded-2xl bg-white/5">
           <h3 className="text-xl font-medium mb-6">Global Settings</h3>
           <form onSubmit={handleSaveSettings} className="space-y-6">
             {/* Prices Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-medium text-[#E5D2A5] uppercase tracking-wide">
+                <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] uppercase tracking-wide">
                   Pricing Configuration (Default)
                 </h4>
               </div>
@@ -2381,7 +3009,7 @@ export default function AdminDashboard() {
                     type="number"
                     value={priceNotes}
                     onChange={(e) => setPriceNotes(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2392,7 +3020,7 @@ export default function AdminDashboard() {
                     type="number"
                     value={priceLectures}
                     onChange={(e) => setPriceLectures(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2403,7 +3031,7 @@ export default function AdminDashboard() {
                     type="number"
                     value={pricePremium}
                     onChange={(e) => setPricePremium(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div className="md:col-span-3">
@@ -2415,15 +3043,15 @@ export default function AdminDashboard() {
                     placeholder="e.g. john@upi"
                     value={upiId}
                     onChange={(e) => setUpiId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
               </div>
 
               {/* Pricing Cards Content Customizer */}
-              <div className="mb-8 p-5 rounded-2xl border border-[#E5D2A5]/20 bg-[#E5D2A5]/5 space-y-6">
+              <div className="mb-8 p-5 rounded-2xl border border-[var(--primary-custom, #F15A29)]/20 bg-[var(--primary-custom, #F15A29)]/5 space-y-6">
                 <div>
-                  <h4 className="text-sm font-bold text-[#E5D2A5] uppercase tracking-wide">
+                  <h4 className="text-sm font-bold text-[var(--primary-custom, #F15A29)] uppercase tracking-wide">
                     Customize Pricing Cards Content & Texts
                   </h4>
                   <p className="text-xs text-white/50 mt-1">
@@ -2443,7 +3071,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard1Badge}
                         onChange={(e) => setPricingCard1Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -2452,7 +3080,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard1Title}
                         onChange={(e) => setPricingCard1Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                   </div>
@@ -2462,7 +3090,7 @@ export default function AdminDashboard() {
                       value={pricingCard1Desc}
                       onChange={(e) => setPricingCard1Desc(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5] resize-none"
+                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
                     />
                   </div>
                   <div>
@@ -2471,7 +3099,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={pricingCard1Features}
                       onChange={(e) => setPricingCard1Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       placeholder="Feature 1, Feature 2, Feature 3"
                     />
                   </div>
@@ -2489,7 +3117,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard2Badge}
                         onChange={(e) => setPricingCard2Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -2498,7 +3126,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard2Title}
                         onChange={(e) => setPricingCard2Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                   </div>
@@ -2508,7 +3136,7 @@ export default function AdminDashboard() {
                       value={pricingCard2Desc}
                       onChange={(e) => setPricingCard2Desc(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5] resize-none"
+                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
                     />
                   </div>
                   <div>
@@ -2517,7 +3145,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={pricingCard2Features}
                       onChange={(e) => setPricingCard2Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       placeholder="Feature 1, Feature 2, Feature 3"
                     />
                   </div>
@@ -2535,7 +3163,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard3Badge}
                         onChange={(e) => setPricingCard3Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -2544,7 +3172,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard3Title}
                         onChange={(e) => setPricingCard3Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                   </div>
@@ -2554,7 +3182,7 @@ export default function AdminDashboard() {
                       value={pricingCard3Desc}
                       onChange={(e) => setPricingCard3Desc(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5] resize-none"
+                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
                     />
                   </div>
                   <div>
@@ -2563,7 +3191,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={pricingCard3Features}
                       onChange={(e) => setPricingCard3Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       placeholder="Feature 1, Feature 2, Feature 3"
                     />
                   </div>
@@ -2598,7 +3226,7 @@ export default function AdminDashboard() {
                             },
                           }))
                         }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -2620,7 +3248,7 @@ export default function AdminDashboard() {
                             },
                           }))
                         }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -2642,7 +3270,7 @@ export default function AdminDashboard() {
                             },
                           }))
                         }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                   </div>
@@ -2652,7 +3280,7 @@ export default function AdminDashboard() {
 
             {/* Branding Section */}
             <div>
-              <h4 className="text-sm font-medium text-[#E5D2A5] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
                 Brand & Identity
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2664,7 +3292,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={websiteName}
                     onChange={(e) => setWebsiteName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2675,7 +3303,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={documentTitle}
                     onChange={(e) => setDocumentTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2686,7 +3314,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={logoText}
                     onChange={(e) => setLogoText(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2697,7 +3325,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={logoImage}
                     onChange={(e) => setLogoImage(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -2708,7 +3336,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={faviconUrl}
                     onChange={(e) => setFaviconUrl(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
               </div>
@@ -2716,7 +3344,7 @@ export default function AdminDashboard() {
 
             {/* Hero Section settings */}
             <div>
-              <h4 className="text-sm font-medium text-[#E5D2A5] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
                 Hero Section (Home)
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2728,7 +3356,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroTitle}
                     onChange={(e) => setHeroTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -2738,7 +3366,7 @@ export default function AdminDashboard() {
                   <textarea
                     value={heroSubtitle}
                     onChange={(e) => setHeroSubtitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5] h-20 resize-none"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-20 resize-none"
                   />
                 </div>
                 <div>
@@ -2749,7 +3377,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroBadgeText}
                     onChange={(e) => setHeroBadgeText(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2760,7 +3388,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroCta1Text}
                     onChange={(e) => setHeroCta1Text(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2772,7 +3400,7 @@ export default function AdminDashboard() {
                     placeholder="/dashboard or https://..."
                     value={heroCta1Link}
                     onChange={(e) => setHeroCta1Link(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2783,7 +3411,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroCta2Text}
                     onChange={(e) => setHeroCta2Text(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
                 <div>
@@ -2795,7 +3423,7 @@ export default function AdminDashboard() {
                     placeholder="https://youtube.com/..."
                     value={heroCta2Link}
                     onChange={(e) => setHeroCta2Link(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
               </div>
@@ -2803,7 +3431,7 @@ export default function AdminDashboard() {
 
             {/* Footer Section */}
             <div>
-              <h4 className="text-sm font-medium text-[#E5D2A5] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
                 Footer Configuration
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -2814,7 +3442,7 @@ export default function AdminDashboard() {
                   <textarea
                     value={footerDescription}
                     onChange={(e) => setFooterDescription(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5] h-20 resize-none"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-20 resize-none"
                   />
                 </div>
               </div>
@@ -2822,7 +3450,7 @@ export default function AdminDashboard() {
 
             {/* Review & Contact Form Section */}
             <div className="mb-6">
-              <h4 className="text-sm font-medium text-[#E5D2A5] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
                 Contact / Review Form Config
               </h4>
               <div className="grid grid-cols-1 gap-4">
@@ -2835,7 +3463,7 @@ export default function AdminDashboard() {
                     placeholder="https://formspree.io/f/..."
                     value={reviewFormUrl}
                     onChange={(e) => setReviewFormUrl(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                   <p className="text-xs text-white/40 mt-2">
                     If provided, a contact form will be displayed at the bottom
@@ -2847,7 +3475,7 @@ export default function AdminDashboard() {
 
             {/* About Section Interactive Graphics Config */}
             <div className="mb-6 border-t border-white/10 pt-6">
-              <h4 className="text-sm font-medium text-[#E5D2A5] mb-4 uppercase tracking-wide font-display">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide font-display">
                 About Section Graphics & Badges Config
               </h4>
               <p className="text-xs text-white/50 mb-4">
@@ -2878,7 +3506,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutMockCardTitle}
                           onChange={(e) => setAboutMockCardTitle(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                         />
                       </div>
                       <div>
@@ -2887,7 +3515,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutMockCardSubtitle}
                           onChange={(e) => setAboutMockCardSubtitle(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                         />
                       </div>
                       <div>
@@ -2896,7 +3524,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutMockCardValue}
                           onChange={(e) => setAboutMockCardValue(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                         />
                       </div>
                     </div>
@@ -2925,7 +3553,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={aboutIitianBadgeText}
                         onChange={(e) => setAboutIitianBadgeText(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                   )}
@@ -2953,7 +3581,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={aboutLiveDoubtsText}
                         onChange={(e) => setAboutLiveDoubtsText(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                   )}
@@ -2983,7 +3611,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusTitle}
                             onChange={(e) => setAboutCalculusTitle(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                           />
                         </div>
                         <div>
@@ -2992,7 +3620,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusBadge}
                             onChange={(e) => setAboutCalculusBadge(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                           />
                         </div>
                       </div>
@@ -3005,7 +3633,7 @@ export default function AdminDashboard() {
                             max="100"
                             value={aboutCalculusProgress}
                             onChange={(e) => setAboutCalculusProgress(Number(e.target.value))}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                           />
                         </div>
                         <div>
@@ -3014,7 +3642,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusLectureText}
                             onChange={(e) => setAboutCalculusLectureText(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                           />
                         </div>
                         <div>
@@ -3023,7 +3651,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusPercentText}
                             onChange={(e) => setAboutCalculusPercentText(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                           />
                         </div>
                       </div>
@@ -3054,7 +3682,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutRatingTitle}
                           onChange={(e) => setAboutRatingTitle(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                         />
                       </div>
                       <div>
@@ -3063,7 +3691,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutRatingDesc}
                           onChange={(e) => setAboutRatingDesc(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                         />
                       </div>
                     </div>
@@ -3090,7 +3718,7 @@ export default function AdminDashboard() {
                         placeholder="https://images.unsplash.com/..."
                         value={aboutCornerImageUrl}
                         onChange={(e) => setAboutCornerImageUrl(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -3098,7 +3726,7 @@ export default function AdminDashboard() {
                       <select
                         value={aboutCornerImgShape}
                         onChange={(e) => setAboutCornerImgShape(e.target.value as "circle" | "card")}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-[#E5D2A5] focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-[var(--primary-custom, #F15A29)] focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       >
                         <option value="circle">Circular / Round Shape</option>
                         <option value="card">Rounded Corner Card Shape</option>
@@ -3109,13 +3737,69 @@ export default function AdminDashboard() {
                       <select
                         value={aboutCornerBackground}
                         onChange={(e) => setAboutCornerBackground(e.target.value as "orange_burst" | "water_spread" | "none")}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-[#ff7a00]/30 text-[#ff7a00] focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-[#ff7a00]/30 text-[#ff7a00] focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       >
                         <option value="water_spread">Liquid Water Spread Spill Pattern (Orange)</option>
                         <option value="orange_burst">Balloon Burst Splatter Burst (Orange)</option>
                         <option value="none">Neutral Clean Background (No pop splash)</option>
                       </select>
                     </div>
+                  </div>
+                </div>
+
+                {/* Interactive Teacher Card on Click */}
+                <div className="p-4 rounded-xl border border-white/10 bg-white/5 space-y-4">
+                  <div>
+                    <span className="text-sm font-semibold text-white flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary-custom, #F15A29)]" /> 
+                      Interactive Teacher Showcase Card (Streak Widget Click)
+                    </span>
+                    <p className="text-xs text-white/50 mt-1">
+                      Customize the details of the roundish corner teacher box that appears with high-end dark water-spraying backdrop.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs text-white/60 mb-1.5">Teacher Photo URL</label>
+                      <input
+                        type="text"
+                        placeholder="https://images.unsplash.com/..."
+                        value={aboutTeacherPhotoUrl}
+                        onChange={(e) => setAboutTeacherPhotoUrl(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/60 mb-1.5">Teacher Name</label>
+                      <input
+                        type="text"
+                        placeholder="Dr. Anand Kumar"
+                        value={aboutTeacherName}
+                        onChange={(e) => setAboutTeacherName(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/60 mb-1.5">Teacher Role/Credentials</label>
+                      <input
+                        type="text"
+                        placeholder="Senior Physics Specialist (Ex-IIT)"
+                        value={aboutTeacherRole}
+                        onChange={(e) => setAboutTeacherRole(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-white/60 mb-1.5">Inspiring Tagline / Bio Quote</label>
+                    <textarea
+                      placeholder="Visualizing complex equations. Crafting interactive modules for deep analytical development."
+                      value={aboutTeacherTagline}
+                      onChange={(e) => setAboutTeacherTagline(e.target.value)}
+                      className="w-full h-16 px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
+                    />
                   </div>
                 </div>
 
@@ -3139,7 +3823,7 @@ export default function AdminDashboard() {
                         placeholder="Install App"
                         value={pwaBtnText}
                         onChange={(e) => setPwaBtnText(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                     </div>
                     <div>
@@ -3149,7 +3833,7 @@ export default function AdminDashboard() {
                         placeholder="https://play.google.com/store/apps/details?id=..."
                         value={pwaBtnLink}
                         onChange={(e) => setPwaBtnLink(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                       />
                       <span className="text-[10px] text-white/40 mt-1 block">
                         Leave blank to activate the default seamless PWA installation flow.
@@ -3158,10 +3842,269 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* 5d. Social Media Live Links & Channels Widget */}
+                <div id="social-media-channels-control-card" className="p-4 rounded-xl border border-white/10 bg-white/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                    <div>
+                      <span className="text-sm font-semibold text-white flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" /> 
+                        Social Media Links & Visibility Control Panel
+                      </span>
+                      <p className="text-xs text-white/50 mt-1">
+                        Control the global social media section layout, edit custom redirection profiles, and toggle channel visibility.
+                      </p>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setSocialSectionShow(!socialSectionShow)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold cursor-pointer transition-colors self-start sm:self-auto ${
+                        socialSectionShow ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-white/10 text-white/60 border border-white/10"
+                      }`}
+                    >
+                      {socialSectionShow ? "Section Enabled" : "Section Hidden"}
+                    </button>
+                  </div>
+
+                  {socialSectionShow && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                        <div>
+                          <label className="block text-xs text-white/60 mb-1.5">Section Main Header Text</label>
+                          <input
+                            type="text"
+                            placeholder="Connect via Socials"
+                            value={socialSectionTitle}
+                            onChange={(e) => setSocialSectionTitle(e.target.value)}
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-white/60 mb-1.5">Section Sub-header Text Detail</label>
+                          <input
+                            type="text"
+                            placeholder="Stay in the loop with live streams..."
+                            value={socialSectionSubtitle}
+                            onChange={(e) => setSocialSectionSubtitle(e.target.value)}
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-white/10 my-4" />
+                      <span className="text-xs font-bold text-[var(--primary-custom, #F15A29)] block mb-2 uppercase tracking-wider">Configure Channels Profiles (Link + Toggle)</span>
+
+                      <div className="space-y-3">
+                        {/* Instagram Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#E1306C]/10 text-[#E1306C] flex items-center justify-center font-bold text-xs">IG</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">Instagram Handle Card</span>
+                              <span className="text-[10px] text-white/40">Visits social circle feedback</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://instagram.com/your-username"
+                              value={socialInstagramUrl}
+                              onChange={(e) => setSocialInstagramUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialInstagramShow(!socialInstagramShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialInstagramShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialInstagramShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* YouTube Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#FF0000]/10 text-[#FF0000] flex items-center justify-center font-bold text-xs">YT</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">YouTube Channel Url</span>
+                              <span className="text-[10px] text-white/40">Video archives & streams</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://youtube.com/@channel"
+                              value={socialYoutubeUrl}
+                              onChange={(e) => setSocialYoutubeUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialYoutubeShow(!socialYoutubeShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialYoutubeShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialYoutubeShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Telegram Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#26A5E4]/10 text-[#26A5E4] flex items-center justify-center font-bold text-xs">TG</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">Telegram Channel Link</span>
+                              <span className="text-[10px] text-white/40">Instant study PDF materials</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://t.me/yourchannel"
+                              value={socialTelegramUrl}
+                              onChange={(e) => setSocialTelegramUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialTelegramShow(!socialTelegramShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialTelegramShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialTelegramShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Discord Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#5865F2]/10 text-[#5865F2] flex items-center justify-center font-bold text-xs">DC</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">Discord Invite Link</span>
+                              <span className="text-[10px] text-white/40">Student voice study room channels</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://discord.gg/invite"
+                              value={socialDiscordUrl}
+                              onChange={(e) => setSocialDiscordUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialDiscordShow(!socialDiscordShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialDiscordShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialDiscordShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Twitter Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#1DA1F2]/10 text-[#1DA1F2] flex items-center justify-center font-bold text-xs">TW</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">Twitter Profile Link (X)</span>
+                              <span className="text-[10px] text-white/40">Curriculum and academic bulletins</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://x.com/username"
+                              value={socialTwitterUrl}
+                              onChange={(e) => setSocialTwitterUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialTwitterShow(!socialTwitterShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialTwitterShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialTwitterShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* LinkedIn Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#0A66C2]/10 text-[#0A66C2] flex items-center justify-center font-bold text-xs">LN</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">LinkedIn Organization Page</span>
+                              <span className="text-[10px] text-white/40">Celebrated mentor details</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://linkedin.com/company/yourcompany"
+                              value={socialLinkedinUrl}
+                              onChange={(e) => setSocialLinkedinUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialLinkedinShow(!socialLinkedinShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialLinkedinShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialLinkedinShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Facebook Platform */}
+                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center font-bold text-xs">FB</div>
+                            <div>
+                              <span className="text-xs font-bold text-white block">Facebook Community Page</span>
+                              <span className="text-[10px] text-white/40">Student and parent updates</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-1 items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder="https://facebook.com/yourpage"
+                              value={socialFacebookUrl}
+                              onChange={(e) => setSocialFacebookUrl(e.target.value)}
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSocialFacebookShow(!socialFacebookShow)}
+                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                                socialFacebookShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                              }`}
+                            >
+                              {socialFacebookShow ? "Visible" : "Hidden"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* 6. Theme-Matched Study Stickers Widget */}
-                <div className="p-5 rounded-2xl border border-[#E5D2A5]/10 bg-white/[0.02]">
+                <div className="p-5 rounded-2xl border border-primary/10 bg-white/[0.02]">
                   <div className="mb-4">
-                    <span className="text-sm font-bold text-[#E5D2A5] tracking-wider font-mono">6. SITE STUDY STICKERS CUSTOMIZATION</span>
+                    <span className="text-sm font-bold text-primary tracking-wider font-mono">6. SITE STUDY STICKERS CUSTOMIZATION</span>
                     <p className="text-xs text-white/50 mt-1">
                       Configure the cute icons, titles, subtitles, and clicked powerup speech bubbles for each draggable sticker.
                     </p>
@@ -3169,16 +4112,25 @@ export default function AdminDashboard() {
 
                   <div className="space-y-6">
                     {[
-                      { num: 1, name: "Sticker 1 (Books - left, top-middle)", emoji: studySticker1Emoji, setEmoji: setStudySticker1Emoji, title: studySticker1Title, setTitle: setStudySticker1Title, subtitle: studySticker1Subtitle, setSubtitle: setStudySticker1Subtitle, popup: studySticker1Popup, setPopup: setStudySticker1Popup },
-                      { num: 2, name: "Sticker 2 (Bulb - left, bottom)", emoji: studySticker2Emoji, setEmoji: setStudySticker2Emoji, title: studySticker2Title, setTitle: setStudySticker2Title, subtitle: studySticker2Subtitle, setSubtitle: setStudySticker2Subtitle, popup: studySticker2Popup, setPopup: setStudySticker2Popup },
-                      { num: 3, name: "Sticker 3 (Graduation Cap - top-center)", emoji: studySticker3Emoji, setEmoji: setStudySticker3Emoji, title: studySticker3Title, setTitle: setStudySticker3Title, subtitle: studySticker3Subtitle, setSubtitle: setStudySticker3Subtitle, popup: studySticker3Popup, setPopup: setStudySticker3Popup },
-                      { num: 4, name: "Sticker 4 (Target - bottom-center)", emoji: studySticker4Emoji, setEmoji: setStudySticker4Emoji, title: studySticker4Title, setTitle: setStudySticker4Title, subtitle: studySticker4Subtitle, setSubtitle: setStudySticker4Subtitle, popup: studySticker4Popup, setPopup: setStudySticker4Popup },
-                      { num: 5, name: "Sticker 5 (Coffee Cup - right, top-middle)", emoji: studySticker5Emoji, setEmoji: setStudySticker5Emoji, title: studySticker5Title, setTitle: setStudySticker5Title, subtitle: studySticker5Subtitle, setSubtitle: setStudySticker5Subtitle, popup: studySticker5Popup, setPopup: setStudySticker5Popup },
-                      { num: 6, name: "Sticker 6 (Brain - right, bottom)", emoji: studySticker6Emoji, setEmoji: setStudySticker6Emoji, title: studySticker6Title, setTitle: setStudySticker6Title, subtitle: studySticker6Subtitle, setSubtitle: setStudySticker6Subtitle, popup: studySticker6Popup, setPopup: setStudySticker6Popup },
+                      { num: 1, name: "Sticker 1 (Books - left, top-middle)", emoji: studySticker1Emoji, setEmoji: setStudySticker1Emoji, title: studySticker1Title, setTitle: setStudySticker1Title, subtitle: studySticker1Subtitle, setSubtitle: setStudySticker1Subtitle, popup: studySticker1Popup, setPopup: setStudySticker1Popup, left: studySticker1Left, setLeft: setStudySticker1Left, top: studySticker1Top, setTop: setStudySticker1Top, rotate: studySticker1Rotate, setRotate: setStudySticker1Rotate, show: studySticker1Show, setShow: setStudySticker1Show },
+                      { num: 2, name: "Sticker 2 (Bulb - left, bottom)", emoji: studySticker2Emoji, setEmoji: setStudySticker2Emoji, title: studySticker2Title, setTitle: setStudySticker2Title, subtitle: studySticker2Subtitle, setSubtitle: setStudySticker2Subtitle, popup: studySticker2Popup, setPopup: setStudySticker2Popup, left: studySticker2Left, setLeft: setStudySticker2Left, top: studySticker2Top, setTop: setStudySticker2Top, rotate: studySticker2Rotate, setRotate: setStudySticker2Rotate, show: studySticker2Show, setShow: setStudySticker2Show },
+                      { num: 3, name: "Sticker 3 (Graduation Cap - top-center)", emoji: studySticker3Emoji, setEmoji: setStudySticker3Emoji, title: studySticker3Title, setTitle: setStudySticker3Title, subtitle: studySticker3Subtitle, setSubtitle: setStudySticker3Subtitle, popup: studySticker3Popup, setPopup: setStudySticker3Popup, left: studySticker3Left, setLeft: setStudySticker3Left, top: studySticker3Top, setTop: setStudySticker3Top, rotate: studySticker3Rotate, setRotate: setStudySticker3Rotate, show: studySticker3Show, setShow: setStudySticker3Show },
+                      { num: 4, name: "Sticker 4 (Target - bottom-center)", emoji: studySticker4Emoji, setEmoji: setStudySticker4Emoji, title: studySticker4Title, setTitle: setStudySticker4Title, subtitle: studySticker4Subtitle, setSubtitle: setStudySticker4Subtitle, popup: studySticker4Popup, setPopup: setStudySticker4Popup, left: studySticker4Left, setLeft: setStudySticker4Left, top: studySticker4Top, setTop: setStudySticker4Top, rotate: studySticker4Rotate, setRotate: setStudySticker4Rotate, show: studySticker4Show, setShow: setStudySticker4Show },
+                      { num: 5, name: "Sticker 5 (Coffee Cup - right, top-middle)", emoji: studySticker5Emoji, setEmoji: setStudySticker5Emoji, title: studySticker5Title, setTitle: setStudySticker5Title, subtitle: studySticker5Subtitle, setSubtitle: setStudySticker5Subtitle, popup: studySticker5Popup, setPopup: setStudySticker5Popup, left: studySticker5Left, setLeft: setStudySticker5Left, top: studySticker5Top, setTop: setStudySticker5Top, rotate: studySticker5Rotate, setRotate: setStudySticker5Rotate, show: studySticker5Show, setShow: setStudySticker5Show },
+                      { num: 6, name: "Sticker 6 (Brain - right, bottom)", emoji: studySticker6Emoji, setEmoji: setStudySticker6Emoji, title: studySticker6Title, setTitle: setStudySticker6Title, subtitle: studySticker6Subtitle, setSubtitle: setStudySticker6Subtitle, popup: studySticker6Popup, setPopup: setStudySticker6Popup, left: studySticker6Left, setLeft: setStudySticker6Left, top: studySticker6Top, setTop: setStudySticker6Top, rotate: studySticker6Rotate, setRotate: setStudySticker6Rotate, show: studySticker6Show, setShow: setStudySticker6Show },
                     ].map((sticker) => (
                       <div key={sticker.num} className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-3 shadow-inner">
-                        <div className="flex items-center gap-2 pb-2 border-b border-white/[0.05]">
+                        <div className="flex items-center justify-between pb-2 border-b border-white/[0.05]">
                           <span className="text-sm font-semibold text-white/90">{sticker.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => sticker.setShow(!sticker.show)}
+                            className={`px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors whitespace-nowrap ${
+                              sticker.show ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
+                            }`}
+                          >
+                            {sticker.show ? "● Showing" : "○ Hidden"}
+                          </button>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -3188,7 +4140,7 @@ export default function AdminDashboard() {
                               type="text"
                               value={sticker.emoji}
                               onChange={(e) => sticker.setEmoji(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/5 text-white focus:outline-none focus:border-[#E5D2A5] text-center"
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-primary text-center"
                             />
                           </div>
                           
@@ -3198,17 +4150,49 @@ export default function AdminDashboard() {
                               type="text"
                               value={sticker.title}
                               onChange={(e) => sticker.setTitle(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/5 text-white focus:outline-none focus:border-[#E5D2A5]"
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-primary"
                             />
                           </div>
 
-                          <div className="md:col-span-5">
+                          <div className="md:col-span-12"></div> {/* force wraps nicely */}
+                          
+                          <div className="md:col-span-4">
                             <label className="block text-[10px] text-white/50 mb-1">Subtitle</label>
                             <input
                               type="text"
                               value={sticker.subtitle}
                               onChange={(e) => sticker.setSubtitle(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/5 text-white focus:outline-none focus:border-[#E5D2A5]"
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-primary"
+                            />
+                          </div>
+
+                          <div className="md:col-span-3">
+                            <label className="block text-[10px] text-white/50 mb-1">Position Left (e.g. 15% or 40px)</label>
+                            <input
+                              type="text"
+                              value={sticker.left}
+                              onChange={(e) => sticker.setLeft(e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-primary"
+                            />
+                          </div>
+
+                          <div className="md:col-span-3">
+                            <label className="block text-[10px] text-white/50 mb-1">Position Top (e.g. 20% or 100px)</label>
+                            <input
+                              type="text"
+                              value={sticker.top}
+                              onChange={(e) => sticker.setTop(e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-primary"
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] text-white/50 mb-1">Rotation (deg)</label>
+                            <input
+                              type="number"
+                              value={sticker.rotate}
+                              onChange={(e) => sticker.setRotate(Number(e.target.value))}
+                              className="w-full px-2.5 py-1.5 text-sm rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-primary text-center"
                             />
                           </div>
                         </div>
@@ -3220,7 +4204,7 @@ export default function AdminDashboard() {
                             onChange={(e) => sticker.setPopup(e.target.value)}
                             rows={2}
                             placeholder="Motivational message or details that appear when clicking the sticker."
-                            className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/5 text-slate-100 focus:outline-none focus:border-[#E5D2A5] resize-none"
+                            className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-slate-100 focus:outline-none focus:border-primary resize-none"
                           />
                         </div>
                       </div>
@@ -3232,15 +4216,202 @@ export default function AdminDashboard() {
 
             <button
               type="submit"
-              className="px-8 py-3 rounded-full bg-[#E5D2A5] text-[#070709] font-medium hover:bg-[#f4ecd8] transition-colors w-full sm:w-auto"
+              className="px-8 py-3 rounded-full bg-primary text-zinc-950 font-medium hover:brightness-110 transition-colors w-full sm:w-auto"
             >
               Publish Settings
             </button>
           </form>
+
+          {/* AI Assistant Configuration & Analytics Section */}
+          <div className="mt-8 border border-white/10 p-6 rounded-2xl bg-white/5 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-medium text-primary flex items-center gap-2">
+                  <span>🤖 Helper AI Assistant Configuration</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 font-mono">
+                    Secure Bot API
+                  </span>
+                </h3>
+                <p className="text-xs text-white/50 mt-1">
+                  Configure the API key and provider for the bottom-right AI Assistant Chatbot.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/60">Enable Assistant Bot:</span>
+                <button
+                  type="button"
+                  onClick={() => setChatbotEnabled(!chatbotEnabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                    chatbotEnabled ? "bg-primary" : "bg-zinc-800"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      chatbotEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Custom AI Logo URL option */}
+            <div className="p-4 rounded-xl bg-black/20 border border-white/5 space-y-3 font-sans">
+              <label className="block text-xs text-white/70 uppercase tracking-wide font-bold">🤖 Custom Chatbot Image Logo URL</label>
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                <input
+                  type="url"
+                  value={chatbotIconUrl}
+                  onChange={(e) => setChatbotIconUrl(e.target.value)}
+                  placeholder="e.g. https://example.com/logo.png"
+                  className="flex-1 w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono"
+                />
+                {chatbotIconUrl && (
+                  <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden flex-shrink-0 bg-zinc-900">
+                    <img src={chatbotIconUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-white/40">
+                Provide an image web link (HTTPS URL) to replace the default chat icon with your custom icon logo throughout the chatbot UI (triggers and avatars). Click "Publish Settings" above to save changes.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveAiSettings} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-sans">
+                <div>
+                  <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">AI Service Provider</label>
+                  <select
+                    value={aiProvider}
+                    onChange={(e) => {
+                      const val = e.target.value as "gemini" | "openai" | "grok";
+                      setAiProvider(val);
+                      if (val === "gemini") setAiModel("gemini-3.5-flash");
+                      else if (val === "openai") setAiModel("gpt-4o-mini");
+                      else if (val === "grok") setAiModel("grok-beta");
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs"
+                  >
+                    <option value="gemini" className="bg-zinc-950">Gemini (Google @google/genai)</option>
+                    <option value="openai" className="bg-zinc-950">OpenAI ChatGPT</option>
+                    <option value="grok" className="bg-zinc-950">Grok (xAI API)</option>
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">API Key</label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? "text" : "password"}
+                      value={aiApiKey}
+                      onChange={(e) => setAiApiKey(e.target.value)}
+                      placeholder="Paste secure API key here..."
+                      className="w-full pl-4 pr-16 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors text-[10px] font-mono font-bold select-none cursor-pointer"
+                    >
+                      {showApiKey ? "HIDE" : "SHOW"}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">AI Model Name</label>
+                  <input
+                    type="text"
+                    value={aiModel}
+                    onChange={(e) => setAiModel(e.target.value)}
+                    placeholder="e.g. gemini-3.5-flash or gpt-4o-mini"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+                <span className="text-[10px] text-rose-300 font-mono">
+                  * Note: Stored securely in private config collection settings/secure_bot. Never loaded into frontends.
+                </span>
+                <button
+                  type="submit"
+                  disabled={isSavingAiSettings}
+                  className="px-6 py-2.5 rounded-xl bg-primary text-zinc-950 font-medium hover:brightness-110 disabled:opacity-50 transition-colors text-xs flex items-center gap-1 cursor-pointer w-full sm:w-auto justify-center"
+                >
+                  {isSavingAiSettings ? "Saving config..." : "Save AI Assistant settings"}
+                </button>
+              </div>
+            </form>
+
+            {/* AI Assistant Conversation Analytics and Logs */}
+            <div className="pt-6 border-t border-white/10 space-y-4 font-sans">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                    <span>📊 Intercept & LLM Interaction Logs</span>
+                    <button
+                      type="button"
+                      onClick={fetchAiLogs}
+                      className="text-[10px] text-primary hover:underline"
+                    >
+                      (fetch logs)
+                    </button>
+                  </h4>
+                  <p className="text-[11px] text-white/40 mt-0.5">Track and browse anonymized student questions and helper completions for learning analytics.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchAiLogs}
+                  disabled={loadingLogs}
+                  className="px-4 py-2 border border-white/10 rounded-lg text-xs hover:bg-white/5 transition-colors text-white/80 cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                >
+                  {loadingLogs ? (
+                    <span>Refreshing...</span>
+                  ) : (
+                    <span>🔄 Refresh Study Logs</span>
+                  )}
+                </button>
+              </div>
+
+              {aiLogs.length === 0 ? (
+                <div 
+                  onClick={fetchAiLogs}
+                  className="p-8 border border-dashed border-white/10 rounded-xl text-center text-white/30 text-xs font-mono hover:bg-white/2 cursor-pointer"
+                >
+                  No logged student conversation events found. Click to fetch or wait for interactions.
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto border border-white/10 rounded-xl bg-black/20 text-xs font-mono divide-y divide-white/5 scrollbar-thin">
+                  {aiLogs.map((log: any) => (
+                    <div key={log.id} className="p-3 hover:bg-white/5 transition-colors space-y-2">
+                      <div className="flex items-center justify-between text-[10px] text-white/40">
+                        <span className="text-primary font-semibold">{log.userEmail || "anonymous student"}</span>
+                        <span>{new Date(log.timestamp).toLocaleString()}</span>
+                      </div>
+                      <div className="space-y-1 text-xs font-sans">
+                        <div className="text-white/80 leading-relaxed font-sans">
+                          <span className="text-violet-400 font-bold mr-1 font-mono">Q:</span>
+                          {log.query}
+                        </div>
+                        <div className="text-white/60 leading-relaxed font-sans bg-black/30 p-2 rounded-lg border border-white/5 whitespace-pre-wrap">
+                          <span className="text-indigo-400 font-bold mr-1 font-mono">A:</span>
+                          {log.response}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-[9px] text-white/30 pt-1">
+                        <span>Provider: <strong className="text-white/50">{log.provider || "direct-intercept"}</strong></span>
+                        <span>Model: <strong className="text-white/50">{log.model || "none"}</strong></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {activeTab === "security" && user?.role === "superadmin" && (
+      {activeTab === "security" && (user?.role === "superadmin" || user?.role === "admin") && (
         <div className="space-y-8 max-w-6xl animate-fade-in text-white">
           
           {/* Real-time security manager header */}
@@ -3308,7 +4479,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="p-5 rounded-2xl border border-white/5 bg-black/30 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-emerald-500/10 text-[#E5D2A5]">
+              <div className="p-3 rounded-xl bg-emerald-500/10 text-[var(--primary-custom, #F15A29)]">
                 <Sliders className="w-6 h-6 text-emerald-400" />
               </div>
               <div>
@@ -3325,7 +4496,7 @@ export default function AdminDashboard() {
               
               {/* OTT Video Stream Security Card */}
               <div className="border border-white/5 rounded-2xl bg-white/5 p-6 space-y-6">
-                <h4 className="text-sm font-bold text-[#E5D2A5] uppercase tracking-wider flex items-center gap-2">
+                <h4 className="text-sm font-bold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider flex items-center gap-2">
                   <Video className="w-4 h-4 text-accent-primary" />
                   <span>Interactive Premium Video Player Security</span>
                 </h4>
@@ -3334,7 +4505,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Video Downloadability</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[#E5D2A5] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
                       value={secVideoDownloads ? "true" : "false"}
                       onChange={(e) => setSecVideoDownloads(e.target.value === "true")}
                     >
@@ -3346,7 +4517,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Defocus / Tab-Switch Action</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[#E5D2A5] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
                       value={secPauseSuspicious ? "true" : "false"}
                       onChange={(e) => setSecPauseSuspicious(e.target.value === "true")}
                     >
@@ -3358,7 +4529,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Screen Capture Prevention Mode</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[#E5D2A5] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
                       value={secVideoScreenshot ? "true" : "false"}
                       onChange={(e) => setSecVideoScreenshot(e.target.value === "true")}
                     >
@@ -3370,7 +4541,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Seeking Operations (Disallow skipping forwards)</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[#E5D2A5] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
                       value={secDisableSeeking ? "true" : "false"}
                       onChange={(e) => setSecDisableSeeking(e.target.value === "true")}
                     >
@@ -3390,7 +4561,7 @@ export default function AdminDashboard() {
                       type="checkbox"
                       checked={secVideoWatermark}
                       onChange={(e) => setSecVideoWatermark(e.target.checked)}
-                      className="w-4 h-4 accent-[#E5D2A5]"
+                      className="w-4 h-4 accent-[var(--primary-custom, #F15A29)]"
                     />
                   </div>
 
@@ -3446,7 +4617,7 @@ export default function AdminDashboard() {
                                   if (active) setSecWatermarkFields(secWatermarkFields.filter(x => x !== f));
                                   else setSecWatermarkFields([...secWatermarkFields, f]);
                                 }}
-                                className={`px-2.5 py-1 rounded-md text-[9px] font-mono tracking-wider uppercase border font-bold transition-all ${active ? 'bg-[#E5D2A5]/10 text-[#E5D2A5] border-[#E5D2A5]/30' : 'bg-transparent text-zinc-500 border-white/10'}`}
+                                className={`px-2.5 py-1 rounded-md text-[9px] font-mono tracking-wider uppercase border font-bold transition-all ${active ? 'bg-[var(--primary-custom, #F15A29)]/10 text-[var(--primary-custom, #F15A29)] border-[var(--primary-custom, #F15A29)]/30' : 'bg-transparent text-zinc-500 border-white/10'}`}
                               >
                                 {f}
                               </button>
@@ -3590,6 +4761,12 @@ export default function AdminDashboard() {
             {/* Violation logs sidebar */}
             <div className="space-y-6">
               
+              {/* NATIVE INTEGRATED DRM SIMULATION SUITE */}
+              <DrmSimulatorDashboard />
+
+              {/* CENTRAL API GATEWAY MONITOR & TELEMETRY OBSERVABILITY CONSOLE */}
+              <ApiGatewayTelemetryConsole />
+
               {/* Security violations list */}
               <div className="border border-white/5 rounded-2xl bg-black/20 p-5 space-y-4 max-h-[600px] overflow-y-auto">
                 <div className="flex items-center justify-between">
@@ -3617,7 +4794,7 @@ export default function AdminDashboard() {
                       
                       <button
                         onClick={() => handleAdminResetDevices(v.userId)}
-                        className="w-full mt-1.5 pt-1.5 pb-1 border-t border-dashed border-white/5 text-[9px] uppercase font-mono tracking-widest text-[#E5D2A5] hover:text-white transition-colors text-center font-bold cursor-pointer"
+                        className="w-full mt-1.5 pt-1.5 pb-1 border-t border-dashed border-white/5 text-[9px] uppercase font-mono tracking-widest text-[var(--primary-custom, #F15A29)] hover:text-white transition-colors text-center font-bold cursor-pointer"
                       >
                         Force drop all sessions!
                       </button>
@@ -3681,6 +4858,135 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {activeTab === "syllabus" && (
+        <div className="space-y-8 max-w-5xl animate-fade-in text-left">
+          {/* Section Header */}
+          <div className="border border-[var(--primary-custom, #F15A29)]/20 bg-[var(--primary-custom, #F15A29)]/5 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-display font-medium text-[var(--primary-custom, #F15A29)] flex items-center gap-2">
+                <span>📚 Custom Syllabus & Section Planner</span>
+              </h3>
+              <p className="text-xs text-white/50 mt-1 max-w-2xl">
+                Define the title of the syllabus portal and manage/edit the curriculum document of every single grade. Use the interactive guides to customize the learning experience of your students.
+              </p>
+            </div>
+            
+            <button
+              onClick={handleSaveSyllabusSettings}
+              disabled={isSavingSyllabus}
+              className="px-6 py-2.5 rounded-xl text-xs font-black uppercase bg-[var(--primary-custom, #F15A29)] text-zinc-950 hover:scale-[1.03] active:scale-[0.98] transition-all shadow-lg cursor-pointer flex items-center gap-2 shrink-0 disabled:opacity-50"
+            >
+              {isSavingSyllabus ? "Saving updates..." : "Publish Syllabus Updates"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Hand: Dashboard Label Customizer & Class select */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="border border-white/10 p-6 rounded-2xl bg-white/5 space-y-4">
+                <h4 className="text-sm font-semibold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider border-b border-white/5 pb-2 font-mono">
+                  Portal Layout Labels
+                </h4>
+                <div>
+                  <label className="block text-xs text-white/60 mb-2">
+                    Syllabus Section Name (Student View)
+                  </label>
+                  <input
+                    type="text"
+                    value={syllabusSectionName}
+                    onChange={(e) => setSyllabusSectionName(e.target.value)}
+                    placeholder="e.g. Syllabus, Course Plan"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)] text-xs font-semibold"
+                  />
+                  <p className="text-[10px] text-white/40 mt-1.5 leading-relaxed">
+                    Changes the rendering text on the student navbar link, persistent dock, mobile drawer menu, and class card headings. Default is "Syllabus".
+                  </p>
+                </div>
+              </div>
+
+              {/* Class Selection List */}
+              <div className="border border-white/10 p-6 rounded-2xl bg-white/5 space-y-4">
+                <h4 className="text-sm font-semibold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider border-b border-white/5 pb-2 font-mono">
+                  Select Grade to Edit
+                </h4>
+                <div className="flex flex-col gap-1.5">
+                  {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setSyllabusEditClass(cls)}
+                      className={`w-full px-4 py-3 rounded-xl text-left text-xs font-bold uppercase tracking-wide transition-all flex items-center justify-between cursor-pointer ${
+                        syllabusEditClass === cls
+                          ? 'bg-[var(--primary-custom, #F15A29)]/15 text-[var(--primary-custom, #F15A29)] border border-[var(--primary-custom, #F15A29)]/30 shadow-md scale-[1.02]'
+                          : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
+                      }`}
+                    >
+                      <span>Class {cls === 'dropper' ? 'Dropper' : cls}</span>
+                      <span className="text-[9px] text-[var(--primary-custom, #F15A29)]/60 bg-[var(--primary-custom, #F15A29)]/10 px-2 py-0.5 rounded-full font-mono font-normal">
+                        {classSyllabuses[cls] ? 'Customized' : 'Template'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Hand: Detailed Syllabus Text Editor & Live Preview */}
+            <div className="lg:col-span-8 flex flex-col space-y-6">
+              <div className="border border-white/10 p-6 rounded-2xl bg-white/5 flex-grow flex flex-col space-y-4">
+                <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider font-mono">
+                      Syllabus Details: Class {syllabusEditClass === 'dropper' ? 'Dropper' : syllabusEditClass}
+                    </h4>
+                    <p className="text-[11px] text-white/50 mt-0.5">
+                      Type the curriculum topics using straightforward formatting guides.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to restore the standard system template for Class " + (syllabusEditClass === 'dropper' ? 'Dropper' : syllabusEditClass) + "? This will discard un-saved changes.")) {
+                        const defaultText = getDefaultSyllabus(syllabusEditClass);
+                        setClassSyllabuses(prev => ({ ...prev, [syllabusEditClass]: defaultText }));
+                      }
+                    }}
+                    className="text-[10px] text-[var(--primary-custom, #F15A29)] hover:underline font-bold cursor-pointer"
+                  >
+                    Restore Class Template
+                  </button>
+                </div>
+
+                <div className="flex-grow flex flex-col space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-mono">Editor Panel</span>
+                    <span className="text-[9px] text-white/30 leading-none">Use # / ## / ### (Headers), - (List) and **bold** formatting tags</span>
+                  </div>
+                  <textarea
+                    rows={12}
+                    value={classSyllabuses[syllabusEditClass] ?? getDefaultSyllabus(syllabusEditClass)}
+                    onChange={(e) => {
+                      const updated = e.target.value;
+                      setClassSyllabuses(prev => ({ ...prev, [syllabusEditClass]: updated }));
+                    }}
+                    placeholder="Describe syllabus units and curriculum layout detail..."
+                    className="w-full flex-grow p-4 rounded-xl bg-black/50 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-y min-h-[300px] leading-relaxed"
+                  />
+                </div>
+
+                {/* Live Preview block mimicking Student View */}
+                <div className="space-y-2 border-t border-white/5 pt-4">
+                  <div className="text-[10px] text-[var(--primary-custom, #F15A29)] uppercase tracking-widest font-mono mb-2">Live Student View Preview</div>
+                  <div className="p-4 rounded-xl bg-black/30 border border-white/5 max-h-[180px] overflow-y-auto custom-scrollbar">
+                    <SyllabusRenderer text={classSyllabuses[syllabusEditClass] ?? getDefaultSyllabus(syllabusEditClass)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "materials" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 border border-white/10 p-6 rounded-2xl bg-white/5 h-fit">
@@ -3693,20 +4999,20 @@ export default function AdminDashboard() {
                 placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
               <textarea
                 required
                 placeholder="Description"
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5] h-24 resize-none"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-24 resize-none"
               />
               <div className="flex flex-col sm:flex-row gap-4">
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                 >
                   <option value="note">Notes / PDF</option>
                   <option value="lecture">Lecture / Video</option>
@@ -3714,7 +5020,7 @@ export default function AdminDashboard() {
                 <select
                   value={classGroup}
                   onChange={(e) => setClassGroup(e.target.value)}
-                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[#E5D2A5]"
+                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                 >
                   <option value="all">Any Class</option>
                   <option value="6">Class 6</option>
@@ -3731,19 +5037,38 @@ export default function AdminDashboard() {
                 placeholder="Optional Thumbnail URL (Image link)"
                 value={thumbnailUrl}
                 onChange={(e) => setThumbnailUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
               <input
                 required
-                placeholder="Content URL (YouTube/PDF link)"
+                placeholder="Content URL, YouTube/PDF link, or VdoCipher Script/Video ID"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="w-full sm:w-1/2">
+                  <input
+                    placeholder="Section Name (e.g. Trigonometry)"
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                  />
+                </div>
+                <div className="w-full sm:w-1/2 flex items-center justify-between px-4 py-2.5 rounded-xl bg-black/40 border border-white/10">
+                  <span className="text-xs text-white/60 font-medium">Hide Content</span>
+                  <input
+                    type="checkbox"
+                    checked={isHidden}
+                    onChange={(e) => setIsHidden(e.target.checked)}
+                    className="w-5 h-5 accent-[var(--primary-custom, #F15A29)] rounded cursor-pointer"
+                  />
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-[#E5D2A5] text-[#070709] font-medium hover:bg-[#f4ecd8] transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-[var(--primary-custom, #F15A29)] text-[#070709] font-medium hover:bg-[var(--primary-custom, #F15A29)] transition-colors"
                 >
                   {editingMaterialId ? "Update Content" : "Publish Content"}
                 </button>
@@ -3774,6 +5099,16 @@ export default function AdminDashboard() {
                       ? "Any Class"
                       : `Class ${mat.classGroup}`}
                   </p>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-[10px] font-mono tracking-wide px-2 py-0.5 rounded bg-white/10 text-white/80 border border-white/5">
+                      Section: {mat.section || "General"}
+                    </span>
+                    {mat.isHidden && (
+                      <span className="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/10 uppercase">
+                        Hidden
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -3888,38 +5223,38 @@ export default function AdminDashboard() {
                 placeholder="Name (e.g. Dr. Aryan Sharma)"
                 value={mentorName}
                 onChange={(e) => setMentorName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
               <input
                 required
                 placeholder="Role (e.g. AIIMS Topper)"
                 value={mentorRole}
                 onChange={(e) => setMentorRole(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
               <input
                 placeholder="Experience (e.g. 10+ Years Exp, Ex-IITian) [Optional]"
                 value={mentorExperience}
                 onChange={(e) => setMentorExperience(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
               <textarea
                 placeholder="Bio/Description [Optional]"
                 value={mentorDescription}
                 onChange={(e) => setMentorDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5] h-20 resize-none"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-20 resize-none"
               />
               <input
                 required
                 placeholder="Image URL (Unsplash link)"
                 value={mentorImage}
                 onChange={(e) => setMentorImage(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[#E5D2A5]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-[#E5D2A5] text-[#070709] font-medium hover:bg-[#f4ecd8] transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-[var(--primary-custom, #F15A29)] text-[#070709] font-medium hover:bg-[var(--primary-custom, #F15A29)] transition-colors"
                 >
                   {editingMentorId ? "Save Changes" : "Publish Faculty"}
                 </button>
@@ -3974,6 +5309,254 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {activeTab === "support_chats" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px] animate-fade-in text-white mb-10 text-left">
+          {/* Left Column: All Sessions List */}
+          <div className="lg:col-span-4 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px]">
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-[#E5D2A5] tracking-wide uppercase">Active Student Threads</h3>
+              <p className="text-[11px] text-white/50">Click on any course student to join or inspect their chat instantly.</p>
+            </div>
+
+            {/* List entries */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {sessions.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 border border-dashed border-white/5 rounded-xl bg-black/10">
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-2">
+                    <History className="w-5 h-5 text-white/30" />
+                  </div>
+                  <span className="text-xs text-zinc-400 font-bold">No active chat sessions</span>
+                  <p className="text-[10px] text-zinc-600 max-w-[180px] mt-1">When students open or type messages to the chatbot, they will appear here in real-time.</p>
+                </div>
+              ) : (
+                sessions.map((sess) => {
+                  const isSelected = sess.id === activeSessionId;
+                  const lastMsg = sess.messages && sess.messages.length > 0 ? sess.messages[sess.messages.length - 1] : null;
+                  const formattedTime = sess.updatedAt 
+                    ? new Date(sess.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    : "Unknown";
+
+                  return (
+                    <div
+                      key={sess.id}
+                      onClick={() => {
+                        setActiveSessionId(sess.id);
+                        // Mark as read by admin when clicked
+                        const sRef = doc(db, "chatbot_sessions", sess.id);
+                        updateDoc(sRef, { unreadByAdmin: false }).catch(err => console.error("Error marking read:", err));
+                      }}
+                      className={`p-3.5 rounded-xl border transition-all cursor-pointer relative group flex flex-col justify-between text-left ${
+                        isSelected
+                          ? "bg-zinc-900 border-[#E5D2A5] shadow-lg shadow-[#E5D2A5]/5"
+                          : "bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/15"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-black truncate text-zinc-100 flex items-center gap-1.5">
+                            <span className="truncate">{sess.userDisplayName || "Guest Student"}</span>
+                            {sess.teacherJoined && (
+                              <span className="text-[8px] bg-emerald-500/10 text-emerald-400 font-extrabold px-1 py-0.2 rounded border border-emerald-500/20 uppercase shrink-0">Live</span>
+                            )}
+                          </h4>
+                          <span className="text-[9px] font-mono text-white/40 block truncate mt-0.5">{sess.userEmail || sess.id}</span>
+                        </div>
+                        {sess.unreadByAdmin && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" title="New messages!" />
+                        )}
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t border-white/[0.04] flex items-center justify-between text-[10px] text-zinc-400 gap-2">
+                        <span className="truncate max-w-[150px] italic font-medium">
+                          {lastMsg ? lastMsg.content : "No messages yet"}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[9px] font-mono text-white/30 shrink-0">{formattedTime}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteChatSession(sess.id);
+                            }}
+                            title="Delete thread"
+                            className="p-1 rounded hover:bg-rose-500/20 text-white/30 hover:text-rose-400 transition-colors cursor-pointer"
+                          >
+                            <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Chat view */}
+          <div className="lg:col-span-8 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px]">
+            {activeSessionId ? (
+              (() => {
+                const currentSession = sessions.find(s => s.id === activeSessionId);
+                if (!currentSession) {
+                  return (
+                    <div className="h-full flex flex-col items-center justify-center text-center">
+                      <span className="text-xs text-white/50">Loading selected thread...</span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex flex-col h-full">
+                    {/* Active Session Header Banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10 mb-4 shrink-0 text-left">
+                      <div>
+                        <div className="flex items-center gap-2.5">
+                          <h3 className="text-base font-bold text-white tracking-wide">{currentSession.userDisplayName || "Student User"}</h3>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                            currentSession.teacherJoined
+                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-extrabold shadow-[0_0_8px_rgba(16,185,129,0.1)]"
+                              : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                          }`}>
+                            {currentSession.teacherJoined ? "🟢 LIVE TUTORING" : "🤖 AUTOMATIC AI"}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono text-zinc-400 mt-0.5 block">{currentSession.userEmail || "anonymous"}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!currentSession.teacherJoined ? (
+                          <div className="flex items-center gap-2">
+                             <button
+                            onClick={() => handleEndChat(currentSession.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-400 border border-rose-500/30 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
+                          >
+                            <XOctagon className="w-3.5 h-3.5" />
+                            <span>End Chat</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleJoinChat(currentSession.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-white font-extrabold text-[11px] uppercase tracking-wider cursor-pointer shadow-md transition-all active:scale-[0.98]"
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            <span>Join & Intervene</span>
+                          </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                             <button
+                            onClick={() => handleEndChat(currentSession.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-400 border border-rose-500/30 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
+                          >
+                            <XOctagon className="w-3.5 h-3.5" />
+                            <span>End Chat</span>
+                          </button>
+                              
+                          <button
+                            onClick={() => handleLeaveChat(currentSession.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-zinc-500/20 text-zinc-300 hover:text-zinc-400 border border-white/5 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Handover</span>
+                          </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Chat Messages Log */}
+                    <div className="flex-1 overflow-y-auto px-1 py-1 space-y-4 mb-4 select-text">
+                      {currentSession.messages && currentSession.messages.length > 0 ? (
+                        currentSession.messages.map((m: any, idx: number) => {
+                          const isStudent = m.role === "user";
+                          const isSys = m.senderName === "System";
+                          const isTeacher = m.role === "teacher" || (!isStudent && (m.senderName?.includes("Teacher") || m.senderName?.includes("Faculty") || m.senderName?.includes("System")));
+                          const isBot = !isStudent && !isTeacher && !isSys;
+
+                          // Format beautiful timestamp
+                          const msgTime = m.timestamp
+                            ? new Date(m.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                            : "Now";
+
+                          if (isSys || m.role === "teacher") {
+                            return (
+                              <div key={m.id || idx} className="flex justify-center my-2 animate-fade-in text-center w-full">
+                                <div className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-[#E5D2A5] max-w-[80%] font-medium">
+                                  {m.content}
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={m.id || idx} className={`flex ${isStudent ? "justify-start" : "justify-end"} animate-fade-in w-full`}>
+                              <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-xs leading-relaxed text-left ${
+                                isStudent
+                                  ? "bg-zinc-900 border border-white/5 text-zinc-100 rounded-tl-none"
+                                  : isTeacher
+                                    ? "bg-[#E5D2A5] text-zinc-950 font-semibold rounded-tr-none"
+                                    : "bg-zinc-900/40 border border-[#E5D2A5]/20 text-zinc-200 rounded-tr-none"
+                              }`}>
+                                <div className="flex items-center gap-1.5 mb-1 opacity-50 text-[9px] font-bold uppercase tracking-wider">
+                                  <span>{m.senderName || (isStudent ? "Student" : isBot ? "Nucleus AI" : "Teacher")}</span>
+                                  <span>•</span>
+                                  <span className="font-mono">{msgTime}</span>
+                                </div>
+                                {isStudent ? (
+                                  <div className="whitespace-pre-wrap select-text">{m.content}</div>
+                                ) : (
+                                  <div className="markdown-body select-text">
+                                    <Markdown>{m.content}</Markdown>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-center text-zinc-500">
+                          <span>No messages in this chat session.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Admin Message Typing Feed footer */}
+                    <div className="pt-3 border-t border-white/10 flex items-center gap-3 shrink-0">
+                      <input
+                        type="text"
+                        value={adminMessageText}
+                        onChange={(e) => setAdminMessageText(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendAdminMessage()}
+                        placeholder="Reply directly to the student or explain formulas..."
+                        className="flex-1 px-4 py-3 text-xs bg-zinc-950 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#E5D2A5]"
+                      />
+                      <button
+                        onClick={handleSendAdminMessage}
+                        disabled={!adminMessageText.trim()}
+                        className="p-3.5 rounded-xl bg-[#E5D2A5] hover:bg-[#f4ecd8] text-zinc-950 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mb-4 border border-white/10">
+                  <MessageSquare className="w-8 h-8 text-white/40" />
+                </div>
+                <h3 className="text-base font-bold text-white tracking-wide">Select a Student Chat Thread</h3>
+                <p className="text-xs text-zinc-500 max-w-sm mt-1">
+                  Access incoming questions from students in real time. You can view bot transcriptions and click "Join & Intervene" to intercept and guide them directly.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {managingUser && (
         <Dialog
           open={!!managingUser}
@@ -4017,7 +5600,7 @@ export default function AdminDashboard() {
                           managingUser.unlockedMaterials,
                         )
                       }
-                      className={`p-2 rounded-lg transition-colors ${unlocked ? "bg-[#E5D2A5] text-[#070709]" : "bg-black/50 text-white/40 hover:text-white/80"}`}
+                      className={`p-2 rounded-lg transition-colors ${unlocked ? "bg-[var(--primary-custom, #F15A29)] text-[#070709]" : "bg-black/50 text-white/40 hover:text-white/80"}`}
                     >
                       {unlocked ? (
                         <Check className="w-5 h-5" />
@@ -4033,5 +5616,348 @@ export default function AdminDashboard() {
         </Dialog>
       )}
     </motion.div>
+  );
+}
+
+interface CapturedMock {
+  id: string;
+  timestamp: string;
+  capturedAs: string;
+  type: string;
+}
+
+interface TelemetryLog {
+  id: string;
+  type: string;
+  msg: string;
+  time: string;
+}
+
+function DrmSimulatorDashboard() {
+  const [sandboxWatermark, setSandboxWatermark] = useState(true);
+  const [sandboxRecording, setSandboxRecording] = useState(false);
+  const [sandboxCaptured, setSandboxCaptured] = useState<CapturedMock[]>([]);
+  const [liveTelemetry, setLiveTelemetry] = useState<TelemetryLog[]>([]);
+
+  useEffect(() => {
+    const handleTelemetry = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail) {
+        setLiveTelemetry(prev => [customEv.detail, ...prev].slice(0, 8));
+      }
+    };
+    window.addEventListener('flag-secure-telemetry', handleTelemetry);
+    return () => {
+      window.removeEventListener('flag-secure-telemetry', handleTelemetry);
+    };
+  }, []);
+
+  const triggerMockShutter = () => {
+    window.dispatchEvent(new CustomEvent('trigger-secure-shutter'));
+    const newRecord: CapturedMock = {
+      id: "CAP_" + Date.now().toString().slice(-5),
+      timestamp: new Date().toLocaleTimeString(),
+      capturedAs: 'PITCH BLACK',
+      type: 'Simulation click'
+    };
+    setSandboxCaptured(prev => [newRecord, ...prev]);
+  };
+
+  const toggleRecording = () => {
+    const newState = !sandboxRecording;
+    setSandboxRecording(newState);
+    window.dispatchEvent(new CustomEvent('toggle-secure-recording', { detail: newState }));
+  };
+
+  const toggleWatermark = () => {
+    const newState = !sandboxWatermark;
+    setSandboxWatermark(newState);
+    window.dispatchEvent(new CustomEvent('toggle-secure-watermark', { detail: newState }));
+  };
+
+  return (
+    <div className="border border-white/5 rounded-2xl bg-black/20 p-5 space-y-4 text-white">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+          <span className="text-xs font-mono font-bold tracking-wider uppercase text-[var(--primary-custom, #F15A29)] flex items-center gap-1">
+            <ShieldAlert className="w-4 h-4 text-[#ff7a00]" /> Secure DRM Simulator
+          </span>
+        </div>
+        <span className="text-[9px] font-mono font-black text-red-500 uppercase tracking-widest bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">FLAG_SECURE Active</span>
+      </div>
+
+      <p className="text-[11px] text-zinc-400 leading-relaxed font-mono text-left">
+        Test hardware blocks safely. Simulates how device screen protections (like banking apps) operate globally across all web and mobile views.
+      </p>
+
+      {/* Control Buttons */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/5">
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-bold text-white flex items-center gap-1 font-mono uppercase">
+              <Layers className="w-3.5 h-3.5 text-blue-400" /> Dynamic Watermark
+            </span>
+            <span className="text-[8px] text-zinc-500 font-mono">Telemetry grid overlay</span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleWatermark}
+            className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono transition-all uppercase cursor-pointer ${
+              sandboxWatermark ? 'bg-[#ff7a00]/20 text-[#ff7a00] border border-[#ff7a00]/30' : 'bg-white/5 text-white/40'
+            }`}
+          >
+            {sandboxWatermark ? 'ENABLED' : 'DISABLED'}
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/5">
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-bold text-white flex items-center gap-1 font-mono uppercase">
+              <Video className="w-3.5 h-3.5 text-red-400" /> Screen Record Block
+            </span>
+            <span className="text-[8px] text-zinc-500 font-mono">Silently black media players</span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleRecording}
+            className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono transition-all uppercase cursor-pointer ${
+              sandboxRecording ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/10 text-red-400'
+            }`}
+          >
+            {sandboxRecording ? 'RECORDING ON' : 'TEST RECORD'}
+          </button>
+        </div>
+      </div>
+
+      {/* Primary Simulator Launch Trigger */}
+      <button
+        type="button"
+        onClick={triggerMockShutter}
+        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-[var(--primary-custom, #F15A29)] to-[#f4e2ba] hover:brightness-110 text-zinc-950 font-bold text-[10px] uppercase tracking-widest cursor-pointer transition-transform active:scale-[0.98]"
+      >
+        <Camera className="w-3.5 h-3.5" /> Trigger Shot Block Simulation
+      </button>
+
+      {/* Captured simulation results list */}
+      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+        <span className="text-[8px] text-[#ff7a00] font-black uppercase tracking-wider block flex items-center gap-1 font-mono text-left">
+          <History className="w-3 h-3" /> Mock Output Buffer Captures ({sandboxCaptured.length})
+        </span>
+
+        {sandboxCaptured.length === 0 ? (
+          <div className="text-center py-2.5 text-zinc-600 text-[9px] font-mono">
+            No capture events simulated. Trigger above!
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-24 overflow-y-auto pr-1">
+            {sandboxCaptured.map((item, index) => {
+              const isTargetBlack = index === 1 || index === 2 || index === 4;
+              return (
+                <div key={item.id} className="flex items-center justify-between bg-zinc-900/60 p-1.5 rounded-lg border border-white/5 font-mono text-[9px]">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-7 rounded bg-black border border-white/20 flex items-center justify-center">
+                      <span className="text-[4px] text-white font-mono scale-90">BLACK</span>
+                    </div>
+                    <div className="flex flex-col text-[8px] leading-none text-left">
+                      <span className="text-zinc-300 font-bold">{item.id}</span>
+                      <span className="text-zinc-500 text-[7px] mt-0.5">{item.timestamp}</span>
+                    </div>
+                  </div>
+                  <span 
+                    className={`text-[7.5px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${
+                      isTargetBlack 
+                        ? 'bg-[var(--primary-custom, #F15A29)] text-black border-none font-extrabold' 
+                        : 'bg-red-400/10 text-red-400 border-red-400/20'
+                    }`}
+                  >
+                    {item.capturedAs}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Live Telemetry monitor output log */}
+      <div className="p-2.5 rounded-xl bg-black/60 border border-white/5 space-y-2 select-text">
+        <span className="text-[8px] text-zinc-400 font-bold uppercase tracking-wider block flex items-center gap-1 font-mono text-left">
+          <AlertTriangle className="w-3 h-3 text-yellow-500" /> Real-time System Console Logs
+        </span>
+
+        {liveTelemetry.length === 0 ? (
+          <div className="text-[8px] font-mono text-zinc-600 py-1.5 text-center">
+            Awaiting real browser actions (PrintScreen / Copy / Switch Tab)...
+          </div>
+        ) : (
+          <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+            {liveTelemetry.map((log, index) => {
+              const isTargetBlack = index === 1 || index === 2 || index === 4;
+              return (
+                <div key={log.id} className="text-[8px] font-mono flex items-start gap-1 justify-between border-b border-white/[0.03] pb-1 text-left">
+                  <span className="text-yellow-400 font-bold uppercase shrink-0">[{log.time}]:</span>
+                  <span 
+                    className={`flex-1 ml-1 leading-normal text-left ${isTargetBlack ? "text-black font-semibold" : "text-zinc-300"}`}
+                  >
+                    {log.msg}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ApiGatewayTelemetryConsole() {
+  const [logs, setLogs] = useState<APITelemetryLog[]>([]);
+  const [totalRequests, setTotalRequests] = useState(0);
+  const [avgLatency, setAvgLatency] = useState(0);
+  const [simulating, setSimulating] = useState(false);
+
+  useEffect(() => {
+    // Sync initial logs
+    const initialLogs = apiGateway.getLogs();
+    setLogs(initialLogs);
+    setTotalRequests(initialLogs.length);
+    if (initialLogs.length > 0) {
+      const sum = initialLogs.reduce((acc, log) => acc + log.latencyMs, 0);
+      setAvgLatency(Math.round(sum / initialLogs.length));
+    }
+
+    // Subscribe to updates with a ref to avoid infinite re-renders or stale count
+    const unsubscribe = apiGateway.subscribeTelemetry((newLog) => {
+      setLogs((prev) => [newLog, ...prev].slice(0, 15));
+      setTotalRequests((prevCount) => {
+        const nextCount = prevCount + 1;
+        setAvgLatency((prevAvg) => {
+          return Math.round((prevAvg * prevCount + newLog.latencyMs) / nextCount);
+        });
+        return nextCount;
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const runLoadSimulation = async () => {
+    if (simulating) return;
+    setSimulating(true);
+    try {
+      // Execute distinct tasks simultaneously to model distributed REST operations
+      await Promise.all([
+        apiGateway.materials.list(2),
+        apiGateway.mentors.list(),
+        apiGateway.settings.getGlobal()
+      ]);
+    } catch (e) {
+      console.error("Simulation query err:", e);
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  return (
+    <div className="border border-white/5 rounded-2xl bg-black/20 p-5 space-y-4 text-white">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="text-xs font-mono font-bold tracking-wider uppercase text-cyan-400 flex items-center gap-1">
+            <Compass className="w-4 h-4 text-cyan-400" /> Central API Gateway Monitor
+          </span>
+        </div>
+        <span className="text-[8px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 uppercase tracking-widest">
+          Active Trace
+        </span>
+      </div>
+
+      <p className="text-[11px] text-zinc-400 leading-relaxed font-mono text-left">
+        Observability panel mapping transactions routing through the central API Gateway tier. Tracks query response times, HTTP states, and database layer latencies.
+      </p>
+
+      {/* Observability Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 text-left">
+          <span className="text-[8px] font-mono text-zinc-500 uppercase block">Total Operations</span>
+          <span className="text-lg font-black font-mono text-white">{totalRequests}</span>
+        </div>
+        <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 text-left">
+          <span className="text-[8px] font-mono text-zinc-500 uppercase block">Avg Latency</span>
+          <span className="text-lg font-black font-mono text-cyan-400 font-bold">
+            {avgLatency > 0 ? `${avgLatency} ms` : "0 ms"}
+          </span>
+        </div>
+      </div>
+
+      {/* Simulator Actions */}
+      <button
+        type="button"
+        disabled={simulating}
+        onClick={runLoadSimulation}
+        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:brightness-110 disabled:opacity-50 text-white font-bold text-[10px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98]"
+      >
+        <RefreshCw className={`w-3.5 h-3.5 ${simulating ? "animate-spin" : ""}`} />
+        {simulating ? "Executing Cloud Fetch..." : "Simulate Live API Load Test"}
+      </button>
+
+      {/* Micro service traces */}
+      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+        <span className="text-[8px] text-cyan-400 font-black uppercase tracking-wider block flex items-center gap-1 font-mono text-left">
+          <History className="w-3 h-3" /> HTTP / Firestore Stream Traces ({logs.length})
+        </span>
+
+        {logs.length === 0 ? (
+          <div className="text-center py-4 text-zinc-500 text-[9px] font-mono">
+            Gateway quiescent. Execute operations or run the load test above!
+          </div>
+        ) : (
+          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            {logs.map((log, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between bg-zinc-900/60 p-1.5 rounded-lg border border-white/5 font-mono text-[9px]"
+              >
+                <div className="flex items-start gap-1.5 text-left min-w-0 flex-1">
+                  <span
+                    className={`text-[8px] font-bold px-1 py-0.2 rounded shrink-0 font-mono ${
+                      log.method === "GET"
+                        ? "bg-sky-500/10 text-sky-400"
+                        : log.method === "POST" || log.method === "PUT"
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : log.method === "DELETE"
+                        ? "bg-rose-500/10 text-rose-400"
+                        : "bg-purple-500/10 text-purple-400"
+                    }`}
+                  >
+                    {log.method}
+                  </span>
+                  <div className="flex flex-col text-[8.5px] leading-tight font-mono text-left min-w-0 flex-1">
+                    <span className="text-zinc-300 font-bold truncate block">{log.endpoint}</span>
+                    <span className="text-zinc-500 text-[6.5px] mt-0.5 font-mono">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <span className="text-[8px] font-mono text-zinc-400 font-bold">
+                    {log.latencyMs}ms
+                  </span>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      log.success ? "bg-emerald-400 shadow-[0_0_4px_#34d399]" : "bg-red-400 animate-ping"
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

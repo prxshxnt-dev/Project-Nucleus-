@@ -74,62 +74,50 @@ export default function ThemeProvider() {
   const activeTheme = currentSettings.activeTheme || 'default';
   
   // Resolve base config from preset or customizations
-  let config: ThemeConfig = THEME_PRESETS.default;
-
-  if (activeTheme === 'custom') {
-    config = currentSettings.themeCustomizations || THEME_PRESETS.default;
-  } else if (THEME_PRESETS[activeTheme]) {
-    config = { ...THEME_PRESETS[activeTheme], ...(currentSettings.themeCustomizations || {}) };
-  } else {
-    config = currentSettings.themeCustomizations || THEME_PRESETS.default;
-  }
+  let config: ThemeConfig = {
+    ...THEME_PRESETS.default,
+    backgroundColor: '#FDF5E6',
+    primaryColor: '#F15A29',
+    secondaryColor: '#1F1F1F',
+    accentGlowColor: '#F15A29',
+    gradientStart: '#F15A29',
+    gradientEnd: '#FDF5E6',
+    isDarkMode: false,
+    shadowIntensity: 'soft',
+    glassmorphism: false,
+    buttonStyle: 'rounded'
+  };
 
   useEffect(() => {
     const root = document.documentElement;
 
     // --- SMART CONTRAST ENGINE ANALYSIS ---
-    const bgHsl = parseToHsl(config.backgroundColor || '#070709');
-    const primaryHsl = parseToHsl(config.primaryColor || '#E5D2A5');
+    const bgHsl = parseToHsl(config.backgroundColor || '#FDF5E6');
+    const primaryHsl = parseToHsl(config.primaryColor || '#F15A29');
     
     // Background light check: is background dark or light?
-    const isBgDark = bgHsl.l < 55;
+    const isBgDark = false;
     // Primary/Accent light check: for button contents, indicators
-    const isPrimaryDark = primaryHsl.l < 52; 
+    const isPrimaryDark = true; 
 
     // Generate Adaptive Texts & Overlays
-    const textPrimary = config.enableManualOverrides && config.overrideTextPrimary
-      ? config.overrideTextPrimary
-      : (isBgDark ? '#fafafa' : '#09090b');
+    const textPrimary = '#1F1F1F';
+    const textSecondary = '#3A3A3A';
+    const textMuted = '#7A7A7A';
 
-    const textSecondary = config.enableManualOverrides && config.overrideTextSecondary
-      ? config.overrideTextSecondary
-      : (isBgDark ? '#d4d4d8' : '#3f3f46');
+    const bgSecondary = '#F5EBD6';
 
-    const textMuted = config.enableManualOverrides && config.overrideTextMuted
-      ? config.overrideTextMuted
-      : (isBgDark ? '#8e8e93' : '#71717a');
+    const borderColor = 'rgba(31, 31, 31, 0.08)';
 
-    const bgSecondary = isBgDark 
-      ? adjustLuminance(config.backgroundColor, 0.05) 
-      : adjustLuminance(config.backgroundColor, -0.06);
+    const cardBg = 'rgba(255, 255, 255, 0.65)';
 
-    const borderColor = isBgDark 
-      ? 'rgba(255, 255, 255, 0.08)' 
-      : 'rgba(0, 0, 0, 0.06)';
+    const glassBg = 'rgba(253, 245, 230, 0.82)';
 
-    const cardBg = isBgDark 
-      ? `rgba(${hexToRgbStr(config.backgroundColor)}, 0.4)` 
-      : `rgba(${hexToRgbStr(config.backgroundColor)}, 0.9)`;
-
-    const glassBg = isBgDark 
-      ? `rgba(${hexToRgbStr(config.backgroundColor)}, 0.65)` 
-      : `rgba(${hexToRgbStr(config.backgroundColor)}, 0.75)`;
-
-    const buttonText = isPrimaryDark ? '#ffffff' : '#09090b';
-    const accentContrast = isPrimaryDark ? '#ffffff' : '#09090b';
+    const buttonText = '#FFFFFF';
+    const accentContrast = '#FFFFFF';
 
     // Navbar Adaptive colors
-    const navbarText = textPrimary;
+    const navbarText = '#1F1F1F';
 
     // Apply Smart Dynamic Variables
     root.style.setProperty('--bg-primary', config.backgroundColor);
@@ -145,11 +133,27 @@ export default function ThemeProvider() {
     root.style.setProperty('--button-text', buttonText);
     root.style.setProperty('--navbar-text', navbarText);
 
+    // Tailwind & shadcn variables support
+    root.style.setProperty('--background', config.backgroundColor);
+    root.style.setProperty('--foreground', textPrimary);
+    root.style.setProperty('--card', '#FFFDF9');
+    root.style.setProperty('--card-foreground', textPrimary);
+    root.style.setProperty('--popover', '#FFFDF9');
+    root.style.setProperty('--popover-foreground', textPrimary);
+    root.style.setProperty('--primary', config.primaryColor);
+    root.style.setProperty('--primary-foreground', '#FFFFFF');
+    root.style.setProperty('--secondary', '#F5EBD6');
+    root.style.setProperty('--secondary-foreground', textPrimary);
+    root.style.setProperty('--muted', '#F5EBD6');
+    root.style.setProperty('--muted-foreground', textMuted);
+    root.style.setProperty('--accent', config.primaryColor);
+    root.style.setProperty('--accent-foreground', '#FFFFFF');
+
     // Backward Compatibility support
     root.style.setProperty('--background-custom', config.backgroundColor);
     root.style.setProperty('--foreground-custom', textPrimary);
     root.style.setProperty('--primary-custom', config.primaryColor);
-    root.style.setProperty('--primary-dark-custom', config.secondaryColor);
+    root.style.setProperty('--primary-dark-custom', '#CC4414');
     root.style.setProperty('--theme-accent-glow', config.accentGlowColor || config.primaryColor);
     root.style.setProperty('--muted-custom', textSecondary);
 

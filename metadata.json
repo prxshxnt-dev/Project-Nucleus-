@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Nucleus Coaching Platform",
+  "description": "Premium educational coaching platform led by IITians and Doctors, featuring secure materials, video classes, and AI-enabled study mentorship.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
