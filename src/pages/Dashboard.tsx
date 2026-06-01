@@ -47,6 +47,7 @@ const getEmbedUrl = (url: string) => {
 export default function Dashboard() {
   const { user, loading: authLoading, setUser } = useAuthStore();
   const { settings } = useSettingsStore();
+  const navigate = useNavigate();
 
   const [deviceBlock, setDeviceBlock] = useState<boolean>(false);
   const [activeDevices, setActiveDevices] = useState<any[]>([]);
@@ -233,14 +234,12 @@ export default function Dashboard() {
   
   useEffect(() => {
     if (user && !user.classGroup) {
-      if (localStorage.getItem(`hasSeenClassSetup_${user.uid}`) !== 'true') {
-        setShowClassSetup(true);
-      }
+      navigate('/select-standard');
     } else if (user?.classGroup) {
       setSelectedClassGroup(user.classGroup);
       setSetupClassGroup(user.classGroup);
     }
-  }, [user?.uid, user?.classGroup]);
+  }, [user?.uid, user?.classGroup, navigate]);
 
   const handleCloseClassSetup = (open: boolean) => {
     if (!open && user) {
@@ -296,7 +295,6 @@ export default function Dashboard() {
   };
 
   const isGuest = user?.role === 'guest';
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!authLoading && !user) {

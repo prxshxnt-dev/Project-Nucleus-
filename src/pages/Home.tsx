@@ -1,12 +1,13 @@
 import { motion, useScroll, useTransform, AnimatePresence } from 'motion/react';
 import { useEffect, useState, useRef } from 'react';
-import { Play, BookOpen, Video, Lock, Check, X, Sparkles, Star, Trophy, ArrowRight, Heart, Feather, Coffee } from 'lucide-react';
+import { Play, BookOpen, Video, Lock, Check, X, Sparkles, Star, Trophy, ArrowRight, Heart, Feather, Coffee, QrCode, Copy, Smartphone } from 'lucide-react';
 import { signInWithGoogle, db } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, getDocs, limit, orderBy } from 'firebase/firestore';
 import { FloatingStickers } from '../components/FloatingStickers';
+import { NucleusLogo } from '../components/NucleusLogo';
 
 function MentorTrack({ mentors, direction = 'left' }: { mentors: any[], direction?: 'left' | 'right' }) {
   // Duplicate for infinite scroll
@@ -77,6 +78,19 @@ export default function Home() {
   const y1 = useTransform(scrollYProgress, [0, 1], [0, 180]);
   const y2 = useTransform(scrollYProgress, [0, 1], [0, -80]);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+
+  // Morph scroll transforms for background blobs
+  const blobSpeed1 = useTransform(scrollYProgress, [0, 1], [0, 240]);
+  const blobSpeed2 = useTransform(scrollYProgress, [0, 1], [0, -180]);
+  const blobSkewY1 = useTransform(scrollYProgress, [0, 0.5, 1], [0, 12, -8]);
+  const blobSkewX1 = useTransform(scrollYProgress, [0, 0.5, 1], [0, -6, 10]);
+  const blobScale1 = useTransform(scrollYProgress, [0, 0.5, 1], [1, 1.2, 0.9]);
+  const blobRotate1 = useTransform(scrollYProgress, [0, 1], [0, 120]);
+
+  const blobSkewY2 = useTransform(scrollYProgress, [0, 0.5, 1], [0, -10, 15]);
+  const blobSkewX2 = useTransform(scrollYProgress, [0, 0.5, 1], [0, 8, -12]);
+  const blobScale2 = useTransform(scrollYProgress, [0, 0.5, 1], [1, 0.85, 1.25]);
+  const blobRotate2 = useTransform(scrollYProgress, [0, 1], [0, -150]);
   
   const pricingContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -147,6 +161,12 @@ export default function Home() {
   const [activeStickerId, setActiveStickerId] = useState<string | null>(null);
   const [activePricingCard, setActivePricingCard] = useState<string | null>('lectures');
   const [showTeacherBox, setShowTeacherBox] = useState(false);
+  const [isPaymentChoiceOpen, setIsPaymentChoiceOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<number>(250);
+  const [customAmountText, setCustomAmountText] = useState<string>('250');
+  const [upiIdCopied, setUpiIdCopied] = useState(false);
+  const [showQrMode, setShowQrMode] = useState(false);
+  const [paymentPurpose, setPaymentPurpose] = useState<string>('Support & Donation');
 
   useEffect(() => {
     // Explicitly scroll to top on mount to ensure landing page starts at the header
@@ -155,6 +175,14 @@ export default function Home() {
     if (lenis) {
       lenis.scrollTo(0, { immediate: true });
     }
+
+    const handleOpenDonation = () => {
+      setPaymentPurpose('Support & Donation');
+      setPaymentAmount(250);
+      setCustomAmountText('250');
+      setIsPaymentChoiceOpen(true);
+    };
+    window.addEventListener('trigger-nucleus-donation', handleOpenDonation);
 
     const fetchMaterials = async () => {
       try {
@@ -176,6 +204,10 @@ export default function Home() {
       }
     };
     fetchMaterials();
+
+    return () => {
+      window.removeEventListener('trigger-nucleus-donation', handleOpenDonation);
+    };
   }, []);
 
   const planTiers = {
@@ -186,20 +218,62 @@ export default function Home() {
   };
   const userTier = user ? planTiers[user.planId as keyof typeof planTiers] : 0;
 
+  const renderDecoratedTitle = (title: string) => {
+    const line1 = settings.heroTitleLine1 || "Learning That's";
+    const line2 = settings.heroTitleLine2 || "Smart, Simple &";
+    const highlight = settings.heroTitleHighlight || "Super Fun!";
+    
+    // Split the middle line to attach the cute purple doodle spark lines above the first word
+    const words = line2.split(' ');
+    const firstWord = words[0] || "";
+    const remainingWords = words.slice(1).join(' ');
+
+    return (
+      <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight text-text-primary mb-8 leading-[1.25] relative select-none text-center flex flex-col items-center justify-center">
+        <span className="block mt-1">{line1}</span>
+        <span className="relative inline-block mt-3 z-10 font-black">
+          {firstWord && (
+            <span className="relative inline-block pr-1 text-text-primary font-black">
+              {firstWord}
+              <span className="absolute -top-7 left-[65%] w-14 h-9 pointer-events-none select-none text-[#b894ff]">
+                <svg viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full stroke-current animate-pulse" strokeWidth="3" strokeLinecap="round">
+                  <path d="M 8 22 C 10 15, 14 8, 22 4" />
+                  <path d="M 18 24 C 21 16, 28 10, 36 6" />
+                  <path d="M 2 16 C 5 12, 10 8, 16 6" />
+                </svg>
+              </span>
+            </span>
+          )}
+          {remainingWords ? ` ${remainingWords}` : ''}
+        </span>
+        <span className="block mt-3 relative z-10">
+          <span className="relative inline-block pb-3.5 text-text-primary font-black">
+            {highlight}
+            <span className="absolute -bottom-1 left-0 w-full h-4 pointer-events-none select-none text-[#FA8339]">
+              <svg viewBox="0 0 160 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full stroke-current" strokeWidth="4.5" strokeLinecap="round">
+                <path d="M 2 4 Q 80 10, 158 3" />
+                <path d="M 8 10 Q 82 14, 148 9" />
+              </svg>
+            </span>
+          </span>
+        </span>
+      </h1>
+    );
+  };
+
+  const handleCopyUpiId = () => {
+    if (settings.upiId) {
+      navigator.clipboard.writeText(settings.upiId);
+      setUpiIdCopied(true);
+      setTimeout(() => setUpiIdCopied(false), 2000);
+    }
+  };
+
   const handleCTA = () => {
-    if (settings.heroCta1Link) {
-      if (settings.heroCta1Link.startsWith('http')) {
-        window.open(settings.heroCta1Link, '_blank');
-      } else {
-        navigate(settings.heroCta1Link);
-      }
-      return;
-    }
-    if (user) {
-       navigate(user.role === 'admin' || user.role === 'superadmin' ? '/admin' : '/dashboard');
-    } else {
-       navigate('/login');
-    }
+    setPaymentPurpose('Support & Donation');
+    setPaymentAmount(250);
+    setCustomAmountText('250');
+    setIsPaymentChoiceOpen(true);
   };
 
   const handleCTA2 = () => {
@@ -214,14 +288,10 @@ export default function Home() {
 
   const handlePayment = (planName: string, amount: number) => {
     if (!settings.upiId) return alert('UPI ID not configured by admin. Please contact support.');
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    const note = `Class: ${pricingClassGroup} | Plan: ${planName} | Email: ${user.email}`;
-    const encodedNote = encodeURIComponent(note);
-    const upiUri = `upi://pay?pa=${settings.upiId}&pn=Admin&am=${amount}&tn=${encodedNote}&cu=INR`;
-    window.location.href = upiUri;
+    setPaymentPurpose(`Class ${pricingClassGroup} ${planName.toUpperCase()} Plan`);
+    setPaymentAmount(amount);
+    setCustomAmountText(amount.toString());
+    setIsPaymentChoiceOpen(true);
   };
 
   return (
@@ -249,7 +319,13 @@ export default function Home() {
             animate={{ 
               x: [0, 40, -20, 0],
               y: [0, -30, 40, 0],
-              scale: [1, 1.1, 0.95, 1],
+            }}
+            style={{ 
+              y: blobSpeed1, 
+              skewX: blobSkewX1, 
+              skewY: blobSkewY1, 
+              scale: blobScale1, 
+              rotate: blobRotate1 
             }}
             transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
             className="absolute top-[10%] left-[5%] w-[380px] h-[380px] rounded-full bg-gradient-to-tr from-accent-primary/15 to-transparent blur-[100px]"
@@ -258,7 +334,13 @@ export default function Home() {
             animate={{ 
               x: [0, -50, 30, 0],
               y: [0, 40, -30, 0],
-              scale: [1, 0.9, 1.1, 1],
+            }}
+            style={{ 
+              y: blobSpeed2, 
+              skewX: blobSkewX2, 
+              skewY: blobSkewY2, 
+              scale: blobScale2, 
+              rotate: blobRotate2 
             }}
             transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
             className="absolute bottom-[20%] right-[10%] w-[450px] h-[450px] rounded-full bg-gradient-to-tr from-[#ff82a0]/15 to-transparent blur-[120px]"
@@ -312,19 +394,16 @@ export default function Home() {
 
             {/* Configurable Image Frame / Circular Profile Element - static, no animations */}
             <div 
-              className={`absolute inset-1 bg-zinc-950/95 p-1 border border-accent-primary/40 overflow-hidden shadow-2xl z-10 flex flex-col items-center justify-center text-center backdrop-blur-md ${
+              className={`absolute inset-1 bg-bg-primary p-1 border border-border-color overflow-hidden shadow-2xl z-10 flex flex-col items-center justify-center text-center ${
                 settings.aboutCornerImgShape === "circle" ? "rounded-full" : "rounded-2xl sm:rounded-[28px]"
               }`}
             >
-              <div className={`relative w-full h-full overflow-hidden ${
+              <div className={`relative w-full h-full overflow-hidden flex items-center justify-center p-4 bg-bg-secondary/40 backdrop-blur-xs ${
                 settings.aboutCornerImgShape === "circle" ? "rounded-full" : "rounded-xl sm:rounded-[22px]"
               }`}>
-                <img 
-                  src={settings.aboutCornerImageUrl || "auto=format&fit=crop&q=80&w=400"} 
-                  alt="Custom corner branding"
-                  className="w-full h-full object-cover brightness-95"
-                  referrerPolicy="no-referrer"
-                  style={{ filter: "url(#logo-theme-tint)" }}
+                <NucleusLogo 
+                  className="w-4/5 h-4/5 text-text-primary" 
+                  logoColor="currentColor" 
                 />
                 
                 {/* Visual Glass highlights */}
@@ -553,12 +632,12 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
           {/* Text/CTA Left */}
-          <div className="lg:col-span-7 text-left flex flex-col items-start">
+          <div className="lg:col-span-7 text-center flex flex-col items-center">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="w-full"
+              className="w-full flex flex-col items-center"
             >
               {/* Cute Badge with animation */}
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent-primary/10 border border-accent-primary/30 mb-6 backdrop-blur-md">
@@ -566,17 +645,15 @@ export default function Home() {
                 <span className="text-xs font-bold tracking-wide text-text-primary uppercase">{settings.heroBadgeText || 'Interactive Modern Learning Hub'}</span>
               </div>
 
-              {/* Huge friendly rounded heading weight */}
-              <h1 className="text-5xl md:text-7xl font-display font-black tracking-tight text-text-primary mb-6 leading-[1.1] text-balance">
-                {settings.heroTitle}
-              </h1>
+              {/* Huge friendly rounded heading weight with handdrawn highlights */}
+              {renderDecoratedTitle(settings.heroTitle)}
 
-              <p className="text-base md:text-lg text-text-secondary max-w-xl mb-10 text-balance leading-relaxed whitespace-pre-line font-medium">
+              <p className="text-base md:text-lg text-text-secondary max-w-xl mb-10 text-balance leading-relaxed whitespace-pre-line font-medium text-center mx-auto">
                 {settings.heroSubtitle}
               </p>
               
-              {/* Primary CTA styling matches a cute responsive game style */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+               {/* Primary CTA styling matches a cute responsive game style */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto mx-auto">
                 <button 
                   onClick={handleCTA}
                   className="theme-btn-themed px-10 py-4.5 bg-accent-primary text-button-text font-bold hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_8px_25px_rgba(229,210,165,0.35)] w-full sm:w-auto flex items-center justify-center gap-2 group cursor-pointer"
@@ -599,339 +676,614 @@ export default function Home() {
 
           {/* Cute interactive mock dashboard graphic Right */}
           <div className="lg:col-span-5 h-full relative flex items-center justify-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, rotate: 2 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, type: 'spring', stiffness: 100 }}
-              className="relative w-full max-w-[420px]"
-            >
-              {/* Soft visual card representing kid learning stats with rounded edges */}
+            <div className="relative w-full max-w-[420px]">
               <div 
-                className="w-full bg-glass-bg border border-border-color backdrop-blur-xl p-6 shadow-2xl relative overflow-hidden"
-                style={{ 
-                  borderRadius: 'var(--theme-card-radius, 32px)',
-                  display: settings.aboutShowMockCard !== false ? 'block' : 'none'
-                }}
+                className="relative w-full aspect-[10/16] bg-gradient-to-b from-[#FE9E5C] to-[#FA8339] rounded-[44px] border-[6px] border-white shadow-[0_24px_50px_rgba(251,148,81,0.25)] overflow-hidden flex flex-col items-center justify-center p-4"
               >
-                {/* Visual header */}
-                <div className="flex items-center justify-between mb-8 border-b border-border-color/40 pb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-[#ff839a]" />
-                    <div className="w-3 h-3 rounded-full bg-accent-primary" />
-                    <div className="w-3 h-3 rounded-full bg-emerald-400" />
-                  </div>
-                  <span className="text-[10px] uppercase tracking-widest text-text-muted font-bold font-mono">Student-LMS v1.2</span>
-                </div>
+                {/* Background SVG Flow Overlay with Crayon Chalk style lines and arrow highlights */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 160">
+                  <defs>
+                    <clipPath id="scallopClipHomeHero">
+                      {/* Precise quadratic flower-petal scalloped mask */}
+                      <motion.path 
+                        d="M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
+                        animate={{ 
+                          d: [
+                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z",
+                            "M 50 8 Q 57 12 64 6 Q 72 12 78 9 Q 84 14 90 12 Q 92 21 97 21 Q 97 30 99 34 Q 97 43 97 49 Q 97 55 99 64 Q 97 68 97 77 Q 92 77 90 86 Q 84 84 78 92 Q 72 88 64 94 Q 57 88 50 94 Q 43 88 36 94 Q 28 88 22 92 Q 16 84 10 86 Q 8 77 3 77 Q 3 68 1 64 Q 3 55 3 49 Q 3 43 1 34 Q 3 30 3 21 Q 8 21 10 12 Q 16 14 22 9 Q 28 12 36 6 Q 43 12 50 8 Z",
+                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
+                          ]
+                        }}
+                        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                    </clipPath>
+                  </defs>
 
-                {/* Simulated course progress widget */}
-                <div className="space-y-4">
-                  {/* Streak Card Widget */}
-                  {showTeacherBox ? (
-                    <motion.div 
-                      layout
-                      initial={{ opacity: 0, scale: 0.9, rotate: 0 }}
-                      animate={{ opacity: 1, scale: 1, rotate: -4 }}
-                      exit={{ opacity: 0, scale: 0.9, rotate: 0 }}
-                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowTeacherBox(false);
-                      }}
-                      className="relative w-full p-6 bg-zinc-950 border border-border-color cursor-pointer select-none overflow-hidden flex flex-col items-center justify-between text-center group"
-                      style={{ borderRadius: '32px' }}
-                    >
-                      {/* Black Water Splash in Background */}
-                      <div className="absolute inset-0 z-0 opacity-100 flex items-center justify-center filter drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)] pointer-events-none">
-                        <svg viewBox="0 0 100 100" className="w-[125%] h-[125%] text-black fill-current transform scale-125 rotate-[15deg]">
-                          <path d="M50 15 C65 10, 85 5, 90 25 C95 45, 80 50, 88 72 C96 94, 65 92, 48 85 C31 78, 5 80, 10 55 C15 30, 35 20, 50 15 Z" />
-                          <circle cx="85" cy="15" r="3" />
-                          <circle cx="94" cy="40" r="2.5" />
-                          <circle cx="80" cy="80" r="3.2" />
-                          <circle cx="50" cy="94" r="3.5" />
-                          <circle cx="15" cy="75" r="2.8" />
-                          <circle cx="6" cy="45" r="4" />
-                          <circle cx="12" cy="18" r="3.2" />
-                        </svg>
-                      </div>
+                  {/* Arrow 1: Top-Center (above avatar) pointing curving up-right to Top-Right cloud */}
+                  <path 
+                    d="M 50,40 C 50,28 56,18 64,22" 
+                    fill="none" 
+                    stroke="#FFFFFF" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeDasharray="4 4"
+                    className="opacity-95" 
+                  />
+                  {/* Arrow 1 custom drawn arrowhead */}
+                  <path 
+                    d="M 58,19 L 64,22 L 62,28" 
+                    fill="none" 
+                    stroke="#FFFFFF" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="opacity-95"
+                  />
 
-                      {/* Content on Top */}
-                      <div className="relative z-10 w-full h-full flex flex-col items-center justify-between gap-4">
-                        {/* Teacher Photo */}
-                        <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-accent-primary/50 shadow-md transform rotate-3 group-hover:rotate-0 transition-transform duration-300 flex items-center justify-center bg-zinc-900">
-                          {settings.aboutTeacherPhotoUrl ? (
-                            <img 
-                              src={settings.aboutTeacherPhotoUrl} 
-                              alt={settings.aboutTeacherName || "Dr. Anand Kumar"} 
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center p-1.5 text-center bg-black/60">
-                              <span className="text-[10px] font-bold text-[#E5D2A5] block">NO PHOTO</span>
-                              <span className="text-[7px] text-zinc-500 font-mono leading-none mt-1 uppercase scale-90">Paste URL in Admin Panel</span>
-                            </div>
-                          )}
-                        </div>
+                  {/* Yellow fever/spark lines right above Arrow 1 head */}
+                  <line x1="64" y1="16" x2="67" y2="10" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="70" y1="18" x2="75" y2="13" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="58" y1="17" x2="60" y2="10" stroke="#FCD34D" strokeWidth="2" strokeLinecap="round" />
 
-                        {/* Teacher Data */}
-                        <div className="space-y-1">
-                          <h4 className="font-display font-black text-sm text-accent-primary tracking-tight leading-tight">
-                            {settings.aboutTeacherName || "Dr. Anand Kumar"}
-                          </h4>
-                          <p className="text-[10px] font-mono text-text-primary px-2.5 py-0.5 rounded-full bg-accent-primary/10 inline-block">
-                            {settings.aboutTeacherRole || "Senior Physics Specialist (Ex-IIT)"}
-                          </p>
-                          <p className="text-[10px] text-text-muted mt-2 font-medium leading-relaxed max-w-[240px] mx-auto italic">
-                            "{settings.aboutTeacherTagline || "Visualizing equations dynamically. Crafting interactive modules for deep analytical development of students."}"
-                          </p>
-                        </div>
+                  {/* Arrow 2: Center-Right curving down-left to Middle-Left cloud */}
+                  <path 
+                    d="M 76,42 C 82,58 78,82 56,90" 
+                    fill="none" 
+                    stroke="#FFFFFF" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeDasharray="4 4"
+                    className="opacity-95" 
+                  />
+                  {/* Arrow 2 custom drawn arrowhead */}
+                  <path 
+                    d="M 62,85 L 56,90 L 62,95" 
+                    fill="none" 
+                    stroke="#FFFFFF" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="opacity-95"
+                  />
 
-                        <span className="text-[9px] font-mono uppercase tracking-widest text-[#ff839a] block animate-pulse">
-                          ✦ Click to return ✦
-                        </span>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <div 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowTeacherBox(true);
-                      }}
-                      className="p-4 rounded-2xl bg-gradient-to-r from-accent-primary/10 to-amber-500/10 border border-accent-primary/25 hover:border-accent-primary/50 transition-all duration-300 hover:scale-[1.01] flex items-center justify-between cursor-pointer select-none"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-full bg-amber-400 text-button-text">
-                          <Trophy className="w-5 h-5 fill-current" />
-                        </div>
-                        <div className="text-left">
-                          <h4 className="font-bold text-sm text-text-primary leading-tight">
-                            {settings.aboutMockCardTitle || 'Physics Expert'}
-                          </h4>
-                          <p className="text-[10px] text-text-muted">
-                            {settings.aboutMockCardSubtitle || 'Daily Challenge streak'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-black text-accent-primary font-display">
-                          {settings.aboutMockCardValue || '8 Days'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  {/* Arrow 3: From Middle-Left cloud curving down-right to Bottom-Center cloud */}
+                  <path 
+                    d="M 22,104 C 18,116 24,128 35,124" 
+                    fill="none" 
+                    stroke="#FFFFFF" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeDasharray="4 4"
+                    className="opacity-95" 
+                  />
+                  {/* Arrow 3 custom drawn arrowhead */}
+                  <path 
+                    d="M 29,122 L 35,124 L 32,130" 
+                    fill="none" 
+                    stroke="#FFFFFF" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="opacity-95"
+                  />
+                </svg>
 
-                  {/* Math progress capsule */}
-                  <div 
-                    className="p-4 rounded-2xl bg-bg-secondary/80 border border-border-color/80 flex flex-col gap-2"
-                    style={{
-                      display: settings.aboutShowCalculusCard !== false ? 'flex' : 'none'
-                    }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-[#ff839a]" />
-                        <span className="text-xs font-bold text-text-primary">{settings.aboutCalculusTitle || 'Calculus Foundation'}</span>
-                      </div>
-                      <span className="text-xs font-bold text-accent-primary">{settings.aboutCalculusBadge || 'Class 11'}</span>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="h-2 rounded-full bg-border-color/60 overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-accent-primary to-amber-400 rounded-full" style={{ width: `${settings.aboutCalculusProgress !== undefined ? settings.aboutCalculusProgress : 74}%` }} />
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-text-muted mt-1">
-                      <span>{settings.aboutCalculusLectureText || '14 Lectures Watched'}</span>
-                      <span>{settings.aboutCalculusPercentText || '74% Complete'}</span>
-                    </div>
-                  </div>
-
-                  {/* Rating widget */}
-                  <div 
-                    className="p-4 rounded-2xl bg-bg-secondary/40 border border-border-color/60 flex items-center gap-4"
-                    style={{
-                      display: settings.aboutShowRatingCard !== false ? 'flex' : 'none'
-                    }}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-[#ff839a]/10 flex items-center justify-center text-[#ff839a]">
-                      <Heart className="w-5 h-5 fill-current" />
-                    </div>
-                    <div className="text-left flex-1 min-w-0">
-                      <p className="text-xs font-black text-text-primary truncate">{settings.aboutRatingTitle || '10,000+ Active Students'}</p>
-                      <p className="text-[10px] text-text-muted">{settings.aboutRatingDesc || 'Highly recommended study app'}</p>
+                {/* Top-Right Cloud */}
+                <div className="absolute top-[6%] right-[3%] z-20">
+                  <div className="relative w-36 xs:w-40 sm:w-44 select-none group cursor-pointer transition-transform duration-300 hover:scale-105 hover:-rotate-1">
+                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(253,148,81,0.2)]" viewBox="0 0 100 60" fill="#FFFFFF">
+                      <path d="M 20,45 C 15,45 10,41 10,36 C 10,30 15,25 21,25 C 23,17 30,11 39,11 C 47,11 54,16 57,23 C 60,19 65,16 71,16 C 79,16 86,23 86,31 C 86,32 86,34 85,35 C 89,35 92,39 92,43 C 92,48 88,52 83,52 L 20,52 Z" />
+                    </svg>
+                    <div className="absolute inset-x-0 bottom-4 top-5 flex flex-col items-center justify-center p-2 text-center">
+                      <span className="text-zinc-800 text-[10px] sm:text-[11px] font-black uppercase tracking-wider font-display leading-tight">
+                        IITian Led
+                      </span>
+                      <span className="text-indigo-600 text-[8px] sm:text-[9px] font-mono font-bold leading-none mt-1 uppercase tracking-widest">
+                        Ex-Super 30
+                      </span>
                     </div>
                   </div>
                 </div>
+
+                {/* Center Scallop Avatar Frame */}
+                <div className="absolute top-[28%] left-[50%] -translate-x-1/2 z-20">
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center select-none group cursor-pointer">
+                    <svg className="absolute w-[108%] h-[108%] filter drop-shadow-[0_16px_32px_rgba(0,0,0,0.2)]" viewBox="0 0 100 100">
+                      {/* Radiant Background outline shadow layer / glowing scallop */}
+                      <motion.path 
+                        d="M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
+                        fill="#FEE2E2" 
+                        animate={{ 
+                          d: [
+                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z",
+                            "M 50 8 Q 57 12 64 6 Q 72 12 78 9 Q 84 14 90 12 Q 92 21 97 21 Q 97 30 99 34 Q 97 43 97 49 Q 97 55 99 64 Q 97 68 97 77 Q 92 77 90 86 Q 84 84 78 92 Q 72 88 64 94 Q 57 88 50 94 Q 43 88 36 94 Q 28 88 22 92 Q 16 84 10 86 Q 8 77 3 77 Q 3 68 1 64 Q 3 55 3 49 Q 3 43 1 34 Q 3 30 3 21 Q 8 21 10 12 Q 16 14 22 9 Q 28 12 36 6 Q 43 12 50 8 Z",
+                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
+                          ]
+                        }}
+                        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+                        className="transform scale-[1.03] origin-center opacity-90 transition-transform duration-300 group-hover:scale-[1.05]"
+                      />
+                      <g clipPath="url(#scallopClipHomeHero)">
+                        <image 
+                          href={settings.aboutTeacherPhotoUrl || settings.aboutCornerImageUrl || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=400"} 
+                          width="100" 
+                          height="100" 
+                          preserveAspectRatio="xMidYMid slice"
+                        />
+                      </g>
+                    </svg>
+
+                    {/* Small Floating Micro Accent badge over avatar */}
+                    <div className="absolute bottom-2 right-2 bg-yellow-400 text-slate-900 text-[8px] font-black px-2 py-0.5 rounded-full border border-white shadow-md uppercase tracking-wider font-mono rotate-6">
+                      SELFIES & LIVE
+                    </div>
+                  </div>
+                </div>
+
+                {/* Middle-Left Cloud */}
+                <div className="absolute top-[48%] left-[3%] z-20">
+                  <div className="relative w-[146px] xs:w-[160px] sm:w-[174px] select-none group cursor-pointer transition-transform duration-300 hover:scale-105 hover:rotate-1">
+                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(253,148,81,0.2)]" viewBox="0 0 100 60" fill="#FFFFFF">
+                      <path d="M 20,45 C 15,45 10,41 10,36 C 10,30 15,25 21,25 C 23,17 30,11 39,11 C 47,11 54,16 57,23 C 60,19 65,16 71,16 C 79,16 86,23 86,31 C 86,32 86,34 85,35 C 89,35 92,39 92,43 C 92,48 88,52 83,52 L 20,52 Z" />
+                    </svg>
+                    <div className="absolute inset-x-0 bottom-4 top-5 flex flex-col items-center justify-center p-2 text-center">
+                      <span className="text-zinc-800 text-[10px] sm:text-[11px] font-black uppercase tracking-wider font-display leading-tight">
+                        Dynamic Modules
+                      </span>
+                      <span className="text-indigo-600 text-[8px] sm:text-[9px] font-mono font-bold leading-none mt-1 uppercase tracking-widest">
+                        Physics & Math
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom-Center Cloud */}
+                <div className="absolute bottom-[6%] left-[28%] z-20">
+                  <div className="relative w-40 xs:w-44 sm:w-48 select-none group cursor-pointer transition-transform duration-300 hover:scale-105 hover:-rotate-1">
+                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(253,148,81,0.2)]" viewBox="0 0 100 60" fill="#FFFFFF">
+                      <path d="M 20,45 C 15,45 10,41 10,36 C 10,30 15,25 21,25 C 23,17 30,11 39,11 C 47,11 54,16 57,23 C 60,19 65,16 71,16 C 79,16 86,23 86,31 C 86,32 86,34 85,35 C 89,35 92,39 92,43 C 92,48 88,52 83,52 L 20,52 Z" />
+                    </svg>
+                    <div className="absolute inset-x-0 bottom-4 top-5 flex flex-col items-center justify-center p-2 text-center">
+                      <span className="text-zinc-800 text-[10px] sm:text-[11px] font-black uppercase tracking-wider font-display leading-tight">
+                        Interactive LMS
+                      </span>
+                      <span className="text-indigo-600 text-[8px] sm:text-[9px] font-mono font-bold leading-none mt-1 uppercase tracking-widest">
+                        10K+ Students
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-
-              {/* Floating Mini Decorative Bubbles on corners */}
-              <motion.div 
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                className="absolute -top-6 -right-6 px-4 py-2 bg-[#ff839a] text-white text-xs font-black rounded-full shadow-lg flex items-center gap-1.5 border border-white/20 select-none z-30"
-                style={{
-                  display: settings.aboutShowIitianBadge !== false ? 'flex' : 'none'
-                }}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{settings.aboutIitianBadgeText || 'IITian Led'}</span>
-              </motion.div>
-
-              <motion.div 
-                animate={{ y: [0, 8, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-                className="absolute -bottom-6 -left-6 p-3 bg-accent-primary text-button-text font-black rounded-2xl shadow-lg flex items-center gap-2 border border-white/20 select-none z-30 text-xs text-left"
-                style={{
-                  display: settings.aboutShowLiveDoubts !== false ? 'flex' : 'none'
-                }}
-              >
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping" />
-                <span>{settings.aboutLiveDoubtsText || 'Live Doubts Active'}</span>
-              </motion.div>
-            </motion.div>
+            </div>
           </div>
 
         </div>
       </section>
 
       {/* Materials Showcase */}
-      {materials.length > 0 && (
-        <section id="classes" className="py-24 relative z-20 bg-bg-secondary/40 border-t border-border-color-none rounded-t-[40px] md:rounded-t-[60px] border-t border-border-color">
-          <div className="max-w-7xl mx-auto px-6 mb-16 text-center">
-            {/* Soft decorative flower or stars */}
-            <div className="w-12 h-12 bg-accent-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-accent-primary border border-accent-primary/25 animate-spin-slow">
-              <Star className="w-6 h-6 fill-current" />
+      <section id="classes" className="py-24 relative z-20 bg-bg-secondary/40 border-t border-border-color rounded-t-[40px] md:rounded-t-[60px]">
+        {/* Soft decorative background glows */}
+        <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-accent-primary/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-[450px] h-[450px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-6 mb-16 text-center">
+          
+          {/* Main heading in a container to absolute-position the rays and underline */}
+          <div className="inline-block relative">
+            {/* Handdrawn blue rays (\ | /) above and left of the heading */}
+            <div className="absolute -top-10 -left-6 md:-top-12 md:-left-8 text-blue-500 w-12 h-12 opacity-85 select-none pointer-events-none flex items-center justify-center">
+              <svg viewBox="0 0 40 40" className="w-10 h-10 stroke-current text-blue-500 animate-pulse" strokeWidth="3" strokeLinecap="round" fill="none">
+                <path d="M 12 28 L 4 12" />
+                <path d="M 22 30 L 18 4" />
+                <path d="M 32 28 L 36 12" />
+              </svg>
             </div>
-            
-            <h2 className="text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary mb-4 leading-normal">
-              Explore Premium <span className="text-accent-primary">Lessons & Notes</span>
+
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary leading-tight md:leading-normal mb-6 px-4">
+              Your Study Resources, <br className="sm:hidden" /> All in{" "}
+              <span className="relative inline-block whitespace-nowrap p-1">
+                One Place!
+                {/* Custom purple highlighter/felt-tip pen underline */}
+                <svg className="absolute -bottom-3 left-0 w-full h-4 text-purple-400 dark:text-purple-500 opacity-90" viewBox="0 0 100 10" preserveAspectRatio="none">
+                  <path d="M 2 8 C 30 5, 70 4, 98 7" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
+                </svg>
+              </span>
             </h2>
-            <p className="text-text-secondary text-base md:text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-semibold">
-              Get an instant look at high-grade course notes, clear explanations, and interactive video lecture assets built by academic rankers.
-            </p>
+          </div>
+
+          <p className="text-text-secondary text-sm md:text-base max-w-3xl mx-auto mb-16 leading-relaxed font-semibold">
+            {(settings as any).resourcesSubtitle || 
+              "Access everything you need to learn smarter, from concise notes and personalized books to interactive tests, insightful blogs, & live video lessons. Study made simple, engaging, and super fun with Nucleus Classes!"}
+          </p>
+
+          {/* New Interactive Bento grid from Reference Images */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left mb-16">
             
-            {/* Fully styled cute Class selection buttons */}
-            <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-4xl mx-auto bg-glass-bg/85 p-2 rounded-3xl border border-border-color backdrop-blur-md">
-              <button 
-                onClick={() => setSelectedClassGroup('all')} 
-                className={`px-5 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-black transition-all cursor-pointer ${
-                  selectedClassGroup === 'all' 
-                    ? 'bg-accent-primary text-button-text shadow-sm' 
-                    : 'text-text-muted hover:text-text-primary hover:bg-white/5'
-                }`}
+            {/* Left Column: Big Lavender mockup Notes & PDFs card (Image 1 style) */}
+            <motion.div 
+              whileHover={{ y: -6 }}
+              className="lg:col-span-7 bg-[#F3E8FF] dark:bg-[#1E1E2E] rounded-[36px] p-8 md:p-10 border border-purple-200/50 dark:border-purple-900/40 relative overflow-hidden flex flex-col justify-between min-h-[500px] md:min-h-[560px] shadow-lg group cursor-pointer"
+              style={{ borderRadius: 'var(--theme-card-radius, 32px)' }}
+              onClick={() => navigate('/learn')}
+            >
+              {/* Highlight background blobs */}
+              <div className="absolute -right-20 -top-20 w-64 h-64 bg-purple-300/30 dark:bg-purple-900/30 rounded-full blur-[100px] pointer-events-none" />
+              <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-300/20 dark:bg-indigo-900/20 rounded-full blur-[100px] pointer-events-none" />
+
+              {/* Text content upper section */}
+              <div className="relative z-20">
+                <h3 className="font-display font-black text-3xl md:text-4xl text-indigo-950 dark:text-purple-100 mb-3 tracking-tight">
+                  Notes & PDFs
+                </h3>
+                
+                <div className="inline-flex items-center gap-1.5 text-indigo-700 dark:text-purple-300 font-bold text-base hover:text-indigo-800 transition-colors">
+                  <span className="text-[#8B5CF6] font-extrabold text-lg">Explore now</span>
+                  <ArrowRight className="w-5 h-5 text-[#8B5CF6] group-hover:translate-x-1.5 transition-transform" />
+                </div>
+              </div>
+
+              {/* Stack of interactive handwritten notebook mockups (realistic formula sheets) */}
+              <div className="relative w-full h-[280px] md:h-[340px] mt-8 flex items-end justify-center select-none pointer-events-none">
+                
+                {/* Underneath Notebook Page: Chemistry/Uses of Graphite */}
+                <div 
+                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-slate-200/60 dark:border-zinc-800 p-5 md:p-6 flex flex-col text-left transition-all duration-500 origin-bottom group-hover:rotate-[-6deg] group-hover:translate-x-[-12px] group-hover:translate-y-[-8px]"
+                  style={{
+                    transform: 'rotate(-4deg) translateY(20px) translateX(-5px)',
+                    backgroundImage: 'repeating-linear-gradient(#ffffff 0px, #ffffff 21px, #eef2f6 22px)',
+                    backgroundSize: '100% 22px'
+                  }}
+                >
+                  {/* Left padding vertical margin line */}
+                  <div className="absolute left-6 top-0 bottom-0 w-[1.5px] bg-red-200" />
+
+                  {/* Chemistry handwritten formulas & Graphite hexa structure */}
+                  <div className="pl-6 pt-2 font-handwriting text-[9px] md:text-[10px] text-slate-700 dark:text-slate-300 font-medium leading-[22px] overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px] md:text-[12px]"># USES OF GRAPHITE</span>
+                      <span className="text-[8px] px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-200 rounded font-bold font-mono rotate-3">RANK #1 TIPS</span>
+                    </div>
+
+                    <div className="mt-2 font-mono flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-indigo-600 dark:text-indigo-400">COVALENT BONDING</p>
+                        <p className="mt-1 leading-snug">• Good conductor of electricity because of free electrons.</p>
+                        <p className="mt-1 leading-snug">• Dull & Black in appearance.</p>
+                        <p className="mt-1 leading-snug">• Used in Electrodes (Anode / Cathode), battery.</p>
+                      </div>
+                      
+                      {/* Graphite carbon sheets diagram */}
+                      <div className="hidden sm:block mr-2 opacity-80">
+                        <svg className="w-16 h-12 stroke-slate-500 fill-none" viewBox="0 0 80 60">
+                          <polygon points="15,15 25,10 35,15 35,25 25,30 15,25" strokeWidth="1.5" />
+                          <polygon points="35,15 45,10 55,15 55,25 45,30 35,25" strokeWidth="1.5" />
+                          <polygon points="25,30 35,25 35,25 45,30 45,40 35,45 25,40" strokeWidth="1.5" />
+                          <text x="21" y="24" className="text-[6px] font-mono fill-slate-500 border-none select-none">C</text>
+                          <text x="41" y="24" className="text-[6px] font-mono fill-slate-500 border-none select-none">C</text>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Overlay Notebook Page: Hydrocarbons & Formulas */}
+                <div 
+                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-700 p-5 md:p-6 flex flex-col text-left transition-all duration-500 origin-bottom group-hover:rotate-[3deg] group-hover:translate-x-[12px] group-hover:translate-y-[-10px]"
+                  style={{
+                    transform: 'rotate(1deg) translateY(35px) translateX(10px)',
+                    backgroundImage: 'repeating-linear-gradient(#ffffff 0px, #ffffff 21px, #e2e8f0 22px)',
+                    backgroundSize: '100% 22px'
+                  }}
+                >
+                  {/* Left margin red lines */}
+                  <div className="absolute left-6 top-0 bottom-0 w-[1.5px] bg-red-200" />
+                  
+                  {/* Binder notebook rings on left margin to make it look incredibly real */}
+                  <div className="absolute left-1 top-6 flex flex-col gap-6 z-10">
+                    {[1, 2, 3, 4, 5].map((iPr) => (
+                      <div key={iPr} className="w-2.5 h-3.5 rounded-full border border-slate-400 bg-slate-200 shadow-inner flex items-center justify-center">
+                        <div className="w-1 h-2 bg-slate-400 rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Content of the notebook sheet */}
+                  <div className="pl-6 pt-1 font-handwriting text-[9px] md:text-[10px] text-slate-700 dark:text-slate-300 font-medium leading-[22px] overflow-hidden">
+                    <p className="font-extrabold text-indigo-900 dark:text-white uppercase tracking-wider text-[11px] md:text-[12px]">SATURATED HYDROCARBONS</p>
+                    
+                    <div className="mt-2 font-mono grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <div className="sm:col-span-8">
+                        <p className="font-bold text-purple-600 dark:text-purple-400">• ALKANES:</p>
+                        <p className="text-gray-600 dark:text-gray-300 leading-snug pl-2">Hydrocarbons containing Single covalent bonds. Eg: Methane (<span className="text-red-500 font-bold">CH₄</span>)</p>
+                        
+                        <p className="font-bold text-purple-600 dark:text-purple-400 mt-1">• UNSATURATED:</p>
+                        <p className="text-gray-600 dark:text-gray-300 leading-snug pl-2">Contain double or triple carbon covalent bonds.</p>
+                        <p className="text-gray-600 dark:text-gray-300 pl-4 leading-tight font-sans">- Alkenes Formula: <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">CnH₂n</span></p>
+                        <p className="text-gray-600 dark:text-gray-300 pl-4 leading-tight font-sans">- Alkynes Formula: <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">CnH₂n₋₂</span></p>
+                      </div>
+
+                      {/* Chemical sketch - methane skeletal */}
+                      <div className="hidden sm:col-span-4 sm:flex items-center justify-center bg-yellow-50/50 dark:bg-yellow-950/20 p-2 rounded-xl border border-yellow-200/50 dark:border-yellow-900/30 scale-90">
+                        <div className="flex flex-col items-center justify-center font-mono text-[9px] text-gray-800 dark:text-gray-200 leading-none">
+                          <span>H</span>
+                          <span className="h-2.5 w-[1.5px] bg-slate-400 my-0.5"></span>
+                          <div className="flex items-center gap-1">
+                            <span>H</span>
+                            <span className="w-2.5 h-[1.5px] bg-slate-400"></span>
+                            <span className="font-extrabold text-red-600">C</span>
+                            <span className="w-2.5 h-[1.5px] bg-slate-400"></span>
+                            <span>H</span>
+                          </div>
+                          <span className="h-2.5 w-[1.5px] bg-slate-400 my-0.5"></span>
+                          <span>H</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </motion.div>
+
+            {/* Right Column: Dynamic Stacked Bento Cards */}
+            <div className="lg:col-span-5 flex flex-col gap-6 justify-between">
+              
+              {/* Bento Card 1: "Get Notes and PDFs" - Image 2 Style */}
+              <motion.div 
+                whileHover={{ y: -4, scale: 1.01 }}
+                className="bg-[#FFF8EE] dark:bg-[#25201A] border border-amber-200/50 dark:border-amber-900/40 p-6 md:p-8 rounded-[32px] flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-sm hover:shadow-md transition-all h-[155px]"
+                onClick={() => navigate('/learn')}
               >
-                All Levels
-              </button>
-              {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map((numPr) => (
+                <div className="flex flex-col justify-center max-w-[70%] z-10">
+                  <h3 className="font-display font-bold text-xl md:text-2xl text-slate-800 dark:text-amber-100 tracking-tight leading-snug">
+                    Get Notes and PDFs
+                  </h3>
+                  <p className="text-amber-700/70 dark:text-amber-400/75 text-[11px] font-semibold mt-1 tracking-wide uppercase">
+                    Red-highlighted summaries
+                  </p>
+                </div>
+
+                {/* Custom Notebook spirals & red highlighter pencil SVG (Exact Illustration style!) */}
+                <div className="relative pr-2 scale-[1.05] group-hover:scale-110 transition-transform duration-300 z-10">
+                  <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none">
+                    <rect x="18" y="22" width="56" height="58" rx="8" fill="#FFFBEB" stroke="#D1A153" strokeWidth="3.5" />
+                    
+                    <line x1="28" y1="36" x2="62" y2="36" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
+                    <line x1="28" y1="46" x2="62" y2="46" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
+                    <line x1="28" y1="56" x2="62" y2="56" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
+                    <line x1="28" y1="66" x2="62" y2="66" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
+                    
+                    <rect x="24" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
+                    <rect x="38" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
+                    <rect x="52" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
+                    <rect x="66" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
+
+                    <g transform="translate(10, -5) rotate(15 50 50)">
+                      <rect x="62" y="42" width="12" height="28" rx="3" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" />
+                      <path d="M 62 42 L 68 34 L 74 42 Z" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" strokeLinejoin="round" />
+                      <polygon points="65,34 68,28 71,28 70,34" fill="#1E293B" />
+                      <rect x="64" y="70" width="8" height="4" rx="1" fill="#1E293B" />
+                      <rect x="65" y="46" width="3" height="20" fill="#FCA5A5" opacity="0.6" />
+                    </g>
+                    
+                    <path d="M 33 54 L 56 46" stroke="#EF4444" strokeWidth="8" strokeLinecap="round" opacity="0.25" />
+                  </svg>
+                </div>
+
+                {/* Classic Blue Arrow indicator on top-right */}
+                <div className="absolute top-4 right-4 text-blue-500 w-5 h-5 flex items-center justify-center hover:scale-105 transition-transform">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-current stroke-[3px]" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              </motion.div>
+
+              {/* Bento Card 2: "Watch Live Tutorials" */}
+              <motion.div 
+                whileHover={{ y: -4, scale: 1.01 }}
+                className="bg-[#EEFDFC] dark:bg-[#152524] border border-teal-200/50 dark:border-teal-900/40 p-6 md:p-8 rounded-[32px] flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-sm hover:shadow-md transition-all h-[155px]"
+                onClick={() => navigate('/learn')}
+              >
+                <div className="flex flex-col justify-center max-w-[70%] z-10">
+                  <h3 className="font-display font-bold text-xl md:text-2xl text-slate-800 dark:text-teal-100 tracking-tight leading-snug">
+                    Watch Video Tutorials
+                  </h3>
+                  <p className="text-teal-700/70 dark:text-teal-400/75 text-[11px] font-semibold mt-1 tracking-wide uppercase">
+                    Interactive Video Assets
+                  </p>
+                </div>
+
+                {/* Custom Video Camera illustration */}
+                <div className="relative pr-2 scale-[1.05] group-hover:scale-110 transition-transform duration-300 z-10 text-teal-600">
+                  <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none">
+                    <rect x="18" y="28" width="46" height="44" rx="8" fill="#CCFBF1" stroke="#0D9488" strokeWidth="3.5" />
+                    <polygon points="64,40 84,30 84,70 64,60" fill="#CCFBF1" stroke="#0D9488" strokeWidth="3.5" strokeLinejoin="round" />
+                    <circle cx="41" cy="50" r="8" fill="#0D9488" />
+                    <polygon points="38,46 47,50 38,54" fill="#FFFFFF" />
+                  </svg>
+                </div>
+
+                {/* Top-Right Blue Arrow */}
+                <div className="absolute top-4 right-4 text-blue-500 w-5 h-5 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-current stroke-[3px]" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              </motion.div>
+
+              {/* Bento Card 3: "Adaptive Chapter Tests" */}
+              <motion.div 
+                whileHover={{ y: -4, scale: 1.01 }}
+                className="bg-[#FCF0FF] dark:bg-[#25152A] border border-fuchsia-200/50 dark:border-fuchsia-900/40 p-6 md:p-8 rounded-[32px] flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-sm hover:shadow-md transition-all h-[155px]"
+                onClick={() => navigate('/learn')}
+              >
+                <div className="flex flex-col justify-center max-w-[70%] z-10">
+                  <h3 className="font-display font-bold text-xl md:text-2xl text-slate-800 dark:text-fuchsia-100 tracking-tight leading-snug">
+                    Take Chapter Tests
+                  </h3>
+                  <p className="text-fuchsia-700/70 dark:text-fuchsia-400/75 text-[11px] font-semibold mt-1 tracking-wide uppercase">
+                    Track adaptive marks
+                  </p>
+                </div>
+
+                {/* Custom checklist board layout */}
+                <div className="relative pr-2 scale-[1.05] group-hover:scale-110 transition-transform duration-300 z-10">
+                  <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none">
+                    <rect x="22" y="24" width="56" height="56" rx="8" fill="#FAE8FF" stroke="#C084FC" strokeWidth="3.5" />
+                    <rect x="42" y="14" width="16" height="12" rx="3" fill="#D8B4FE" stroke="#A855F7" strokeWidth="2.5" />
+                    
+                    {/* Tick markers */}
+                    <path d="M 32 40 L 36 44 L 46 32" stroke="#A855F7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 32 58 L 36 62 L 46 50" stroke="#A855F7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    
+                    <line x1="52" y1="38" x2="68" y2="38" stroke="#C084FC" strokeWidth="3" strokeLinecap="round" />
+                    <line x1="52" y1="56" x2="68" y2="56" stroke="#C084FC" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                </div>
+
+                {/* Top-Right Blue Arrow */}
+                <div className="absolute top-4 right-4 text-blue-500 w-5 h-5 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-current stroke-[3px]" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              </motion.div>
+
+            </div>
+
+          </div>
+
+          {/* Catalog Class Selector Segment */}
+          {materials.length > 0 && (
+            <div className="pt-12 border-t border-border-color/60 relative z-20">
+              <div className="text-center mb-8">
+                <span className="text-[10px] px-3 py-1 rounded-full bg-accent-primary/10 text-accent-primary font-black uppercase tracking-widest border border-accent-primary/20">
+                  Live Resource Repository
+                </span>
+                <h4 className="text-2xl font-display font-bold text-text-primary mt-3">
+                  Syllabus Documents & Uploads Showcase
+                </h4>
+              </div>
+
+              {/* Fully styled cute Class selection buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-4xl mx-auto bg-glass-bg/85 p-2 rounded-3xl border border-border-color backdrop-blur-md mb-10">
                 <button 
-                  key={numPr}
-                  onClick={() => setSelectedClassGroup(numPr)} 
-                  className={`px-4.5 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-black transition-all cursor-pointer ${
-                    selectedClassGroup === numPr 
+                  onClick={() => setSelectedClassGroup('all')} 
+                  className={`px-5 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-black transition-all cursor-pointer ${
+                    selectedClassGroup === 'all' 
                       ? 'bg-accent-primary text-button-text shadow-sm' 
                       : 'text-text-muted hover:text-text-primary hover:bg-white/5'
                   }`}
                 >
-                  {numPr === 'dropper' ? 'Droppers' : `Class ${numPr}`}
+                  All Levels
                 </button>
-              ))}
-            </div>
-          </div>
-          
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {materials
-              .filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id))
-              .slice(0, 6)
-              .map((mat, i) => {
-                 const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-                 const hasAccess = hasSpecificAccess || user?.role === 'admin' || user?.role === 'superadmin';
-                 
-                 return (
-                   <motion.div 
-                     key={mat.id}
-                     initial={{ opacity: 0, y: 30 }}
-                     whileInView={{ opacity: 1, y: 0 }}
-                     viewport={{ once: true, margin: "-50px" }}
-                     transition={{ delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                     whileHover={{ y: -8, scale: 1.015 }}
-                     className="group relative overflow-hidden rounded-[32px] border bg-glass-bg border-border-color hover:border-accent-primary/40 flex flex-col transition-all duration-300 cursor-pointer shadow-sm hover:shadow-2xl"
-                     style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
-                     onClick={() => {
-                       if (!user) {
-                         alert("login first to unlock this");
-                       } else {
-                         navigate('/learn');
-                       }
-                     }}
-                   >
-                     {/* Gradient background sheen */}
-                     <div className="absolute inset-0 bg-gradient-to-tr from-accent-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map((numPr) => (
+                  <button 
+                    key={numPr}
+                    onClick={() => setSelectedClassGroup(numPr)} 
+                    className={`px-4.5 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-black transition-all cursor-pointer ${
+                      selectedClassGroup === numPr 
+                        ? 'bg-accent-primary text-button-text shadow-sm' 
+                        : 'text-text-muted hover:text-text-primary hover:bg-white/5'
+                    }`}
+                  >
+                    {numPr === 'dropper' ? 'Droppers' : `Class ${numPr}`}
+                  </button>
+                ))}
+              </div>
 
-                     {mat.thumbnailUrl ? (
-                       <div className="w-full h-44 bg-bg-secondary relative overflow-hidden border-b border-border-color/50">
-                         <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover group-hover:scale-108 transition-all duration-700" />
-                         <div className="absolute inset-0 bg-gradient-to-t from-bg-primary/80 to-transparent" />
-                         {/* Thumbnail badge for type */}
-                         <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-white/95 dark:bg-zinc-900/95 font-bold tracking-wide uppercase text-[8px] flex items-center gap-1">
-                           {mat.type === 'note' ? <BookOpen className="w-2.5 h-2.5 text-accent-primary" /> : <Video className="w-2.5 h-2.5 text-[#ff8a9e]" />}
-                           <span className="text-text-primary">{mat.type === 'note' ? 'Syllabus Note' : 'Video Tutorial'}</span>
-                         </div>
-                       </div>
-                     ) : null}
+              {/* Grid of the resources cards loaded from Database */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {materials
+                  .filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id))
+                  .slice(0, 6)
+                  .map((mat, i) => {
+                     const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
+                     const hasAccess = hasSpecificAccess || user?.role === 'admin' || user?.role === 'superadmin';
                      
-                     <div className="p-6 flex flex-col flex-1 relative z-20">
-                       <div className="flex items-center justify-between mb-4">
-                         {!mat.thumbnailUrl && (
-                            <div className={`p-3 rounded-2xl transition-colors duration-500 ${
-                              mat.type === 'note' 
-                                ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
-                                : 'bg-accent-primary/10 text-accent-primary'
-                            }`}>
-                              {mat.type === 'note' ? <BookOpen className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                            </div>
-                         )}
-                         <div className="px-3 py-1.5 rounded-full bg-bg-secondary text-[9px] text-text-muted border border-border-color uppercase tracking-widest font-black font-mono">
-                           {mat.classGroup === "all" || !mat.classGroup ? "All Batches" : "Class " + mat.classGroup}
-                         </div>
-                       </div>
+                     return (
+                       <motion.div 
+                         key={mat.id}
+                         initial={{ opacity: 0, y: 30 }}
+                         whileInView={{ opacity: 1, y: 0 }}
+                         viewport={{ once: true, margin: "-50px" }}
+                         transition={{ delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                         whileHover={{ y: -8, scale: 1.015 }}
+                         className="group relative overflow-hidden rounded-[32px] border bg-glass-bg border-border-color hover:border-accent-primary/40 flex flex-col transition-all duration-300 cursor-pointer shadow-sm hover:shadow-2xl"
+                         style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+                         onClick={() => {
+                           if (!user) {
+                             alert("login first to unlock this");
+                           } else {
+                             navigate('/learn');
+                           }
+                         }}
+                       >
+                         {/* Gradient background sheen */}
+                         <div className="absolute inset-0 bg-gradient-to-tr from-accent-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-                       <h3 className="font-display text-xl font-bold text-text-primary mb-2 group-hover:text-accent-primary transition-colors duration-300 line-clamp-1 truncate">
-                         {mat.title}
-                       </h3>
-                       
-                       <p className="text-text-secondary text-xs font-semibold mb-6 flex-1 leading-relaxed line-clamp-2">
-                         {mat.description || 'Unlock this extensive curated educational material compiled by the top rankers.'}
-                       </p>
+                         {mat.thumbnailUrl ? (
+                           <div className="w-full h-44 bg-bg-secondary relative overflow-hidden border-b border-border-color/50">
+                             <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover group-hover:scale-108 transition-all duration-700" />
+                             <div className="absolute inset-0 bg-gradient-to-t from-bg-primary/80 to-transparent" />
+                             {/* Thumbnail badge for type */}
+                             <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-white/95 dark:bg-zinc-900/95 font-bold tracking-wide uppercase text-[8px] flex items-center gap-1">
+                               {mat.type === 'note' ? <BookOpen className="w-2.5 h-2.5 text-accent-primary" /> : <Video className="w-2.5 h-2.5 text-[#ff8a9e]" />}
+                               <span className="text-text-primary">{mat.type === 'note' ? 'Syllabus Note' : 'Video Tutorial'}</span>
+                             </div>
+                           </div>
+                         ) : null}
+                         
+                         <div className="p-6 flex flex-col flex-1 relative z-20">
+                           <div className="flex items-center justify-between mb-4">
+                             {!mat.thumbnailUrl && (
+                                <div className={`p-3 rounded-2xl transition-colors duration-500 ${
+                                  mat.type === 'note' 
+                                    ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
+                                    : 'bg-accent-primary/10 text-accent-primary'
+                                }`}>
+                                  {mat.type === 'note' ? <BookOpen className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                                </div>
+                             )}
+                             <div className="px-3 py-1.5 rounded-full bg-bg-secondary text-[9px] text-text-muted border border-border-color uppercase tracking-widest font-black font-mono">
+                               {mat.classGroup === "all" || !mat.classGroup ? "All Batches" : "Class " + mat.classGroup}
+                             </div>
+                           </div>
 
-                       <div className="pt-4 border-t border-border-color/40 flex items-center justify-between text-text-muted mt-auto">
-                         <div className="flex items-center gap-2 text-xs font-bold transition-all duration-300">
-                           {hasAccess ? (
-                             <div className="flex items-center gap-1.5 text-accent-primary group-hover:translate-x-1 transition-transform">
-                               <span>Study Now</span>
-                               <ArrowRight className="w-3.5 h-3.5" />
+                           <h3 className="font-display text-xl font-bold text-text-primary mb-2 group-hover:text-accent-primary transition-colors duration-300 line-clamp-1 truncate">
+                             {mat.title}
+                           </h3>
+                           
+                           <p className="text-text-secondary text-xs font-semibold mb-6 flex-1 leading-relaxed line-clamp-2">
+                             {mat.description || 'Unlock this extensive curated educational material compiled by the top rankers.'}
+                           </p>
+
+                           <div className="pt-4 border-t border-border-color/40 flex items-center justify-between text-text-muted mt-auto">
+                             <div className="flex items-center gap-2 text-xs font-bold transition-all duration-300">
+                               {hasAccess ? (
+                                 <div className="flex items-center gap-1.5 text-accent-primary group-hover:translate-x-1 transition-transform">
+                                   <span>Study Now</span>
+                                   <ArrowRight className="w-3.5 h-3.5" />
+                                 </div>
+                               ) : (
+                                 <div className="flex items-center gap-1.5 p-1 rounded-md text-text-muted group-hover:text-text-primary transition-colors">
+                                   <Lock className="w-3.5 h-3.5" />
+                                   <span>Syllabus Locked</span>
+                                 </div>
+                               )}
                              </div>
-                           ) : (
-                             <div className="flex items-center gap-1.5 p-1 rounded-md text-text-muted group-hover:text-text-primary transition-colors">
-                               <Lock className="w-3.5 h-3.5" />
-                               <span>Syllabus Locked</span>
-                             </div>
-                           )}
+                           </div>
                          </div>
-                       </div>
-                     </div>
-                   </motion.div>
-                 );
-              })}
-          </div>
-          <div className="mt-16 text-center">
-            <button 
-              onClick={handleCTA} 
-              className="theme-btn-themed px-8 py-3.5 bg-glass-bg text-text-primary font-bold border border-border-color hover:border-accent-primary/50 hover:bg-white/5 transition-all text-sm cursor-pointer"
-              style={{ borderRadius: 'var(--theme-btn-radius, 9999px)' }}
-            >
-              Browse Complete Syllabus Catalog
-            </button>
-          </div>
-        </section>
-      )}
+                       </motion.div>
+                     );
+                  })}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </section>
 
       {/* Pricing Section */}
       <section id="pricing" className="py-24 relative z-20">
@@ -940,16 +1292,32 @@ export default function Home() {
         <div className="absolute top-[25%] left-1/2 -translate-x-1/2 w-[500px] h-[550px] bg-gradient-to-tr from-accent-primary/5 via-amber-400/5 to-transparent blur-[110px] pointer-events-none select-none" />
 
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-8 md:mb-16">
-            <div className="w-12 h-12 bg-[#ff839a]/10 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4 text-[#ff839a] border border-[#ff839a]/25 animate-bounce">
-              <Sparkles className="w-5 h-5 fill-current" />
+          <div className="text-center mb-12 md:mb-16">
+            <div className="inline-block relative">
+              {/* Handdrawn pink rays (\ | /) above and left of the heading */}
+              <div className="absolute -top-10 -left-6 md:-top-12 md:-left-8 text-[#FF2E93] w-12 h-12 opacity-85 select-none pointer-events-none flex items-center justify-center">
+                <svg viewBox="0 0 40 40" className="w-10 h-10 stroke-current text-[#FF2E93]" strokeWidth="3.5" strokeLinecap="round" fill="none">
+                  <path d="M 22 22 L 6 12" />
+                  <path d="M 24 20 L 14 4" />
+                  <path d="M 28 22 L 26 5" />
+                </svg>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary leading-tight md:leading-normal mb-6 px-4">
+                Explore More From{" "}
+                <br className="sm:hidden" />
+                <span className="relative inline-block whitespace-nowrap p-1">
+                  Nucleus Classes!
+                  {/* Custom orange highlighter/felt-tip pen double underline */}
+                  <svg className="absolute -bottom-3.5 left-0 w-full h-4 text-orange-500 opacity-95" viewBox="0 0 100 10" preserveAspectRatio="none">
+                    <path d="M 2 5 C 30 3, 70 2, 98 4" fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
+                    <path d="M 12 9 C 42 7, 72 6, 88 8" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                </span>
+              </h2>
             </div>
-            
-            <h2 className="text-3xl md:text-5xl font-display font-black tracking-tight text-text-primary mb-3 md:mb-4 leading-normal">
-              A Premium Education to <span className="text-accent-primary">Shape Your Life.</span>
-            </h2>
-            <p className="text-text-secondary text-sm md:text-lg max-w-2xl mx-auto font-semibold leading-relaxed">
-              No hidden high-fees. Select the class level that corresponds to you. Enjoy pure learning with cute stickers and bento templates.
+            <p className="text-text-secondary text-sm md:text-lg max-w-2xl mx-auto font-semibold leading-relaxed mt-4">
+              {(settings as any).pricingSubtitle || "No hidden high-fees. Select the class level that corresponds to you. Enjoy pure learning with cute stickers and bento templates."}
             </p>
           </div>
           
@@ -1215,194 +1583,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Dynamic Animated Social Media Section */}
-      {settings.socialSectionShow !== false && (
-        <section id="social-connect" className="py-20 relative z-20">
-          <div className="max-w-7xl mx-auto px-6 text-left">
-            <div className="inline-flex px-3 py-1 rounded-full bg-accent-primary/10 text-accent-primary text-[10px] font-black uppercase tracking-widest mb-4">
-              Join our Community
-            </div>
-            <h2 className="text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary mb-4 leading-normal">
-              {settings.socialSectionTitle || 'Connect via Socials'}
-            </h2>
-            <p className="text-text-secondary text-base md:text-lg max-w-2xl font-semibold leading-relaxed mb-12">
-              {settings.socialSectionSubtitle || 'Stay in the loop with live streams, instant tips, sample study papers, and continuous student updates.'}
-            </p>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {/* Instagram Card */}
-              {settings.socialInstagramShow !== false && settings.socialInstagramUrl && (
-                <motion.a
-                  href={settings.socialInstagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#E1306C]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(225,48,108,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#E1306C]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#E1306C]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">Instagram</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Join our student circle</p>
-                  </div>
-                </motion.a>
-              )}
-
-              {/* YouTube Card */}
-              {settings.socialYoutubeShow !== false && settings.socialYoutubeUrl && (
-                <motion.a
-                  href={settings.socialYoutubeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#FF0000]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(255,0,0,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF0000]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#FF0000]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#FF0000] to-[#cc0000] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M23.498 6.163a3.003 3.003 0 00-2.11-2.11C19.53 3.545 12 3.545 12 3.545s-7.53 0-9.388.508a3.003 3.003 0 00-2.11 2.11C0 8.017 0 12 0 12s0 3.983.502 5.837a3.003 3.003 0 002.11 2.11c1.858.507 9.388.507 9.388.507s7.53 0 9.388-.507a3.003 3.003 0 002.11-2.11C24 15.983 24 12 24 12s0-3.983-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">YouTube</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Concept lectures & streams</p>
-                  </div>
-                </motion.a>
-              )}
-
-              {/* Telegram Card */}
-              {settings.socialTelegramShow !== false && settings.socialTelegramUrl && (
-                <motion.a
-                  href={settings.socialTelegramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#26A5E4]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(38,165,228,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#26A5E4]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#26A5E4]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2AABEE] to-[#229ED9] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M11.944 0C5.344 0 0 5.344 0 11.944c0 5.622 3.88 10.35 9.126 11.66.12.022.241.033.364.033.432 0 .822-.213 1.042-.564.218-.344.228-.776.028-1.129-.1-.177-1.353-2.39-1.93-3.414l7.636-6.6a.417.417 0 00-.097-.704.425.425 0 00-.336-.01l-10.232 4.14-3.64-1.22c-.44-.148-.415-.758.04-1.002L21.3 2.115c.421-.225.93.072.93.551l-.014 16.48c-.012.879-1.04 1.344-1.688.75l-4.704-4.305-2.614 2.502-.45 3.332c-.06.44-.44.77-.881.77h-.012c-.5 0-.91-.41-.91-.91V16.89M8.374 13.916l1.9-1.39 6.84-5.1" stroke="currentColor" strokeWidth="0.5" fill="none"/>
-                      <path d="M21.933 2.593L2.1 10.1c-.482.193-.478.895.006 1.077l5.053 1.583 1.7 5.253c.123.38.567.557.915.351l2.955-1.75 4.966 3.7c.433.323.993.078 1.085-.43l3.223-16.79c.105-.544-.403-.984-.973-.751z" fill="currentColor"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">Telegram</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Instant notes PDF drops</p>
-                  </div>
-                </motion.a>
-              )}
-
-              {/* Discord Card */}
-              {settings.socialDiscordShow !== false && settings.socialDiscordUrl && (
-                <motion.a
-                  href={settings.socialDiscordUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#5865F2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(88,101,242,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#5865F2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#5865F2]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#5865F2] to-[#404eed] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25c-.015-.022-.043-.037-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.093 13.093 0 01-1.873-.894.077.077 0 01-.008-.128c.126-.093.252-.19.372-.287a.075.075 0 01.077-.011c3.92 1.793 8.18 1.793 12.061 0a.073.073 0 01.078.009c.12.099.246.195.373.289a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.894.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.156-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.156 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.156-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.156 2.418z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">Discord</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Live voice doubt lobbies</p>
-                  </div>
-                </motion.a>
-              )}
-
-              {/* Twitter Card */}
-              {settings.socialTwitterShow !== false && settings.socialTwitterUrl && (
-                <motion.a
-                  href={settings.socialTwitterUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#1DA1F2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(29,161,242,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#1DA1F2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#1DA1F2]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1DA1F2] to-[#0d8ddb] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">Twitter (X)</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Curriculum announcements</p>
-                  </div>
-                </motion.a>
-              )}
-
-              {/* LinkedIn Card */}
-              {settings.socialLinkedinShow !== false && settings.socialLinkedinUrl && (
-                <motion.a
-                  href={settings.socialLinkedinUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#0A66C2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(10,102,194,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#0A66C2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#0A66C2]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-[#0A66C2] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M22.23 0H1.77C.8 0 0 .77 0 1.72v20.56C0 23.23.8 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.72V1.72C24 .77 23.2 0 22.23 0zM7.12 20.45H3.56V9H7.12v11.45zM5.34 7.43c-1.14 0-2.06-.92-2.06-2.06 0-1.14.92-2.06 2.06-2.06 1.14 0 2.06.92 2.06 2.06 0 1.14-.92 2.06-2.06 2.06zm15.11 13.02h-3.56v-5.6c0-1.34-.03-3.05-1.86-3.05-1.86 0-2.14 1.45-2.14 2.95v5.7h-3.56V9h3.42v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">LinkedIn</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Academic faculty profiles</p>
-                  </div>
-                </motion.a>
-              )}
-
-              {/* Facebook Card */}
-              {settings.socialFacebookShow !== false && settings.socialFacebookUrl && (
-                <motion.a
-                  href={settings.socialFacebookUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  whileHover={{ y: -6, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden group p-6 bg-glass-bg border border-border-color hover:border-[#1877F2]/40 rounded-3xl transition-all duration-300 flex flex-col justify-between h-44 cursor-pointer shadow-sm hover:shadow-[0_8px_30px_rgba(24,119,242,0.15)]"
-                  style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#1877F2]/10 rounded-full blur-2xl pointer-events-none group-hover:bg-[#1877F2]/20 transition-all duration-300" />
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1877F2] to-[#166fe5] flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform duration-300 shadow-md">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-display font-black text-lg text-text-primary">Facebook</h3>
-                    <p className="text-[11px] font-bold text-text-muted mt-1 uppercase tracking-wider">Parents & mentors network</p>
-                  </div>
-                </motion.a>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Mentor Showcase */}
       <section id="teachers" className="py-24 relative z-20 bg-bg-secondary/20 rounded-[40px] md:rounded-[60px] border-t border-b border-border-color">
         <div className="max-w-7xl mx-auto px-6 mb-16 text-left">
@@ -1426,12 +1606,8 @@ export default function Home() {
         <section id="review" className="py-24 relative z-20">
           <div className="max-w-3xl mx-auto px-6">
             <div className="text-center mb-12">
-              <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#ff839a] border border-[#ff839a]/30 animate-pulse">
-                <Heart className="w-5 h-5 fill-current text-accent-primary" />
-              </div>
-
               <h2 className="text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary mb-4 leading-normal">
-                Leave a <span className="text-accent-primary">Feedback Core.</span>
+                Leave a <span className="text-accent-primary">Feedback.</span>
               </h2>
               <p className="text-text-secondary text-base font-semibold">
                 Your satisfaction is our focus. Submit your candid thoughts, ideas, and curriculum feedback with our senior mentors.
@@ -1455,6 +1631,11 @@ export default function Home() {
                 </div>
               </div>
 
+              <div className="text-left">
+                <label htmlFor="message" className="block text-xs uppercase tracking-wider font-bold text-text-secondary mb-2">Message or Query</label>
+                <textarea required id="message" name="message" rows={4} className="w-full px-5 py-3 rounded-2xl bg-bg-secondary/40 border border-border-color text-text-primary text-sm font-semibold focus:outline-none focus:border-accent-primary/60 transition-colors resize-none" placeholder="Enter your comments, feedback or queries here..." />
+              </div>
+
               <div className="text-center pt-2">
                 <button 
                   type="submit" 
@@ -1468,7 +1649,213 @@ export default function Home() {
           </div>
         </section>
       )}
-      
+
+      {/* Dynamic UPI Payment / Donation Selection Modal */}
+      <AnimatePresence>
+        {isPaymentChoiceOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md">
+            {/* Backdrop close */}
+            <div className="absolute inset-0 cursor-default" onClick={() => setIsPaymentChoiceOpen(false)} />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 8 }}
+              transition={{ ease: "easeOut", duration: 0.3 }}
+              className="relative w-full max-w-lg md:max-w-3xl bg-zinc-950 border border-zinc-800 shadow-2xl p-6 md:p-8 flex flex-col gap-6 overflow-hidden z-10"
+              style={{ borderRadius: 'var(--theme-card-radius, 20px)' }}
+            >
+              {/* Subtle Elegant Ambient Light */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4/5 h-[1px] bg-gradient-to-r from-transparent via-zinc-700 to-transparent pointer-events-none" />
+
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-zinc-900 pb-5 relative z-10">
+                <div className="flex items-center gap-3.5">
+                  <div className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 flex items-center justify-center">
+                    <Heart className="w-5 h-5 text-accent-primary fill-accent-primary/20" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-sans font-medium text-lg text-white tracking-tight">
+                      {paymentPurpose || `Support ${settings.websiteName}`}
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5 font-normal">
+                      Secure Peer-to-Peer UPI Payment
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPaymentChoiceOpen(false)}
+                  className="p-2 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white transition-all cursor-pointer hover:bg-zinc-800"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Amount Selection presets & custom input */}
+              <div className="flex flex-col gap-3.5 relative z-10">
+                <label className="text-xs font-medium tracking-wide text-zinc-300 text-left">
+                  Support Amount (₹)
+                </label>
+                
+                {/* Minimalist preset buttons */}
+                <div className="grid grid-cols-4 gap-2.5">
+                  {[100, 250, 500, 1000].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => {
+                        setPaymentAmount(amt);
+                        setCustomAmountText(amt.toString());
+                      }}
+                      className={`py-2.5 rounded-lg font-medium text-sm transition-all border cursor-pointer ${
+                        paymentAmount === amt
+                          ? 'bg-white text-zinc-950 border-white shadow-md'
+                          : 'bg-zinc-900 hover:bg-zinc-850 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                      }`}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Elegant dynamic input box */}
+                <div className="relative mt-1">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-zinc-500 text-sm">₹</span>
+                  <input
+                    type="number"
+                    value={customAmountText}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomAmountText(val);
+                      const parsed = parseInt(val);
+                      if (!isNaN(parsed) && parsed > 0) {
+                        setPaymentAmount(parsed);
+                      }
+                    }}
+                    className="w-full pl-8 pr-24 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 focus:border-zinc-500 text-white text-sm focus:outline-none transition-all placeholder:text-zinc-600"
+                    placeholder="Other amount"
+                    min="1"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
+                    INR Wallet
+                  </span>
+                </div>
+              </div>
+
+              {/* Administrative Copy UPI Section */}
+              <div className="p-3.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10">
+                <div className="flex flex-col text-left w-full sm:w-auto">
+                  <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider leading-none">
+                    Recipient Address
+                  </span>
+                  <span className="text-sm font-mono font-medium text-zinc-200 mt-1.5 selection:bg-zinc-800">
+                    {settings.upiId || 'test@upi'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyUpiId}
+                  className={`w-full sm:w-auto px-4 py-2 rounded-lg border font-medium text-xs flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    upiIdCopied
+                      ? 'bg-emerald-950/40 border-emerald-800/40 text-emerald-400'
+                      : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 hover:border-zinc-700 text-zinc-300'
+                  }`}
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{upiIdCopied ? 'Copied ID' : 'Copy ID'}</span>
+                </button>
+              </div>
+
+              {/* Payment execution center: Split side-by-side on desktop */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-zinc-900 pt-6 relative z-10 text-left">
+                
+                {/* Section A: Direct via UPI Donation */}
+                <div className="flex flex-col justify-between gap-4">
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                      <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Option 1: Pay directly with App</span>
+                    </h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed font-normal">
+                      Launch GPay, PhonePe, Paytm, or BHIM directly from your device to initiate a safe payment of <strong className="text-zinc-200 font-medium">₹{paymentAmount}</strong>.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const note = paymentPurpose 
+                          ? `${paymentPurpose}${user?.email ? ` | ${user.email}` : ''}`
+                          : `Support: ${settings.websiteName || 'Nucleus'} | Amount: ₹${paymentAmount}`;
+                        const upiUri = `upi://pay?pa=${settings.upiId || 'test@upi'}&pn=${encodeURIComponent(settings.websiteName || 'Nucleus')}&am=${paymentAmount}&tn=${encodeURIComponent(note)}&cu=INR`;
+                        window.location.href = upiUri;
+                      }}
+                      className="w-full py-3 bg-white text-zinc-950 hover:bg-zinc-100 font-medium text-xs uppercase tracking-widest transition-all rounded-lg flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Launch Payment (₹{paymentAmount})</span>
+                    </button>
+
+                    <div className="border-t border-zinc-900 pt-3">
+                      <p className="text-[11px] text-zinc-500 font-normal leading-relaxed">
+                        Alternatively, manually enter <span className="text-zinc-400 font-medium">{settings.upiId || 'test@upi'}</span> inside your payment application.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section B: Scan QR Code */}
+                <div className="flex flex-col items-center justify-between border-t md:border-t-0 md:border-l border-zinc-900 pt-6 md:pt-0 md:pl-8 text-center gap-4">
+                  <div className="w-full text-left md:text-center space-y-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center justify-start md:justify-center gap-2">
+                      <QrCode className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Option 2: Scan QR Code</span>
+                    </h4>
+                    <p className="text-xs text-zinc-500 leading-relaxed max-w-[240px] md:mx-auto font-normal">
+                      Scan this QR code with any UPI app on another device to pay <span className="text-zinc-350 font-medium">₹{paymentAmount}</span>.
+                    </p>
+                  </div>
+
+                  <div className="p-2.5 bg-white rounded-xl shadow-md border border-zinc-200">
+                    {settings.upiQrCode ? (
+                      <img 
+                        src={settings.upiQrCode}
+                        alt="Administrative UPI QR Code"
+                        className="w-[120px] h-[120px] object-contain rounded mx-auto"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=ffffff&color=000000&data=${encodeURIComponent(
+                          `upi://pay?pa=${settings.upiId || 'test@upi'}&pn=${encodeURIComponent(settings.websiteName || 'Nucleus')}&am=${paymentAmount}&tn=${encodeURIComponent(paymentPurpose || 'Donation')}&cu=INR`
+                        )}`}
+                        alt="UPI Payment QR Code"
+                        className="w-[120px] h-[120px] object-contain mx-auto"
+                        referrerPolicy="no-referrer"
+                      />
+                    )}
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-[10px] text-zinc-500 font-normal">
+                      Supports direct UPI network transfers
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Informative Security Micro footer */}
+              <div className="text-[10px] text-zinc-600 text-center font-normal tracking-wide border-t border-zinc-900 pt-4.5">
+                🔒 Secure Transfer | Direct Peer-to-Peer Transaction
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <style>{`
         .fade-mask {
           mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);

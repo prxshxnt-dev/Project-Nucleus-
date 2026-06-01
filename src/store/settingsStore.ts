@@ -29,15 +29,15 @@ export interface ThemeConfig {
 export const THEME_PRESETS: Record<string, ThemeConfig> = {
   default: {
     activeTheme: 'default',
-    primaryColor: '#F15A29',
-    secondaryColor: '#1F1F1F',
-    accentGlowColor: '#F15A29',
-    backgroundColor: '#FDF5E6',
-    gradientStart: '#F15A29',
-    gradientEnd: '#FDF5E6',
+    primaryColor: '#4F46E5',
+    secondaryColor: '#0F172A',
+    accentGlowColor: '#4F46E5',
+    backgroundColor: '#FAFAFC',
+    gradientStart: '#4F46E5',
+    gradientEnd: '#FAFAFC',
     buttonStyle: 'rounded',
-    borderRadius: 16,
-    fontFamily: 'Outfit',
+    borderRadius: 20,
+    fontFamily: 'Inter',
     isDarkMode: false,
     animationIntensity: 'normal',
     glassmorphism: false,
@@ -210,6 +210,7 @@ export interface ScheduledTheme {
 
 interface SiteSettings {
   upiId?: string;
+  upiQrCode?: string;
   priceNotes?: number;
   priceLectures?: number;
   pricePremium?: number;
@@ -232,6 +233,9 @@ interface SiteSettings {
   documentTitle?: string;
   
   heroTitle?: string;
+  heroTitleLine1?: string;
+  heroTitleLine2?: string;
+  heroTitleHighlight?: string;
   heroSubtitle?: string;
   heroBadgeText?: string;
   heroCta1Text?: string;
@@ -419,6 +423,7 @@ interface SiteSettings {
   socialFacebookShow?: boolean;
   syllabusSectionName?: string;
   classSyllabuses?: { [classGroup: string]: string };
+  loaderSteps?: string;
 }
 
 interface SettingsState {
@@ -435,13 +440,16 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     logoText: 'N',
     syllabusSectionName: 'Syllabus',
     classSyllabuses: {},
-    documentTitle: 'Nucleus - Academic Excellence',
-    heroTitle: 'Redefining Academic Excellence.',
-    heroSubtitle: 'Experience the highest echelon of coaching. Crafted for ambitious minds, powered by top IITians and Doctors. Welcome to the future of learning.',
-    heroBadgeText: 'Premium Access Now Open',
-    heroCta1Text: 'Join the Elite',
+    documentTitle: 'Nucleus - Learning That\'s Smart, Simple & Super Fun!',
+    heroTitle: 'Learning That\'s Smart, Simple & Super Fun!',
+    heroTitleLine1: 'Learning That\'s',
+    heroTitleLine2: 'Smart, Simple &',
+    heroTitleHighlight: 'Super Fun!',
+    heroSubtitle: 'Master Science, Maths & More with India\'s most engaging learning app – where every concept clicks and every lesson feels like play.',
+    heroBadgeText: 'India\'s Most Engaging Learning Hub',
+    heroCta1Text: 'Start Learning Now',
     heroCta1Link: '',
-    heroCta2Text: 'Watch Preview',
+    heroCta2Text: 'Quick Video Preview',
     heroCta2Link: '',
     footerDescription: 'The world\'s most premium learning ecosystem designed for peak academic performance.',
     footerLink1Text: 'Architecture',
@@ -619,7 +627,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     socialLinkedinUrl: '',
     socialLinkedinShow: false,
     socialFacebookUrl: '',
-    socialFacebookShow: false
+    socialFacebookShow: false,
+    loaderSteps: 'Formulating learning equations...\nLearn to become smart\nLearn to become simple\nLearn to become super fun!\nReady to play & learn!'
   },
   setSettings: (settings) => set({ settings }),
   previewSettings: null,

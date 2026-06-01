@@ -4,7 +4,8 @@ import { useSettingsStore, THEME_PRESETS } from '../store/settingsStore';
 import { signInWithGoogle, logout } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
-import { Menu, X, Home as HomeIcon, BookOpen, Sliders, LogIn, LogOut, Sparkles, User, LayoutDashboard, Smartphone } from 'lucide-react';
+import { Menu, X, Home as HomeIcon, BookOpen, Sliders, LogIn, LogOut, Sparkles, User, LayoutDashboard, Smartphone, Heart } from 'lucide-react';
+import { NucleusLogo } from './NucleusLogo';
 
 // Parse site's active theme or custom primary color to decimal values
 const parseHexToRgbDecimals = (hex?: string) => {
@@ -96,21 +97,7 @@ export default function Navbar() {
         style={{ borderColor: 'var(--border-color)' }}
       >
         <Link to="/" className="flex items-center gap-3 xl:gap-4 group shrink-0">
-          {settings.logoImage ? (
-            <img 
-              src={settings.logoImage} 
-              alt="Logo" 
-              className="w-8 h-8 md:w-10 md:h-10 object-contain transition-all"
-              style={{ filter: "url(#logo-theme-tint)" }}
-            />
-          ) : (
-            <div 
-              className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-accent-primary flex items-center justify-center text-button-text font-display font-bold text-lg shadow-md transition-all"
-              style={{ borderRadius: 'var(--theme-card-radius, 16px)' }}
-            >
-              {settings.logoText || 'N'}
-            </div>
-          )}
+          <NucleusLogo className="w-8 h-8 md:w-10 md:h-10 text-black block" logoColor="black" />
           <span className="font-display font-bold tracking-tight text-lg text-text-primary group-hover:text-accent-primary transition-colors">
             {settings.websiteName}
           </span>
@@ -149,6 +136,17 @@ export default function Navbar() {
             <Smartphone className="w-3.5 h-3.5" />
             <span>{settings.pwaBtnText || "Install App"}</span>
           </button>
+          {settings.upiId && (
+            <button
+              onClick={() => {
+                window.dispatchEvent(new Event('trigger-nucleus-donation'));
+              }}
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-600/30 hover:border-emerald-600/60 bg-emerald-600/5 hover:bg-emerald-600/10 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 shrink-0"
+            >
+              <Heart className="w-3.5 h-3.5 fill-current text-emerald-500 animate-pulse" />
+              <span>Donate / Support</span>
+            </button>
+          )}
           {!loading && (
             user ? (
               <>
@@ -329,18 +327,7 @@ export default function Navbar() {
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-color">
               <Link to="/" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
-                {settings.logoImage ? (
-                  <img 
-                    src={settings.logoImage} 
-                    alt="Logo" 
-                    className="w-8 h-8 object-contain" 
-                    style={{ filter: "url(#logo-theme-tint)" }}
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-button-text font-display font-bold text-lg">
-                    {settings.logoText || 'N'}
-                  </div>
-                )}
+                <NucleusLogo className="w-8 h-8 text-black" logoColor="black" />
                 <span className="font-display font-bold tracking-tight text-lg text-text-primary">
                    {settings.websiteName}
                 </span>
@@ -384,6 +371,18 @@ export default function Navbar() {
                 <Smartphone className="w-5 h-5 text-[#ff7a00]" />
                 <span>{settings.pwaBtnText || "Install Native App"}</span>
               </button>
+              {settings.upiId && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    window.dispatchEvent(new Event('trigger-nucleus-donation'));
+                  }}
+                  className="text-left text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 flex items-center gap-2 cursor-pointer pt-1"
+                >
+                  <Heart className="w-5 h-5 text-emerald-500 animate-pulse" />
+                  <span>Donate / Support</span>
+                </button>
+              )}
               
               <div className="h-px bg-border-color w-full my-2"></div>
               

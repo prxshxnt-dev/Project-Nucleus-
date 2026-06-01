@@ -16,6 +16,24 @@ interface ChatMessage {
   senderName?: string;
 }
 
+const QnaBotLogo: React.FC<{ className?: string }> = ({ className = "w-7 h-7" }) => (
+  <svg viewBox="0 0 48 48" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Speech Bubble / QnA base */}
+    <rect x="4" y="6" width="30" height="24" rx="8" fill="#18181B" stroke="#E5D2A5" strokeWidth="2.5" />
+    <path d="M12 30L6 36V30H12Z" fill="#18181B" stroke="#E5D2A5" strokeWidth="2.5" strokeLinejoin="round" />
+    {/* Question mark inside bubble */}
+    <path d="M15 13C15 11.5 16.2 10.5 18 10.5C19.8 10.5 21 11.5 21 13C21 14.8 19.3 15.6 18.5 16.5C17.7 17.4 17.7 18.2 17.7 19.5" stroke="#E5D2A5" strokeWidth="2.5" strokeLinecap="round" />
+    <circle cx="17.7" cy="23.5" r="1.5" fill="#E5D2A5" />
+    
+    {/* Smart Helper Bot (overlapping, cute) */}
+    <rect x="22" y="18" width="22" height="20" rx="6" fill="#E5D2A5" stroke="#18181B" strokeWidth="2" />
+    <path d="M30 18L30 15M36 18L36 15" stroke="#18181B" strokeWidth="2" strokeLinecap="round" />
+    <circle cx="28" cy="26" r="1.5" fill="#18181B" />
+    <circle cx="38" cy="26" r="1.5" fill="#18181B" />
+    <path d="M31 31C32 32 34 32 35 31" stroke="#18181B" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
 export const AIAssistantBot: React.FC = () => {
   const { settings } = useSettingsStore();
   const { user } = useAuthStore();
@@ -390,7 +408,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
   };
 
   return (
-    <div className={isOpen ? "fixed inset-0 z-[100] font-sans bg-zinc-950" : "fixed bottom-6 right-6 z-50 font-sans select-none"}>
+    <div className={isOpen ? "fixed inset-0 z-[100] font-sans bg-zinc-950" : "fixed bottom-28 right-6 z-50 font-sans select-none md:bottom-[104px] md:right-8"}>
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -411,7 +429,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
                 className="w-full h-full object-cover"
               />
             ) : (
-              <MessageSquare className="w-6 h-6 transition-transform group-hover:scale-110" />
+              <QnaBotLogo className="w-7 h-7 text-zinc-900 transition-transform group-hover:scale-110" />
             )}
             {!isEnabled && isAdminOrSuperAdmin && (
               <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 border border-zinc-950 flex items-center justify-center text-[7px] text-white font-bold">
@@ -452,7 +470,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <Sparkles className="w-5 h-5 text-[#E5D2A5]" />
+                      <QnaBotLogo className="w-6 h-6" />
                     )}
                   </div>
                   <div>
@@ -512,7 +530,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <Sparkles className="w-4 h-4 text-[#E5D2A5]" />
+                              <QnaBotLogo className="w-5 h-5" />
                             )
                           )}
                         </div>
@@ -553,7 +571,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Sparkles className="w-4 h-4 text-[#E5D2A5]" />
+                          <QnaBotLogo className="w-5 h-5" />
                         )}
                       </div>
                       <div className="bg-zinc-900 border border-white/5 rounded-2xl rounded-tl-none px-5 py-3.5 text-sm">

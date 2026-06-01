@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -14,6 +14,10 @@ import Dashboard from './pages/Dashboard';
 import Learn from './pages/Learn';
 import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
+import VerifyOtp from './pages/VerifyOtp';
+import ForgotPassword from './pages/ForgotPassword';
+import SelectStandard from './pages/SelectStandard';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ThemeProvider from './components/ThemeProvider';
@@ -22,10 +26,12 @@ import ScreenProtector from './components/ScreenProtector';
 import { AIAssistantBot } from './components/AIAssistantBot';
 import PwaManager from './components/PwaManager';
 import LiquidGlassDock from './components/LiquidGlassDock';
+import GlobalLoader from './components/GlobalLoader';
 
 function AppContent() {
   const { setUser, setLoading, user, loading } = useAuthStore();
   const { setSettings } = useSettingsStore();
+  const [localLoading, setLocalLoading] = useState(true);
   const location = useLocation();
 
   useEffect(() => {
@@ -50,6 +56,11 @@ function AppContent() {
       lenis.scrollTo(0, { immediate: true });
     }
   }, [location.pathname]);
+
+  // Trigger the premium loader for all internal routing page/section transitions
+  useEffect(() => {
+    setLocalLoading(true);
+  }, [location.pathname, location.search, location.hash]);
 
   useEffect(() => {
     // Fetch global settings
@@ -101,9 +112,48 @@ function AppContent() {
           setLoading(false);
         });
       } else {
-        if (unsubDoc) unsubDoc();
-        setUser(null);
-        setLoading(false);
+        const localIsLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+        const customUserStr = localStorage.getItem("currentUser");
+        if (localIsLoggedIn && customUserStr) {
+          try {
+            const customUser = JSON.parse(customUserStr);
+            setUser(customUser);
+            setLoading(false);
+            
+            if (customUser.uid) {
+              const userRef = doc(db, 'users', customUser.uid);
+              if (unsubDoc) unsubDoc();
+              unsubDoc = onSnapshot(userRef, (userSnap) => {
+                if (userSnap.exists()) {
+                  const userData = userSnap.data();
+                  setUser({
+                    uid: customUser.uid,
+                    email: userData.email || customUser.email,
+                    displayName: userData.displayName || customUser.displayName,
+                    role: userData.role || customUser.role,
+                    planId: userData.planId || customUser.planId,
+                    classGroup: userData.classGroup || customUser.classGroup,
+                    unlockedMaterials: userData.unlockedMaterials || [],
+                    streak: userData.streak || 0,
+                    lastStudyDate: userData.lastStudyDate,
+                    todayStudyMinutes: userData.todayStudyMinutes,
+                    lastStreakDate: userData.lastStreakDate,
+                    photoURL: userData.photoURL || null,
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Custom session restore failed:", e);
+            if (unsubDoc) unsubDoc();
+            setUser(null);
+            setLoading(false);
+          }
+        } else {
+          if (unsubDoc) unsubDoc();
+          setUser(null);
+          setLoading(false);
+        }
       }
     });
 
@@ -115,26 +165,38 @@ function AppContent() {
   }, [setUser, setLoading, setSettings]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30">
-      <ScreenProtector />
-      <ThemeProvider />
-      <SeasonalOverlay />
-      <Navbar />
-      <PwaManager />
+    <>
       <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/learn" element={<Learn />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        {(loading || localLoading) && (
+          <GlobalLoader key="global-app-loader" onFullyLoaded={() => setLocalLoading(false)} />
+        )}
       </AnimatePresence>
-      <LiquidGlassDock />
-      <AIAssistantBot />
-      <Footer />
-    </div>
+
+      <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30">
+        <ScreenProtector />
+        <ThemeProvider />
+        <SeasonalOverlay />
+        <Navbar />
+        <PwaManager />
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-otp" element={<VerifyOtp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/select-standard" element={<SelectStandard />} />
+            <Route path="/learn" element={<Learn />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AnimatePresence>
+        <LiquidGlassDock />
+        <AIAssistantBot />
+        <Footer />
+      </div>
+    </>
   );
 }
 

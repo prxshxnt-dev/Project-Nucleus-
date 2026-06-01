@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useSettingsStore } from '../store/settingsStore';
+import { NucleusLogo } from './NucleusLogo';
 
 export default function Footer() {
   const { settings } = useSettingsStore();
@@ -9,23 +10,110 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-12 relative z-10">
         <div className="max-w-xs">
           <Link to="/" className="flex items-center gap-2 mb-4 group">
-            {settings.logoImage ? (
-              <img 
-                src={settings.logoImage} 
-                alt="Logo" 
-                className="h-8 object-contain" 
-                style={{ filter: "url(#logo-theme-tint)" }}
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-button-text font-display font-bold text-lg">
-                {settings.logoText || 'N'}
-              </div>
-            )}
+            <NucleusLogo className="w-8 h-8 text-black bg-white rounded-full p-0.5" logoColor="black" />
             <span className="font-display font-semibold tracking-tight text-xl text-white">{settings.websiteName}</span>
           </Link>
           <p className="text-sm text-white/50 leading-relaxed">
             {settings.footerDescription}
           </p>
+        </div>
+
+        <div className="flex gap-16 md:gap-24 relative z-10">
+          {settings.socialSectionShow !== false && (
+            <div className="flex flex-col gap-4">
+              <h4 className="font-display font-bold text-white text-[17px] tracking-tight mb-2">Social</h4>
+              <div className="flex flex-col gap-3">
+                {settings.socialInstagramShow !== false && settings.socialInstagramUrl && (
+                  <a 
+                    href={settings.socialInstagramUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    Instagram
+                  </a>
+                )}
+                {settings.socialYoutubeShow !== false && settings.socialYoutubeUrl && (
+                  <a 
+                    href={settings.socialYoutubeUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    YouTube
+                  </a>
+                )}
+                {settings.socialTwitterShow !== false && settings.socialTwitterUrl && (
+                  <a 
+                    href={settings.socialTwitterUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    Twitter
+                  </a>
+                )}
+                {settings.socialTelegramShow !== false && settings.socialTelegramUrl && (
+                  <a 
+                    href={settings.socialTelegramUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    Telegram
+                  </a>
+                )}
+                {settings.socialDiscordShow !== false && settings.socialDiscordUrl && (
+                  <a 
+                    href={settings.socialDiscordUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    Discord
+                  </a>
+                )}
+                {settings.socialLinkedinShow !== false && settings.socialLinkedinUrl && (
+                  <a 
+                    href={settings.socialLinkedinUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    LinkedIn
+                  </a>
+                )}
+                {settings.socialFacebookShow !== false && settings.socialFacebookUrl && (
+                  <a 
+                    href={settings.socialFacebookUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
+                  >
+                    Facebook
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4">
+            <h4 className="font-display font-bold text-white text-[17px] tracking-tight mb-2">Company</h4>
+            <div className="flex flex-col gap-3">
+              <a 
+                href="#/terms" 
+                className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide whitespace-nowrap"
+              >
+                Terms & Conditions
+              </a>
+              <a 
+                href="#/privacy" 
+                className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide whitespace-nowrap"
+              >
+                Privacy Policy
+              </a>
+            </div>
+          </div>
         </div>
         
       </div>

@@ -41,7 +41,7 @@ const PRESET_INFO: Record<
 > = {
   default: {
     name: "1. Default Luxury Gold",
-    desc: "Slate-dark baseline aesthetic framing core learning workflows. Refined typography alongside luxurious bronze and pale gold accents.",
+    desc: "Slate-dark baseline aesthetic framing key learning workflows. Refined typography alongside luxurious bronze and pale gold accents.",
     colors: ["#070709", "var(--primary-custom, #F15A29)", "#b59f6d"],
   },
   theme2: {
@@ -299,6 +299,7 @@ export default function AdminDashboard() {
 
   // Settings Form
   const [upiId, setUpiId] = useState("");
+  const [upiQrCode, setUpiQrCode] = useState("");
   const [priceNotes, setPriceNotes] = useState(99);
   const [priceLectures, setPriceLectures] = useState(499);
   const [pricePremium, setPricePremium] = useState(999);
@@ -312,14 +313,18 @@ export default function AdminDashboard() {
   const [logoText, setLogoText] = useState("N");
   const [logoImage, setLogoImage] = useState("");
   const [faviconUrl, setFaviconUrl] = useState("");
-  const [heroTitle, setHeroTitle] = useState("Redefining Academic Excellence.");
+  const [heroTitle, setHeroTitle] = useState("Learning That's Smart, Simple & Super Fun!");
+  const [heroTitleLine1, setHeroTitleLine1] = useState("Learning That's");
+  const [heroTitleLine2, setHeroTitleLine2] = useState("Smart, Simple &");
+  const [heroTitleHighlight, setHeroTitleHighlight] = useState("Super Fun!");
+  const [loaderSteps, setLoaderSteps] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState(
-    "Experience the highest echelon of coaching.",
+    "Master Science, Maths & More with India's most engaging learning app – where every concept clicks and every lesson feels like play.",
   );
-  const [heroBadgeText, setHeroBadgeText] = useState("Premium Access Now Open");
-  const [heroCta1Text, setHeroCta1Text] = useState("Join the Elite");
+  const [heroBadgeText, setHeroBadgeText] = useState("India's Most Engaging Learning Hub");
+  const [heroCta1Text, setHeroCta1Text] = useState("Start Learning Now");
   const [heroCta1Link, setHeroCta1Link] = useState("");
-  const [heroCta2Text, setHeroCta2Text] = useState("Watch Preview");
+  const [heroCta2Text, setHeroCta2Text] = useState("Quick Video Preview");
   const [heroCta2Link, setHeroCta2Link] = useState("");
 
   // Footer Form
@@ -749,6 +754,7 @@ export default function AdminDashboard() {
         setSyllabusSectionName(d.syllabusSectionName || "Syllabus");
         setClassSyllabuses(d.classSyllabuses || {});
         setUpiId(d.upiId || "");
+        setUpiQrCode(d.upiQrCode || "");
         setPriceNotes(d.priceNotes || 99);
         setPriceLectures(d.priceLectures || 499);
         setPricePremium(d.pricePremium || 999);
@@ -759,7 +765,11 @@ export default function AdminDashboard() {
         if (d.logoImage !== undefined) setLogoImage(d.logoImage);
         if (d.faviconUrl !== undefined) setFaviconUrl(d.faviconUrl);
         if (d.heroTitle !== undefined) setHeroTitle(d.heroTitle);
+        if (d.heroTitleLine1 !== undefined) setHeroTitleLine1(d.heroTitleLine1);
+        if (d.heroTitleLine2 !== undefined) setHeroTitleLine2(d.heroTitleLine2);
+        if (d.heroTitleHighlight !== undefined) setHeroTitleHighlight(d.heroTitleHighlight);
         if (d.heroSubtitle !== undefined) setHeroSubtitle(d.heroSubtitle);
+        if (d.loaderSteps !== undefined) setLoaderSteps(d.loaderSteps);
         if (d.heroBadgeText !== undefined) setHeroBadgeText(d.heroBadgeText);
         if (d.heroCta1Text !== undefined) setHeroCta1Text(d.heroCta1Text);
         if (d.heroCta1Link !== undefined) setHeroCta1Link(d.heroCta1Link);
@@ -1316,6 +1326,7 @@ export default function AdminDashboard() {
         doc(db, "settings", "global"),
         {
           upiId,
+          upiQrCode,
           priceNotes: Number(priceNotes),
           priceLectures: Number(priceLectures),
           pricePremium: Number(pricePremium),
@@ -1326,6 +1337,9 @@ export default function AdminDashboard() {
           logoImage,
           faviconUrl,
           heroTitle,
+          heroTitleLine1,
+          heroTitleLine2,
+          heroTitleHighlight,
           heroSubtitle,
           heroBadgeText,
           heroCta1Text,
@@ -1451,6 +1465,7 @@ export default function AdminDashboard() {
           classSyllabuses,
           chatbotEnabled,
           chatbotIconUrl,
+          loaderSteps,
         },
         { merge: true },
       );
@@ -2530,7 +2545,7 @@ export default function AdminDashboard() {
               {/* Button Style selector */}
               <div>
                 <span className="block text-xs font-medium text-white/60 mb-2">
-                  Core Button Accent Shape
+                  Button Accent Shape
                 </span>
                 <div className="grid grid-cols-3 gap-2">
                   {(["pill", "rounded", "square"] as const).map((bStyle) => (
@@ -2687,10 +2702,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* LMS Core Dashboard Layout Template */}
+              {/* LMS Dashboard Layout Template */}
               <div className="border-t border-white/5 pt-4">
                 <label className="block text-xs font-medium text-white/60 mb-2 font-display">
-                  LMS Core Dashboard Layout Template
+                  LMS Dashboard Layout Template
                 </label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {(["bento", "split", "classic", "minimalist"] as const).map((style) => (
@@ -3034,17 +3049,31 @@ export default function AdminDashboard() {
                     className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
                 </div>
-                <div className="md:col-span-3">
-                  <label className="block text-sm text-white/60 mb-2">
-                    UPI ID (For Payments)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. john@upi"
-                    value={upiId}
-                    onChange={(e) => setUpiId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
-                  />
+                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">
+                      UPI ID (For Payments)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. john@upi"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">
+                      Custom UPI QR Code Image URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. https://domain.com/my-qr.jpg (leave blank to auto-generate from UPI ID)"
+                      value={upiQrCode}
+                      onChange={(e) => setUpiQrCode(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -3350,7 +3379,7 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm text-white/60 mb-2">
-                    Main Headline
+                    Fallback Headline
                   </label>
                   <input
                     type="text"
@@ -3358,6 +3387,43 @@ export default function AdminDashboard() {
                     onChange={(e) => setHeroTitle(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
+                </div>
+
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 border border-white/5 bg-white/5 p-4 rounded-xl mt-2 mb-2">
+                  <div className="md:col-span-3">
+                    <span className="text-xs font-bold text-[var(--primary-custom,#F15A29)] tracking-wider uppercase">Doodle Title Configuration (Editable Layout)</span>
+                    <p className="text-xs text-white/50 mt-1">Controls the text structure EXACTLY like the playful handdrawn layout in the landing page (e.g., sparkles and curved double underlines).</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-1.5">Line 1 (Top Style)</label>
+                    <input
+                      type="text"
+                      value={heroTitleLine1}
+                      onChange={(e) => setHeroTitleLine1(e.target.value)}
+                      placeholder="Learning That's"
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-1.5">Line 2 (Middle Style)</label>
+                    <input
+                      type="text"
+                      value={heroTitleLine2}
+                      onChange={(e) => setHeroTitleLine2(e.target.value)}
+                      placeholder="Smart, Simple &"
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-1.5">Line 3 Highlight (Double Underlined)</label>
+                    <input
+                      type="text"
+                      value={heroTitleHighlight}
+                      onChange={(e) => setHeroTitleHighlight(e.target.value)}
+                      placeholder="Super Fun!"
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    />
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm text-white/60 mb-2">
@@ -3425,6 +3491,29 @@ export default function AdminDashboard() {
                     onChange={(e) => setHeroCta2Link(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Loading Screen Customizer Section */}
+            <div>
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
+                Interactive Loading Screen Customizer
+              </h4>
+              <div className="grid grid-cols-1 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm text-white/60 mb-2">
+                    Dynamic Progress Steps (One text per line)
+                  </label>
+                  <textarea
+                    value={loaderSteps}
+                    onChange={(e) => setLoaderSteps(e.target.value)}
+                    placeholder="Formulating learning equations...&#10;Learn to become smart&#10;Learn to become simple&#10;Learn to become super fun!&#10;Ready to play & learn!"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-32 font-mono scrollbar-thin"
+                  />
+                  <p className="text-xs text-white/45 mt-1">
+                    Provide the phrases to show sequentially (one per line) as the application fully boots.
+                  </p>
                 </div>
               </div>
             </div>
@@ -3848,10 +3937,10 @@ export default function AdminDashboard() {
                     <div>
                       <span className="text-sm font-semibold text-white flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" /> 
-                        Social Media Links & Visibility Control Panel
+                        Footer Social Media Links & Visibility Control Panel
                       </span>
                       <p className="text-xs text-white/50 mt-1">
-                        Control the global social media section layout, edit custom redirection profiles, and toggle channel visibility.
+                        Control the footer social media links, edit custom redirection profiles, and toggle channel visibility inside the footer.
                       </p>
                     </div>
                     <button 

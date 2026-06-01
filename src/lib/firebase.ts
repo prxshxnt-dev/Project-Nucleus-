@@ -67,9 +67,11 @@ export const signInWithGoogle = async () => {
   } catch (error: any) {
     console.error('Error signing in with Google', error);
     if (error.code === 'auth/cancelled-popup-request') {
-      alert('Sign-in popup was closed or cancelled. If you are viewing this inside the AI Studio preview, please click the "Open in new tab" button (arrow icon) in the top right to sign in properly.');
+      alert('Sign-in popup was closed or cancelled. If you are viewing this inside the AI Studio preview, please click the "Open in new tab" button (arrow icon) in the top right of the preview header to sign in properly.');
     } else if (error.code === 'auth/popup-blocked') {
       alert('Popup blocked by browser. Please allow popups or open the app in a new tab.');
+    } else if (error.code === 'auth/network-request-failed' || error.message?.includes('network-request-failed')) {
+      alert('Google Sign-In connection was blocked by your browser inside the AI Studio sandbox iframe (due to third-party cookie/iframe block limits).\n\nTo log in successfully:\n1. Click the "Open in new tab" button (the upper-right corner icon inside the top navigation/preview controller bar).\n2. Attempt the sign-in again from the newly opened browser tab.');
     } else {
       alert(`Failed to sign in: ${error.message}`);
     }
@@ -78,6 +80,11 @@ export const signInWithGoogle = async () => {
 
 export const logout = async () => {
   try {
+    // Purge custom Email OTP session tokens
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("isLoggedIn");
+
     // Instantly update client-side auth state to null to eliminate any delays
     useAuthStore.getState().setUser(null);
     useAuthStore.getState().setLoading(false);

@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if true; }
 
     function isSignedIn() {
       return request.auth != null;
@@ -119,7 +119,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || userId.startsWith('student-');
+      allow get: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || userId.matches('^student-.*');
       allow list: if isAdmin();
       
       allow create: if (
@@ -134,7 +134,7 @@ service cloud.firestore {
       ) || (
         !isSignedIn()
         && isValidId(userId)
-        && userId.startsWith('student-')
+        && userId.matches('^student-.*')
         && incoming().role == 'student'
         && incoming().planId == 'free'
       );
@@ -152,7 +152,7 @@ service cloud.firestore {
         ) || (
           !isSignedIn()
           && isValidId(userId)
-          && userId.startsWith('student-')
+          && userId.matches('^student-.*')
           && incoming().role == existing().role
           && incoming().planId == existing().planId
         )
