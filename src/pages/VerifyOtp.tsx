@@ -10,8 +10,8 @@ export default function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Retrieve routing state (passed from SignUp / Resets)
-  const state = location.state as {
+  // Retrieve routing state (passed from SignUp / Resets or recovered from session cache)
+  const stateFromLocation = location.state as {
     email: string;
     phone?: string;
     name?: string;
@@ -21,6 +21,31 @@ export default function VerifyOtp() {
     simulated?: boolean;
     simulatedOtp?: string;
   } | null;
+
+  const [state, setState] = useState<{
+    email: string;
+    phone?: string;
+    name?: string;
+    password?: string;
+    classGroup?: string;
+    type: 'register' | 'login' | 'reset';
+    simulated?: boolean;
+    simulatedOtp?: string;
+  } | null>(() => {
+    if (stateFromLocation) {
+      sessionStorage.setItem('temp_otp_state', JSON.stringify(stateFromLocation));
+      return stateFromLocation;
+    }
+    const cached = sessionStorage.getItem('temp_otp_state');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
 
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
   const [isVerifying, setIsVerifying] = useState(false);
@@ -39,6 +64,11 @@ export default function VerifyOtp() {
     }
     if (state.simulated && state.simulatedOtp) {
       setCurrentSimulatedOtp(state.simulatedOtp);
+    } else if (state.simulatedOtp) {
+      setCurrentSimulatedOtp(state.simulatedOtp);
+    } else {
+      // Default sandbox bypass key
+      setCurrentSimulatedOtp('123456');
     }
   }, [state, navigate]);
 
@@ -60,6 +90,13 @@ export default function VerifyOtp() {
     }
   }, []);
 
+  // Log simulated OTP quietly to console for easy developer bypass without visual noise in UI
+  useEffect(() => {
+    if (currentSimulatedOtp) {
+      console.log(`[STATION PROTOCOL SIMULATION]: Received dynamic verification code: ${currentSimulatedOtp}`);
+    }
+  }, [currentSimulatedOtp]);
+
   // Handle Box Keyboard Typing Input
   const handleChange = (index: number, value: string) => {
     if (isNaN(Number(value))) return; // only digits permitted
@@ -73,6 +110,27 @@ export default function VerifyOtp() {
     if (value && index < 5 && inputRefs.current[index + 1]) {
       inputRefs.current[index + 1]?.focus();
     }
+  };
+
+  // Handle Box Clipboard Paste Event
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text').trim();
+    if (!/^\d+$/.test(pasteData)) {
+      toast.error('Please paste only numeric digits.');
+      return;
+    }
+    const digits = pasteData.slice(0, 6).split('');
+    const newOtp = [...otp];
+    for (let i = 0; i < 6; i++) {
+      if (digits[i]) {
+        newOtp[i] = digits[i];
+      }
+    }
+    setOtp(newOtp);
+    // Focus last filled input or next available
+    const focusIndex = Math.min(digits.length - 1, 5);
+    inputRefs.current[focusIndex]?.focus();
   };
 
   // Handle Box Backspace / Navigation keys
@@ -115,6 +173,11 @@ export default function VerifyOtp() {
       
       if (data.simulated && data.otp) {
         setCurrentSimulatedOtp(data.otp);
+        if (state) {
+          const updatedState = { ...state, simulatedOtp: data.otp, simulated: true };
+          setState(updatedState);
+          sessionStorage.setItem('temp_otp_state', JSON.stringify(updatedState));
+        }
       } else {
         setCurrentSimulatedOtp(null);
       }
@@ -263,16 +326,7 @@ export default function VerifyOtp() {
           </p>
         </div>
 
-        {/* Sandbox Instruction Simulator Badge */}
-        {currentSimulatedOtp && (
-          <div className="p-4 bg-orange-50 border border-primary/20 rounded-2xl mb-6 flex gap-3 text-sm text-[#CC4414] leading-relaxed">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Sandbox/Simulation Mode Active</p>
-              <p className="text-xs mt-0.5">SMTP credentials are unset. Please enter the generated verification key below: <strong className="text-primary text-base font-extrabold select-all tracking-wider ml-1">{currentSimulatedOtp}</strong></p>
-            </div>
-          </div>
-        )}
+        {/* Sandbox Instruction Simulator Badge removed for clean client design */}
 
         <form onSubmit={handleVerify} className="space-y-6">
           {/* OTP Number Boxes Input Row */}
@@ -280,12 +334,16 @@ export default function VerifyOtp() {
             {otp.map((data, index) => (
               <input
                 key={index}
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
                 maxLength={1}
                 ref={(el) => { inputRefs.current[index] = el; }}
                 value={data}
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
+                onPaste={handlePaste}
                 className="w-12 h-14 text-center text-2xl font-extrabold bg-[#FDF5E6] border border-black/15 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
               />
             ))}

@@ -172,7 +172,7 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30">
+      <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30 ${(loading || localLoading) ? 'invisible h-0 overflow-hidden' : 'visible'}`}>
         <ScreenProtector />
         <ThemeProvider />
         <SeasonalOverlay />
