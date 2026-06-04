@@ -65,7 +65,34 @@
         },
         "classGroup": {
           "type": "string",
-          "enum": ["all", "6", "7", "8", "9", "10", "11", "12", "dropper"]
+          "enum": ["all", "6", "7", "8", "9", "10", "11", "12", "dropper", "jee", "neet"]
+        },
+        "classId": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
+        },
+        "chapterId": {
+          "type": "string"
+        },
+        "materialType": {
+          "type": "string",
+          "enum": ["notes", "pyqs", "assignments", "dpps", "practice_sheets", "video_lectures", "formula_sheets", "mind_maps", "sample_papers", "tests"]
+        },
+        "fileUrl": {
+          "type": "string"
+        },
+        "fileType": {
+          "type": "string",
+          "enum": ["pdf", "video", "image", "zip"]
+        },
+        "downloadCount": {
+          "type": "number"
+        },
+        "bookmarks": {
+          "type": "array",
+          "items": { "type": "string" }
         },
         "createdAt": {
           "type": "string"
@@ -77,7 +104,36 @@
           "type": "string"
         }
       },
-      "required": ["title", "description", "type", "createdAt", "updatedAt", "authorId"]
+      "required": ["title", "description", "createdAt", "updatedAt", "authorId"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "Educative course standard.",
+      "type": "object",
+      "properties": {
+        "className": { "type": "string" }
+      },
+      "required": ["className"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Educative course subject.",
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string" },
+        "subjectName": { "type": "string" }
+      },
+      "required": ["classId", "subjectName"]
+    },
+    "Chapter": {
+      "title": "Chapter",
+      "description": "Subject specific chapter folder.",
+      "type": "object",
+      "properties": {
+        "subjectId": { "type": "string" },
+        "chapterName": { "type": "string" }
+      },
+      "required": ["subjectId", "chapterName"]
     },
     "ActiveDevice": {
       "title": "ActiveDevice",
@@ -145,6 +201,18 @@
     "materials/{materialId}": {
       "schema": { "$ref": "#/entities/Material" },
       "description": "Stores educational materials."
+    },
+    "classes/{classId}": {
+      "schema": { "$ref": "#/entities/Class" },
+      "description": "Stores Class standards."
+    },
+    "subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Stores Subject items belonging to Class."
+    },
+    "chapters/{chapterId}": {
+      "schema": { "$ref": "#/entities/Chapter" },
+      "description": "Stores chapter folders inside subjects."
     },
     "active_devices/{deviceId}": {
       "schema": { "$ref": "#/entities/ActiveDevice" },

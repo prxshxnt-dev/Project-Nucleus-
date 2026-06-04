@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactPlayer from 'react-player';
+
+const ReactPlayerComponent = ReactPlayer as any;
 import { Play, Pause, Volume1, Volume2, VolumeX, Maximize, Minimize, AlertCircle } from 'lucide-react';
 import screenfull from 'screenfull';
 import { motion, AnimatePresence } from 'motion/react';
@@ -94,6 +96,18 @@ export function parseVdoCipher(input: string): VdoCipherData | null {
     } catch (e) {}
   }
 
+  return null;
+}
+
+export function parseDriveVideoUrl(url: string): string | null {
+  if (!url) return null;
+  const clean = url.trim();
+  if (!clean.includes('drive.google.com')) return null;
+  const driveRegExp = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
+  const match = clean.match(driveRegExp);
+  if (match && match[1]) {
+    return `https://drive.google.com/file/d/${match[1]}/preview`;
+  }
   return null;
 }
 
@@ -348,6 +362,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
   };
 
   const vdoData = parseVdoCipher(url);
+  const drivePreviewUrl = parseDriveVideoUrl(url);
 
   if (vdoData) {
     return (
@@ -404,6 +419,61 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
     );
   }
 
+  if (drivePreviewUrl) {
+    return (
+      <div 
+        ref={playerContainerRef} 
+        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+        onContextMenu={(e) => { e.preventDefault(); }}
+      >
+        {/* Dynamic Moving Security Watermark */}
+        {settings.secVideoWatermarkEnabled !== false && user && (
+          <motion.div
+            animate={{
+              top: watermarkPos.top,
+              left: watermarkPos.left
+            }}
+            transition={{
+              type: 'tween',
+              duration: 1.8,
+              ease: 'easeInOut'
+            }}
+            style={{
+              position: 'absolute',
+              fontSize: `${settings.secWatermarkSize || 12}px`,
+              opacity: settings.secWatermarkOpacity !== undefined ? settings.secWatermarkOpacity : 0.35,
+              color: 'rgba(255,255,255,0.85)',
+              textShadow: '1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9)',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(0,0,0,0.2)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              pointerEvents: 'none',
+              zIndex: 40,
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {getWatermarkText()}
+          </motion.div>
+        )}
+
+        <iframe
+          src={drivePreviewUrl}
+          style={{
+            height: '100%',
+            width: '100%',
+            border: '0',
+          }}
+          className="w-full aspect-video"
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    );
+  }
+
   return (
     <div 
       ref={playerContainerRef} 
@@ -449,9 +519,9 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
       <div className="absolute inset-0 z-10 pointer-events-none" onClick={(e) => { e.stopPropagation(); handlePlayPause(); }} style={{ pointerEvents: 'auto' }} />
 
       <div className="w-full h-full pointer-events-none" style={{ pointerEvents: 'none' }}>
-          <ReactPlayer 
+          <ReactPlayerComponent 
             ref={playerRef as any}
-            src={url}
+            url={url}
             width="100%"
             height="100%"
             playing={playing}
@@ -459,15 +529,11 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
             volume={volume}
             muted={muted}
             playsInline
-            onTimeUpdate={(e: React.SyntheticEvent<HTMLVideoElement>) => {
-              if (duration > 0) {
-                 setPlayed(e.currentTarget.currentTime / duration);
-              }
-              if (e.currentTarget.buffered && e.currentTarget.buffered.length > 0) {
-                 setLoaded(e.currentTarget.buffered.end(e.currentTarget.buffered.length - 1) / duration);
-              }
+            onProgress={(state: any) => {
+              setPlayed(state.played);
+              setLoaded(state.loaded);
             }}
-            onDurationChange={(e: React.SyntheticEvent<HTMLVideoElement>) => setDuration(e.currentTarget.duration)}
+            onDuration={(dur: any) => setDuration(dur)}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
             onEnded={() => setPlaying(false)}

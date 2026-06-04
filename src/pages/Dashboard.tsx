@@ -1,16 +1,17 @@
 import { motion } from 'motion/react';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw } from 'lucide-react';
+import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw, Folder, FolderOpen, Search, Download, Bookmark, FileText } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, getDocs, doc, updateDoc, setDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, setDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot, increment } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
 import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
 import SecurePdfViewer from '../components/SecurePdfViewer';
 import { FloatingStickers } from '../components/FloatingStickers';
+import OrbitalLoader from '../components/OrbitalLoader';
 
 const planTiers = {
   free: 0,
@@ -152,7 +153,82 @@ export default function Dashboard() {
   }, [user?.uid, settings?.secMaxDeviceLimit]);
 
   const [materials, setMaterials] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [chapters, setChapters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Folder routing states
+  const [activeClassId, setActiveClassId] = useState<string | null>(null);
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>("Notes");
+  const [studentSearchQuery, setStudentSearchQuery] = useState<string>("");
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
+
+  // Load recently viewed materials on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nucleus_recently_viewed');
+      if (saved) {
+        setRecentlyViewed(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const handleViewMaterial = (mat: any) => {
+    if (!mat?.url) return;
+    try {
+      // Add to recently viewed list
+      const currentList = [mat.id, ...recentlyViewed.filter(id => id !== mat.id)].slice(0, 5);
+      setRecentlyViewed(currentList);
+      localStorage.setItem('nucleus_recently_viewed', JSON.stringify(currentList));
+    } catch (e) {
+      console.error(e);
+    }
+    setSelectedMaterial(mat);
+  };
+
+  const handleIncrementDownloadInDashboard = async (mat: any, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!mat?.url) return;
+    try {
+      await updateDoc(doc(db, 'materials', mat.id), {
+        downloadCount: increment(1)
+      });
+      window.open(mat.url, '_blank');
+    } catch (e) {
+      console.error(e);
+      window.open(mat.url, '_blank');
+    }
+  };
+
+  const handleToggleBookmarkInDashboard = async (materialId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!user) {
+      alert("Please login to bookmark material.");
+      return;
+    }
+    try {
+      const mat = materials.find(m => m.id === materialId);
+      if (!mat) return;
+      const userBookmarksArray = mat.bookmarks || [];
+      let updatedBookmarks = [...userBookmarksArray];
+      if (userBookmarksArray.includes(user.uid)) {
+        updatedBookmarks = updatedBookmarks.filter(uid => uid !== user.uid);
+      } else {
+        updatedBookmarks.push(user.uid);
+      }
+      await updateDoc(doc(db, 'materials', materialId), {
+        bookmarks: updatedBookmarks
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<any | null>(null);
 
@@ -302,27 +378,59 @@ export default function Dashboard() {
     }
   }, [user, authLoading, navigate]);
 
+  // Load Classes, Subjects, Chapters and Materials in Real-time (Synchronization)
   useEffect(() => {
-    const fetchMaterials = async () => {
-      const hasUnlocked = user?.unlockedMaterials && user.unlockedMaterials.length > 0;
-      // If guest and has no explicitly unlocked materials, don't fetch or show materials
-      if (isGuest && !hasUnlocked) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const q = query(collection(db, 'materials'));
-        const snapshot = await getDocs(q);
-        const mats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setMaterials(mats);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'materials');
-      } finally {
-        setLoading(false);
-      }
+    if (!user) return;
+
+    setLoading(true);
+
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+      const classesList = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      // Sort classes by order if defined
+      classesList.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        return a.className.localeCompare(b.className);
+      });
+      setClasses(classesList);
+    }, (error) => {
+      console.error(error);
+    });
+
+    const unsubSubjects = onSnapshot(collection(db, 'subjects'), (snap) => {
+      const subjectsList = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      subjectsList.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        return a.subjectName.localeCompare(b.subjectName);
+      });
+      setSubjects(subjectsList);
+    }, (error) => {
+      console.error(error);
+    });
+
+    const unsubChapters = onSnapshot(collection(db, 'chapters'), (snap) => {
+      const chaptersList = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      chaptersList.sort((a, b) => a.chapterName.localeCompare(b.chapterName));
+      setChapters(chaptersList);
+    }, (error) => {
+      console.error(error);
+    });
+
+    const unsubMaterials = onSnapshot(collection(db, 'materials'), (snap) => {
+      const matsList = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      setMaterials(matsList);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'materials');
+      setLoading(false);
+    });
+
+    return () => {
+      unsubClasses();
+      unsubSubjects();
+      unsubChapters();
+      unsubMaterials();
     };
-    fetchMaterials();
-  }, [isGuest, user?.unlockedMaterials?.join(',')]);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user || user.role === 'guest') return;
@@ -612,216 +720,492 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* Main Grid View */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left">
+  {/* Home Dashboard Integration & Bento Widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 text-left">
+        {/* Widget 1: Quick Access Classes */}
+        <div className="md:col-span-2 bg-glass-bg border border-border-color p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="p-1.5 rounded-lg bg-accent-primary/10 text-accent-primary">
+                <Sparkles className="w-4 h-4 animate-pulse" />
+              </span>
+              <h3 className="font-display font-black text-sm uppercase tracking-wider text-text-primary">Quick Access Classes</h3>
+            </div>
+            <p className="text-xs text-text-secondary mb-4">Click any card to jump and browse folders instantly below.</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {[
+              { id: 'class_6', label: 'Class 6', glow: 'from-blue-500/10' },
+              { id: 'class_7', label: 'Class 7', glow: 'from-indigo-500/10' },
+              { id: 'class_8', label: 'Class 8', glow: 'from-purple-500/10' },
+              { id: 'class_9', label: 'Class 9', glow: 'from-pink-500/10' },
+              { id: 'class_10', label: 'Class 10', glow: 'from-rose-500/10' },
+              { id: 'class_11', label: 'Class 11', glow: 'from-amber-500/10' },
+              { id: 'class_12', label: 'Class 12', glow: 'from-orange-500/10' },
+              { id: 'class_jee', label: 'JEE Main/Adv', glow: 'from-emerald-500/10' },
+              { id: 'class_neet', label: 'NEET', glow: 'from-teal-500/10' },
+              { id: 'class_droppers', label: 'Droppers', glow: 'from-cyan-500/10' }
+            ].map((clsEx) => {
+              const matchingDbClass = classes.find(c => c.id === clsEx.id || c.className?.toLowerCase() === clsEx.label.toLowerCase());
+              const targetId = matchingDbClass?.id || clsEx.id;
+              return (
+                <button
+                  key={clsEx.id}
+                  onClick={() => {
+                    setActiveClassId(targetId);
+                    setActiveSubjectId(null);
+                    setActiveChapterId(null);
+                    const el = document.getElementById('my-classes-directory');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className={`p-2.5 rounded-xl border border-border-color bg-gradient-to-br ${clsEx.glow} to-transparent text-left hover:scale-[1.03] hover:border-accent-primary/40 active:scale-[0.98] transition-all text-[11px] font-bold text-text-primary cursor-pointer`}
+                >
+                  <Folder className="w-3.5 h-3.5 text-accent-primary/80 mb-1.5" />
+                  <div className="truncate leading-tight">{clsEx.label}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Widget 2: Continue Learning */}
+        <div className="bg-glass-bg border border-border-color p-6 rounded-3xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+                <Clock className="w-4 h-4" />
+              </span>
+              <h3 className="font-display font-black text-sm uppercase tracking-wider text-text-primary">Continue Learning</h3>
+            </div>
+            <p className="text-xs text-text-secondary mb-4">Pick up your recent modules or bookmarked files.</p>
+          </div>
+          <div className="space-y-2 max-h-[140px] overflow-y-auto custom-scrollbar">
+            {materials.filter(m => user && (recentlyViewed.includes(m.id) || m.bookmarks?.includes(user.uid))).slice(0, 3).map((mat) => (
+              <div
+                key={mat.id}
+                onClick={() => setSelectedMaterial(mat)}
+                className="p-2 rounded-xl bg-bg-secondary/40 border border-border-color/60 flex items-center justify-between gap-3 text-xs hover:border-accent-primary/30 cursor-pointer group"
+              >
+                <div className="truncate text-left flex-1">
+                  <p className="font-bold text-text-primary group-hover:text-accent-primary transition-colors truncate">{mat.title}</p>
+                  <p className="text-[10px] text-text-muted capitalize">{mat.materialType || mat.type || 'study guide'}</p>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
+              </div>
+            ))}
+            {materials.filter(m => user && (recentlyViewed.includes(m.id) || m.bookmarks?.includes(user.uid))).length === 0 && (
+              <p className="text-xs text-text-muted text-center py-4 italic">No recent pages. Search files below to continue!</p>
+            )}
+          </div>
+        </div>
+
+        {/* Widget 3: Recently Uploaded */}
+        <div className="bg-glass-bg border border-border-color p-6 rounded-3xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 animate-pulse">
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <h3 className="font-display font-black text-sm uppercase tracking-wider text-text-primary">Recently Uploaded</h3>
+            </div>
+            <p className="text-xs text-text-secondary mb-2">Instantly synced curriculum files added by teachers.</p>
+          </div>
+          <div className="space-y-2 max-h-[140px] overflow-y-auto custom-scrollbar">
+            {[...materials].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 3).map((mat) => (
+              <div
+                key={mat.id}
+                onClick={() => setSelectedMaterial(mat)}
+                className="p-2 rounded-xl bg-bg-secondary/40 border border-border-color/60 flex items-center gap-2.5 text-xs hover:border-accent-primary/30 cursor-pointer"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-accent-primary shrink-0 animate-ping" />
+                <div className="truncate text-left flex-1 min-w-0">
+                  <p className="font-bold text-text-primary truncate">{mat.title}</p>
+                  <p className="text-[10px] text-text-muted truncate">Class: {mat.classGroup || 'Any'}</p>
+                </div>
+              </div>
+            ))}
+            {materials.length === 0 && (
+              <p className="text-xs text-text-muted text-center py-4 italic">No uploads synced yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modern Class-wise Folder Explorer Interface */}
+      <div
+        id="my-classes-directory"
+        className="w-full bg-glass-bg border border-border-color p-6 md:p-8 mb-12 text-left relative overflow-hidden"
+        style={{ borderRadius: 'var(--theme-card-radius, 32px)' }}
+      >
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-accent-primary/10 via-accent-primary/40 to-accent-primary/10" />
         
-        {/* Left Side: Course lessons list */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-display font-black text-text-primary">{settings.syllabusSectionName || "Curriculum Course Materials"}</h2>
-              <p className="text-xs text-text-secondary font-medium mt-1">Select chapters below to load video content and study guides.</p>
+        {/* Header Ribbon */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-2xl font-display font-black text-text-primary flex items-center gap-2.5">
+              <span>📂 My Classes Folder System</span>
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-accent-primary/15 text-accent-primary border border-accent-primary/20 tracking-wider uppercase font-mono">
+                Live Directory Sync
+              </span>
+            </h2>
+            <p className="text-xs text-text-secondary mt-1">
+              Browse nested files, class subjects, assignments, PYQs, and test modules dynamically.
+            </p>
+          </div>
+
+          {/* Breadcrumb Navigation bar */}
+          <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-full bg-bg-secondary/60 border border-border-color text-xs text-text-secondary max-w-full overflow-x-auto select-none font-mono">
+            <span
+              onClick={() => {
+                setActiveClassId(null);
+                setActiveSubjectId(null);
+                setActiveChapterId(null);
+              }}
+              className="hover:text-accent-primary cursor-pointer transition-colors"
+            >
+              School
+            </span>
+            {activeClassId && (
+              <>
+                <ChevronRight className="w-3 h-3 text-text-muted shrink-0" />
+                <span
+                  onClick={() => {
+                    setActiveSubjectId(null);
+                    setActiveChapterId(null);
+                  }}
+                  className="hover:text-accent-primary cursor-pointer transition-colors max-w-[80px] truncate"
+                >
+                  {classes.find(c => c.id === activeClassId)?.className || activeClassId.replace('class_', '').toUpperCase()}
+                </span>
+              </>
+            )}
+            {activeSubjectId && (
+              <>
+                <ChevronRight className="w-3 h-3 text-text-muted shrink-0" />
+                <span
+                  onClick={() => {
+                    setActiveChapterId(null);
+                  }}
+                  className="hover:text-accent-primary cursor-pointer transition-colors max-w-[100px] truncate"
+                >
+                  {subjects.find(s => s.id === activeSubjectId)?.subjectName || 'Subject'}
+                </span>
+              </>
+            )}
+            {activeChapterId && (
+              <>
+                <ChevronRight className="w-3 h-3 text-text-muted shrink-0" />
+                <span className="text-accent-primary max-w-[100px] truncate">
+                  {chapters.find(c => c.id === activeChapterId)?.chapterName || 'Chapter'}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Level 0: Display Class Folders */}
+        {activeClassId === null && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {(classes.length > 0 ? classes : [
+              { id: 'class_6', className: 'Class 6' },
+              { id: 'class_7', className: 'Class 7' },
+              { id: 'class_8', className: 'Class 8' },
+              { id: 'class_9', className: 'Class 9' },
+              { id: 'class_10', className: 'Class 10' },
+              { id: 'class_11', className: 'Class 11' },
+              { id: 'class_12', className: 'Class 12' },
+              { id: 'class_jee', className: 'JEE' },
+              { id: 'class_neet', className: 'NEET' },
+              { id: 'class_droppers', className: 'Droppers' }
+            ]).map((cls) => {
+              const subCount = subjects.filter(s => s.classId === cls.id).length;
+              return (
+                <div
+                  key={cls.id}
+                  onClick={() => {
+                    setActiveClassId(cls.id);
+                    setActiveSubjectId(null);
+                    setActiveChapterId(null);
+                  }}
+                  className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] shadow-sm transition-all"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary group-hover:bg-accent-primary group-hover:text-zinc-950 transition-all mb-4">
+                    <Folder className="w-6 h-6 shrink-0 fill-current" />
+                  </div>
+                  <h4 className="font-display font-black text-base text-text-primary group-hover:text-accent-primary transition-colors truncate">
+                    {cls.className}
+                  </h4>
+                  <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
+                    {subCount} Subject Folders
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Level 1: Display Subject Folders under Class */}
+        {activeClassId !== null && activeSubjectId === null && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setActiveClassId(null)}
+                className="p-1 px-3 rounded-lg text-xs font-bold bg-bg-secondary border border-border-color hover:text-accent-primary transition-colors cursor-pointer"
+              >
+                ← Back to Classes
+              </button>
             </div>
             
-            {/* Soft, beautiful filter buttons row */}
-            <div className="flex flex-col sm:items-end gap-2.5">
-              <div className="flex flex-wrap items-center gap-1 bg-glass-bg p-1.5 rounded-2xl border border-border-color shrink-0 self-start sm:self-auto">
-                  {['all', '6', '7', '8', '9', '10', '11', '12', 'dropper'].map((clsKey) => (
-                    <button 
-                      key={clsKey}
-                      onClick={() => setSelectedClassGroup(clsKey)} 
-                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                        selectedClassGroup === clsKey 
-                          ? 'bg-accent-primary text-button-text shadow-sm' 
-                          : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                      }`}
-                    >
-                      {clsKey === 'all' ? 'All' : clsKey}
-                    </button>
-                  ))}
-              </div>
-
-              {user && selectedClassGroup !== 'all' && selectedClassGroup !== user.classGroup && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  onClick={async () => {
-                    try {
-                      await setDoc(doc(db, 'users', user.uid), {
-                        classGroup: selectedClassGroup,
-                        updatedAt: serverTimestamp()
-                      }, { merge: true });
-                      setUser({
-                        ...user,
-                        classGroup: selectedClassGroup
-                      });
-                    } catch (e) {
-                      handleFirestoreError(e, OperationType.UPDATE, `users/${user.uid}`);
-                    }
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl text-[10px] uppercase font-black tracking-widest bg-[#F15A29]/15 text-[#F15A29] hover:bg-[#F15A29] hover:text-black border border-[#F15A29]/30 transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-auto shadow-sm"
-                >
-                  <span>Save Class {selectedClassGroup === 'dropper' ? 'Dropper' : selectedClassGroup} as My Batch</span>
-                  <span>💾</span>
-                </motion.button>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {subjects.filter(s => s.classId === activeClassId).map((subj) => {
+                const chapCount = chapters.filter(c => c.subjectId === subj.id).length;
+                return (
+                  <div
+                    key={subj.id}
+                    onClick={() => {
+                      setActiveSubjectId(subj.id);
+                      setActiveChapterId(null);
+                    }}
+                    className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] transition-all"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-black transition-all mb-4">
+                      <Folder className="w-6 h-6 shrink-0 fill-current" />
+                    </div>
+                    <h4 className="font-display font-black text-base text-text-primary group-hover:text-indigo-400 transition-colors truncate">
+                      {subj.subjectName}
+                    </h4>
+                    <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
+                      {chapCount} Chapters
+                    </p>
+                  </div>
+                );
+              })}
+              {subjects.filter(s => s.classId === activeClassId).length === 0 && (
+                <div className="p-8 text-center bg-bg-secondary/20 border border-dashed border-border-color rounded-2xl col-span-full">
+                  <p className="text-xs text-text-muted font-mono">No subjects added for this class standard yet.</p>
+                </div>
               )}
             </div>
           </div>
-          
-          {/* Materials Showcase lists */}
-          {isGuest && (!user?.unlockedMaterials || user.unlockedMaterials.length === 0) ? (
-            <div 
-              className="text-center py-16 bg-glass-bg border border-border-color text-text-secondary flex flex-col items-center justify-center gap-3"
-              style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
-            >
-              <div className="w-14 h-14 bg-red-400/10 text-red-400 border border-red-400/20 rounded-full flex items-center justify-center text-xl">
-                <Lock className="w-6 h-6 animate-pulse" />
-              </div>
-              <h3 className="text-lg font-bold text-text-primary">Ecosystem Materials Locked</h3>
-              <p className="text-sm text-text-muted max-w-sm mx-auto font-medium">
-                Your guest profile does not possess study course items. Kindly request promotion from the administrator panel to proceed.
-              </p>
+        )}
+
+        {/* Level 2: Display Chapter Folders under Subject */}
+        {activeClassId !== null && activeSubjectId !== null && activeChapterId === null && (
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => {
+                  setActiveSubjectId(null);
+                  setActiveChapterId(null);
+                }}
+                className="p-1 px-3 rounded-lg text-xs font-bold bg-bg-secondary border border-border-color hover:text-accent-primary transition-colors cursor-pointer"
+              >
+                ← Back to Subjects
+              </button>
             </div>
-          ) : loading ? (
-             <div className="space-y-4">
-               {[1,2,3].map((i) => (
-                 <div 
-                   key={i} 
-                   className="w-full h-24 rounded-2xl bg-bg-secondary/40 border border-border-color animate-pulse flex items-center p-5 gap-4"
-                 >
-                   <div className="w-12 h-12 bg-border-color/60 rounded-xl" />
-                   <div className="space-y-2 flex-1">
-                     <div className="h-4 bg-border-color/60 rounded-full w-1/3" />
-                     <div className="h-3 bg-border-color/60 rounded-full w-1/2" />
-                   </div>
-                   <div className="w-16 h-8 bg-border-color/60 rounded-full" />
-                 </div>
-               ))}
-             </div>
-          ) : (
-            (() => {
-              const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-              const filtered = materials.filter(m => {
-                if (m.isHidden && !isAdmin) return false;
-                return selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id);
-              });
-              
-              if (filtered.length === 0) {
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {chapters.filter(c => c.subjectId === activeSubjectId).map((chap) => {
+                // Count materials matching this chapter
+                const mCount = materials.filter(m => m.chapterId === chap.id).length;
                 return (
-                  <div 
-                    className="text-center py-16 bg-glass-bg border border-border-color text-text-secondary w-full"
-                    style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
+                  <div
+                    key={chap.id}
+                    onClick={() => {
+                      setActiveChapterId(chap.id);
+                    }}
+                    className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] transition-all"
                   >
-                    No study materials found matching this batch filter. Check back shortly!
+                    <div className="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-450 group-hover:bg-purple-500 group-hover:text-black transition-all mb-4">
+                      <FolderOpen className="w-5.5 h-5.5 shrink-0" />
+                    </div>
+                    <h5 className="font-display font-black text-sm text-text-primary group-hover:text-purple-400 transition-colors truncate">
+                      {chap.chapterName}
+                    </h5>
+                    <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
+                      {mCount} Materials
+                    </p>
                   </div>
                 );
-              }
-              
-              // Group materials by section
-              const sectionsMap: { [section: string]: any[] } = {};
-              filtered.forEach(m => {
-                const sec = m.section || 'General Curriculum';
-                if (!sectionsMap[sec]) {
-                  sectionsMap[sec] = [];
+              })}
+              {chapters.filter(c => c.subjectId === activeSubjectId).length === 0 && (
+                <div className="p-8 text-center bg-bg-secondary/20 border border-dashed border-border-color rounded-2xl col-span-full">
+                  <p className="text-xs text-text-muted font-mono">No chapter folders available in this subject module yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Level 3: Display Categorized Files listing under selected Chapter */}
+        {activeClassId !== null && activeSubjectId !== null && activeChapterId !== null && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <button
+                onClick={() => {
+                  setActiveChapterId(null);
+                }}
+                className="p-1 px-3 rounded-lg text-xs font-bold bg-bg-secondary border border-border-color hover:text-accent-primary transition-colors cursor-pointer"
+              >
+                ← Back to Chapters
+              </button>
+
+              {/* Dynamic Folder Search Panel */}
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-text-muted pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search file name..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-black/30 border border-border-color text-text-primary placeholder-text-muted focus:outline-none focus:border-accent-primary"
+                />
+              </div>
+            </div>
+
+            {/* Material Categories Tabs bar inside Chapter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-bg-secondary/40 p-1.5 rounded-2xl border border-border-color">
+              {[
+                { label: 'Notes', icon: '📝' },
+                { label: 'PYQs', icon: '🏆' },
+                { label: 'Assignments', icon: '📂' },
+                { label: 'DPPs', icon: '📚' },
+                { label: 'Videos', icon: '🎥' },
+                { label: 'Formula Sheets', icon: '📐' },
+                { label: 'Tests', icon: '✏️' }
+              ].map((catTab) => (
+                <button
+                  key={catTab.label}
+                  onClick={() => setActiveCategory(catTab.label)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                    activeCategory === catTab.label
+                      ? 'bg-accent-primary text-zinc-950 shadow-md font-bold'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                  }`}
+                >
+                  <span>{catTab.icon}</span>
+                  <span>{catTab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Render matched materials files */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(() => {
+                const filteredFiles = materials.filter((mat) => {
+                  // Must match active chapter doc reference or class/subject hierarchy
+                  const mClass = mat.classId === activeClassId || mat.classGroup === activeClassId.replace('class_', '');
+                  const mSubj = mat.subjectId === activeSubjectId;
+                  const mChap = mat.chapterId === activeChapterId;
+                  if (!mClass || !mSubj || !mChap) return false;
+
+                  // Must match activeCategory
+                  const mType = (mat.materialType || '').toLowerCase();
+                  const type = (mat.type || '').toLowerCase();
+                  const normCat = activeCategory.toLowerCase();
+                  let catMatch = false;
+
+                  if (normCat === 'notes') {
+                    catMatch = mType === 'notes' || mType === 'note' || type === 'note' || type === 'notes';
+                  } else if (normCat === 'videos') {
+                    catMatch = mType === 'video_lectures' || mType === 'videos' || mType === 'video' || type === 'lecture' || type === 'video' || type === 'videos';
+                  } else if (normCat === 'pyqs') {
+                    catMatch = mType === 'pyqs' || mType === 'pyq';
+                  } else if (normCat === 'assignments') {
+                    catMatch = mType === 'assignments' || mType === 'assignment';
+                  } else if (normCat === 'dpps') {
+                    catMatch = mType === 'dpps' || mType === 'dpp';
+                  } else if (normCat === 'formula sheets') {
+                    catMatch = mType === 'formula_sheets' || mType === 'formula_sheet' || normCat.includes('formula') || (mat.title && mat.title.toLowerCase().includes('formula'));
+                  } else if (normCat === 'tests') {
+                    catMatch = mType === 'tests' || mType === 'test';
+                  }
+
+                  if (!catMatch) return false;
+
+                  // Must match search query
+                  if (studentSearchQuery.trim()) {
+                    return mat.title.toLowerCase().includes(studentSearchQuery.toLowerCase().trim());
+                  }
+                  return true;
+                });
+
+                if (filteredFiles.length === 0) {
+                  return (
+                    <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl col-span-full">
+                      <p className="text-xs text-text-muted italic">No {activeCategory} documents synced under this chapter folder.</p>
+                    </div>
+                  );
                 }
-                sectionsMap[sec].push(m);
-              });
-              
-              return (
-                <div className="space-y-10 w-full">
-                  {Object.entries(sectionsMap).map(([sectionName, sectionMats]) => (
-                    <div key={sectionName} className="space-y-4">
-                      {/* Section Separator & Heading */}
-                      <div className="flex items-center gap-3 pt-2">
-                        <h4 className="font-display font-black text-xs uppercase tracking-widest text-accent-primary bg-accent-primary/10 px-3.5 py-1.5 rounded-xl border border-border-color/40 shadow-sm">
-                          {sectionName}
-                        </h4>
-                        <div className="h-[1px] flex-1 bg-gradient-to-r from-border-color/85 to-transparent" />
+
+                return filteredFiles.map((mat) => {
+                  const isBookmarked = user && mat.bookmarks?.includes(user.uid);
+                  const isVideoFile = mat.type === 'lecture' || mat.materialType === 'video_lectures' || (mat.url && mat.url.includes('youtube.com'));
+                  return (
+                    <div
+                      key={mat.id}
+                      className="p-5 rounded-2xl border border-border-color bg-gradient-to-br from-bg-secondary/40 to-transparent flex flex-col justify-between gap-4 relative overflow-hidden group"
+                    >
+                      <div className="flex gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                          isVideoFile ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {isVideoFile ? <Video className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <h4 className="font-bold text-sm text-text-primary group-hover:text-accent-primary transition-colors truncate">
+                            {mat.title}
+                          </h4>
+                          <p className="text-xs text-text-muted mt-1 line-clamp-2 leading-relaxed">
+                            {mat.description || 'No summary parameters provided for this curriculum sheet.'}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[9px] font-mono text-text-muted">
+                            {mat.downloadCount !== undefined && (
+                              <span>⬇ {mat.downloadCount} downloads</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      
-                      {/* Materials Cards inside this Section */}
-                      <div className="space-y-4">
-                        {sectionMats.map((mat) => {
-                          const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-                          const hasFullAccess = isAdmin;
-                          const isLocked = !hasSpecificAccess && !hasFullAccess;
-                          
-                          return (
-                            <motion.div 
-                              key={mat.id}
-                              onClick={() => setSelectedMaterial(mat)}
-                              initial={{ opacity: 0, y: 10 }}
-                              whileInView={{ opacity: 1, y: 0 }}
-                              viewport={{ once: true }}
-                              whileHover={{ y: -4, scale: 1.01, boxShadow: "0 10px 25px rgba(241, 90, 41, 0.05)" }}
-                              whileTap={{ scale: 0.99 }}
-                              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                              className={`group relative overflow-hidden p-3.5 sm:p-5 flex flex-col xs:flex-row items-stretch xs:items-center gap-4 sm:gap-5 bg-glass-bg border border-border-color hover:border-accent-primary/40 cursor-pointer shadow-sm transition-colors duration-200`}
-                              style={{ borderRadius: 'var(--theme-card-radius, 24px)' }}
-                            >
-                              {/* Soft visual glow plat */}
-                              <div className="absolute inset-0 bg-gradient-to-r from-accent-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-                              {mat.thumbnailUrl ? (
-                                <div className="w-full xs:w-20 h-32 xs:h-20 shrink-0 rounded-2xl overflow-hidden bg-bg-secondary relative border border-border-color/40">
-                                  <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover" />
-                                  <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-                                </div>
-                              ) : (
-                                <div className={`p-4 rounded-2xl self-start xs:self-auto shrink-0 transition-colors duration-300 ${
-                                  mat.type === 'note' 
-                                    ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
-                                    : 'bg-accent-primary/10 text-accent-primary'
-                                }`}>
-                                  {mat.type === 'note' ? <BookOpen className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-                                </div>
-                              )}
-
-                              <div className="flex-1 min-w-0 pr-2 text-left">
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  <h3 className="font-display font-black text-base sm:text-lg text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                                    {mat.title}
-                                  </h3>
-                                  {mat.type === 'note' ? (
-                                    <span className="shrink-0 text-[8px] font-extrabold uppercase bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-300 px-2 py-0.5 rounded-md">Note</span>
-                                  ) : (
-                                    <span className="shrink-0 text-[8px] font-extrabold uppercase bg-[#ff839a]/10 text-[#ff839a] px-2 py-0.5 rounded-md">Video</span>
-                                  )}
-                                  {mat.isHidden && (
-                                    <span className="shrink-0 text-[8px] font-extrabold uppercase bg-red-400/20 text-red-400 px-2 py-0.5 rounded-md">Hidden</span>
-                                  )}
-                                </div>
-                                <p className="text-xs font-semibold text-text-secondary line-clamp-2 leading-relaxed">
-                                  {mat.description || 'Access notes, conceptual materials, or helpful guidelines to reinforce learning.'}
-                                </p>
-                              </div>
-                              
-                              {isLocked ? (
-                                <div className="flex flex-row xs:flex-col items-center xs:items-end justify-between xs:justify-center gap-1.5 shrink-0 bg-red-400/5 border border-red-400/10 p-2.5 rounded-2xl w-full xs:w-auto mt-2 xs:mt-0">
-                                   <div className="p-1 px-1.5 rounded-lg bg-red-500/15 text-red-500">
-                                     <Lock className="w-3.5 h-3.5" />
-                                   </div>
-                                   <span className="text-[8px] font-black text-red-400 uppercase tracking-widest font-mono">Locked</span>
-                                </div>
-                              ) : (
-                                 <div className="self-end xs:self-auto shrink-0 flex items-center justify-center p-3 rounded-full bg-accent-primary/10 hover:bg-accent-primary text-accent-primary hover:text-button-text group-hover:scale-105 transition-all duration-300 mt-2 xs:mt-0">
-                                   <PlayCircle className="w-6 h-6 fill-current" />
-                                 </div>
-                              )}
-                            </motion.div>
-                          );
-                        })}
+                      <div className="flex items-center gap-2 border-t border-border-color/40 pt-3 mt-1">
+                        <button
+                          onClick={() => handleViewMaterial(mat)}
+                          className="flex-1 py-2 rounded-xl bg-accent-primary text-[#050508] font-black uppercase tracking-wider text-[10px] hover:bg-accent-primary/80 transition-colors cursor-pointer"
+                        >
+                          View {isVideoFile ? 'Lecture' : 'PDF'}
+                        </button>
+                        
+                        {mat.url && !isVideoFile && (
+                          <button
+                            onClick={(e) => handleIncrementDownloadInDashboard(mat, e)}
+                            className="p-2 rounded-xl bg-bg-secondary hover:text-accent-primary transition-colors cursor-pointer border border-border-color"
+                            title="Download module"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        )}
+                        
+                        <button
+                          onClick={(e) => handleToggleBookmarkInDashboard(mat.id, e)}
+                          className={`p-2 rounded-xl bg-bg-secondary transition-colors cursor-pointer border border-border-color ${
+                            isBookmarked ? 'text-accent-primary border-accent-primary/30 bg-accent-primary/5' : 'hover:text-accent-primary'
+                          }`}
+                          title="Bookmark file"
+                        >
+                          <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              );
-            })()
-          )}
-        </div>
-        
-        {/* Right Side Sidebar widgets */}
-        <div className="lg:col-span-4 space-y-6">
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Sidebar and Promo Widgets Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left shrink-0 mt-8">
            
            {/* Widget 1: Elite premium subscription upgrade banner */}
            <div 
@@ -878,8 +1262,6 @@ export default function Dashboard() {
                </p>
              </div>
            </div>
-
-        </div>
       </div>
 
       {/* Upgrades Plan Modal Dialog */}
@@ -1136,9 +1518,8 @@ export default function Dashboard() {
                     </button>
                   </div>
                 ) : fetchingUrl && activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' ? (
-                  <div className="flex flex-col items-center justify-center gap-3 p-8 bg-bg-secondary w-full h-full text-text-secondary font-bold text-xs">
-                     <Loader className="w-6 h-6 animate-spin text-accent-primary" />
-                     <span>Securing academic URL streams...</span>
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 bg-bg-secondary w-full h-full text-text-secondary font-bold text-xs min-h-[300px]">
+                     <OrbitalLoader size="md" text="Securing academic URL streams..." />
                   </div>
                 ) : (activeMaterial.type === 'video' || activeMaterial.type === 'lecture') || ReactPlayer.canPlay(secureUrl || activeMaterial.url) ? (
                   <CustomVideoPlayer url={secureUrl || activeMaterial.url} playing={!!selectedMaterial} />

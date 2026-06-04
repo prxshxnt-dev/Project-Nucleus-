@@ -318,9 +318,9 @@ export default function VerifyOtp() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full text-primary mb-4">
             <ShieldCheck className="w-7 h-7" />
           </div>
-          <h2 className="font-display font-extrabold text-3xl">Verify Security PIN</h2>
+          <h2 className="font-display font-extrabold text-3xl">Enter Verification Code</h2>
           <p className="text-[#7A7A7A] text-sm mt-1.5 px-2 leading-relaxed">
-            We dispatched a credentials key to your security channels:{' '}
+            We have sent a 6-digit verification code to:
             {state?.email && <span className="block mt-1 font-bold text-black">{state.email}</span>}
             {state?.phone && <span className="block mt-0.5 font-bold text-black">{state.phone}</span>}
           </p>
@@ -358,10 +358,10 @@ export default function VerifyOtp() {
             {isVerifying ? (
               <>
                 <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>Verifying Student Security Token...</span>
+                <span>Verifying code...</span>
               </>
             ) : (
-              <span>Verify and Access Portal</span>
+              <span>Verify & Continue</span>
             )}
           </motion.button>
         </form>
@@ -369,7 +369,7 @@ export default function VerifyOtp() {
         {/* Cooldown control resends */}
         <div className="mt-8 pt-6 border-t border-black/5 text-center">
           <p className="text-[#7A7A7A] text-sm">
-            Didn't receive the email?
+            Didn't receive the code?
           </p>
           {cooldown > 0 ? (
             <div className="inline-flex items-center gap-1.5 text-xs text-primary font-bold mt-2 py-1.5 px-3 bg-primary/5 rounded-full">
@@ -388,7 +388,7 @@ export default function VerifyOtp() {
                   <span>Resending...</span>
                 </>
               ) : (
-                <span>Request details again</span>
+                <span>Resend Code</span>
               )}
             </button>
           )}

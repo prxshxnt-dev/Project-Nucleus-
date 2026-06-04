@@ -68,9 +68,9 @@ export const AIAssistantBot: React.FC = () => {
           {
             id: "msg_welcome_" + Date.now(),
             role: "assistant",
-            content: "Hello! I am **Highly Targeted Mentorship Ai**, your smart physics & entrance advisor.\n\nHow can I support your study session or mentor queries today?",
+            content: "Hello! I am **Nucleus AI Advisor**, your premium learning companion & entrance exam mentor.\n\nHow can I support your study session or help you solve interactive problems today?",
             timestamp: new Date().toISOString(),
-            senderName: "Highly Targeted Mentorship Ai"
+            senderName: "Nucleus AI Advisor"
           }
         ]
       });
@@ -78,9 +78,9 @@ export const AIAssistantBot: React.FC = () => {
         {
           id: "msg_welcome_" + Date.now(),
           role: "assistant",
-          content: "Hello! I am **Highly Targeted Mentorship Ai**, your smart physics & entrance advisor.\n\nHow can I support your study session or mentor queries today?",
+          content: "Hello! I am **Nucleus AI Advisor**, your premium learning companion & entrance exam mentor.\n\nHow can I support your study session or help you solve interactive problems today?",
           timestamp: new Date(),
-          senderName: "Highly Targeted Mentorship Ai"
+          senderName: "Nucleus AI Advisor"
         }
       ]);
     } catch (err) {
@@ -182,9 +182,9 @@ export const AIAssistantBot: React.FC = () => {
               {
                 id: "msg_welcome",
                 role: "assistant",
-                content: "Hello! I am **Highly Targeted Mentorship Ai**, your smart physics & entrance advisor.\n\nHow can I support your study session or mentor queries today?",
+                content: "Hello! I am **Nucleus AI Advisor**, your premium learning companion & entrance exam mentor.\n\nHow can I support your study session or help you solve interactive problems today?",
                 timestamp: new Date().toISOString(),
-                senderName: "Highly Targeted Mentorship Ai"
+                senderName: "Nucleus AI Advisor"
               }
             ]
           });
@@ -298,9 +298,9 @@ export const AIAssistantBot: React.FC = () => {
             {
               id: "msg_welcome",
               role: "assistant" as const,
-              content: "Hello! I am **Highly Targeted Mentorship Ai**, your smart physics & entrance advisor.\n\nHow can I support your study session or mentor queries today?",
+              content: "Hello! I am **Nucleus AI Advisor**, your premium learning companion & entrance exam mentor.\n\nHow can I support your study session or help you solve interactive problems today?",
               timestamp: new Date().toISOString(),
-              senderName: "Highly Targeted Mentorship Ai"
+              senderName: "Nucleus AI Advisor"
             },
             newUserMessage
           ]
@@ -360,7 +360,7 @@ export const AIAssistantBot: React.FC = () => {
         role: "assistant" as const,
         content: responseData.response || "No response received.",
         timestamp: new Date().toISOString(),
-        senderName: "Highly Targeted Mentorship Ai"
+        senderName: "Nucleus AI Advisor"
       };
 
       await updateDoc(sessionRef, {
@@ -376,7 +376,7 @@ export const AIAssistantBot: React.FC = () => {
 
 Please type in your question, formula, or topic, and let's solve it step-by-step together!`,
         timestamp: new Date().toISOString(),
-        senderName: "Highly Targeted Mentorship Ai"
+        senderName: "Nucleus AI Advisor"
       };
 
       await updateDoc(sessionRef, {
@@ -589,7 +589,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
               {/* Suggestions & Quick Prompts banner inside Fullscreen Panel */}
               {messages.length <= 2 && (
                 <div className="px-6 py-4 border-t border-white/5 bg-zinc-900/50">
-                  <span className="text-xs text-white/50 block mb-2 font-bold uppercase tracking-wider">⚡ Highly Targeted Mentorship Ai</span>
+                  <span className="text-xs text-white/50 block mb-2 font-bold uppercase tracking-wider">⚡ Nucleus AI Advisor</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                     {quickStudySuggestions.map((s) => (
                       <button

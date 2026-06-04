@@ -34,6 +34,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Pre-fill email/phone identifier if passed from Signup or password resets
+  useEffect(() => {
+    if (location.state && (location.state as any).email) {
+      const stateEmail = (location.state as any).email;
+      setEmail(stateEmail);
+      setOtpIdentifier(stateEmail);
+    }
+  }, [location.state]);
+
   // Auto-redirect if user already logged in
   useEffect(() => {
     if (!loading && user) {

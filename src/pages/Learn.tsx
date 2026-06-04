@@ -12,6 +12,7 @@ import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
 import SecurePdfViewer from '../components/SecurePdfViewer';
 import { FloatingStickers } from '../components/FloatingStickers';
 import { SyllabusRenderer, getDefaultSyllabus } from '../components/SyllabusRenderer';
+import OrbitalLoader from '../components/OrbitalLoader';
 
 const planTiers = {
   free: 0,
@@ -352,9 +353,8 @@ export default function Learn() {
                     </button>
                   </div>
                 ) : fetchingUrl && activeMaterial.type !== 'video' && activeMaterial.type !== 'lecture' ? (
-                  <div className="flex flex-col items-center justify-center gap-3 p-8 bg-bg-secondary w-full h-full text-text-secondary font-bold text-xs">
-                     <Loader className="w-6 h-6 animate-spin text-accent-primary" />
-                     <span>Securing academic URL streams...</span>
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 bg-bg-secondary w-full h-full text-text-secondary font-bold text-xs min-h-[300px]">
+                     <OrbitalLoader size="md" text="Securing academic URL streams..." />
                   </div>
                 ) : (activeMaterial.type === 'video' || activeMaterial.type === 'lecture') || ReactPlayer.canPlay(secureUrl || activeMaterial.url) ? (
                   <CustomVideoPlayer url={secureUrl || activeMaterial.url} playing={!!selectedMaterial} />

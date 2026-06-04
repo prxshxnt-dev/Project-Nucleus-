@@ -34,6 +34,7 @@ import {
   ThemeConfig,
 } from "../store/settingsStore";
 import { SyllabusRenderer, getDefaultSyllabus } from "../components/SyllabusRenderer";
+import { ContentManagement } from "../components/ContentManagement";
 
 const PRESET_INFO: Record<
   string,
@@ -139,8 +140,51 @@ export default function AdminDashboard() {
     }
   }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<
-    "materials" | "users" | "mentors" | "settings" | "appearance" | "security" | "syllabus" | "support_chats"
-  >("materials");
+    "materials" | "users" | "mentors" | "settings" | "appearance" | "security" | "syllabus" | "support_chats" | "content_management"
+  >("content_management");
+
+  // Content Management Sub-tab States
+  const [contentSubTab, setContentSubTab] = useState<
+    "classes" | "subjects" | "chapters" | "materials" | "upload_center"
+  >("classes");
+
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
+  const [chaptersList, setChaptersList] = useState<any[]>([]);
+
+  // Folder Explorer Navigation States
+  const [expClassId, setExpClassId] = useState<string | null>(null);
+  const [expSubjectId, setExpSubjectId] = useState<string | null>(null);
+  const [expChapterId, setExpChapterId] = useState<string | null>(null);
+
+  // Forms states
+  const [classEditingId, setClassEditingId] = useState<string | null>(null);
+  const [classFormName, setClassFormName] = useState("");
+  const [classFormOrder, setClassFormOrder] = useState<number | "">("");
+
+  const [subjectEditingId, setSubjectEditingId] = useState<string | null>(null);
+  const [subjectFormName, setSubjectFormName] = useState("");
+  const [subjectFormClassId, setSubjectFormClassId] = useState("");
+  const [subjectFormOrder, setSubjectFormOrder] = useState<number | "">("");
+
+  const [chapterEditingId, setChapterEditingId] = useState<string | null>(null);
+  const [chapterFormName, setChapterFormName] = useState("");
+  const [chapterFormSubjectId, setChapterFormSubjectId] = useState("");
+
+  const [mEditingId, setMEditingId] = useState<string | null>(null);
+  const [mTitle, setMTitle] = useState("");
+  const [mDesc, setMDesc] = useState("");
+  const [mUrl, setMUrl] = useState("");
+  const [mType, setMType] = useState("note");
+  const [mMaterialType, setMMaterialType] = useState<
+    "notes" | "pyqs" | "assignments" | "dpps" | "video_lectures" | "formula_sheets" | "tests"
+  >("notes");
+  const [mClassId, setMClassId] = useState("");
+  const [mSubjectId, setMSubjectId] = useState("");
+  const [mChapterId, setMChapterId] = useState("");
+  const [mThumbnailUrl, setMThumbnailUrl] = useState("");
+  const [mIsHidden, setMIsHidden] = useState(false);
+
   const [users, setUsers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
   const [mentors, setMentors] = useState<any[]>([]);
@@ -252,7 +296,7 @@ export default function AdminDashboard() {
         role: "assistant" as const,
         content: "Thanks for asking your queries! Hopefully your queries have been resolved. ✨",
         timestamp: new Date().toISOString(),
-        senderName: "Highly Targeted Mentorship Ai"
+        senderName: "Nucleus AI Advisor"
       };
 
       await updateDoc(sessionRef, {
@@ -733,6 +777,10 @@ export default function AdminDashboard() {
   >("none");
   const [livePreviewActive, setLivePreviewActive] = useState(false);
 
+  const showToast = (message: string, isError = false) => {
+    alert(isError ? `❌ Error: ${message}` : `✨ ${message}`);
+  };
+
   const fetchData = async () => {
     try {
       const usersList = await apiGateway.users.list();
@@ -966,6 +1014,267 @@ export default function AdminDashboard() {
       } catch (aiErr) {
         console.error("Error loading secure AI config:", aiErr);
       }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Load Classes, Subjects, and Chapters in real-time on Admin mount
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubClasses = onSnapshot(collection(db, "classes"), (snap) => {
+      const cls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      cls.sort((a: any, b: any) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        return a.className.localeCompare(b.className);
+      });
+      setClassesList(cls);
+    });
+
+    const unsubSubjects = onSnapshot(collection(db, "subjects"), (snap) => {
+      const sub = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      sub.sort((a: any, b: any) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        return a.subjectName.localeCompare(b.subjectName);
+      });
+      setSubjectsList(sub);
+    });
+
+    const unsubChapters = onSnapshot(collection(db, "chapters"), (snap) => {
+      const chap = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      chap.sort((a: any, b: any) => a.chapterName.localeCompare(b.chapterName));
+      setChaptersList(chap);
+    });
+
+    return () => {
+      unsubClasses();
+      unsubSubjects();
+      unsubChapters();
+    };
+  }, [user]);
+
+  // --- Content Management CRUD Event Handlers (Classes, Subjects, Chapters, Materials) ---
+  const handleSaveClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!classFormName.trim()) return;
+    try {
+      if (classEditingId) {
+        await updateDoc(doc(db, "classes", classEditingId), {
+          className: classFormName,
+          order: classFormOrder === "" ? 0 : Number(classFormOrder)
+        });
+        showToast("Class structural level updated successfully.");
+      } else {
+        await addDoc(collection(db, "classes"), {
+          className: classFormName,
+          order: classFormOrder === "" ? 0 : Number(classFormOrder),
+          createdAt: serverTimestamp()
+        });
+        showToast("Class folder created safely.");
+      }
+      setClassEditingId(null);
+      setClassFormName("");
+      setClassFormOrder("");
+    } catch (err) {
+      console.error(err);
+      showToast("Error saving class folder.", true);
+    }
+  };
+
+  const handleReorderClass = async (id: string, dir: "up" | "down") => {
+    const cls = classesList.find(c => c.id === id);
+    if (!cls) return;
+    const currentOrder = cls.order !== undefined ? cls.order : 0;
+    const targetOrder = dir === "up" ? currentOrder - 1 : currentOrder + 1;
+    try {
+      await updateDoc(doc(db, "classes", id), { order: targetOrder });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteClass = async (id: string) => {
+    if (!window.confirm("Deleting this standard folder will drop all subjects, chapters, and files nested within. Proceed?")) return;
+    try {
+      await deleteDoc(doc(db, "classes", id));
+      // Cascade delete subjects
+      const subs = subjectsList.filter(s => s.classId === id);
+      for (const s of subs) {
+        await deleteDoc(doc(db, "subjects", s.id));
+      }
+      // Cascade delete chapters
+      const chaps = chaptersList.filter(c => c.classId === id);
+      for (const c of chaps) {
+        await deleteDoc(doc(db, "chapters", c.id));
+      }
+      showToast("Class folder standard cascade-deleted.");
+    } catch (err) {
+      console.error(err);
+      showToast("Error deleting class.", true);
+    }
+  };
+
+  // Subjects Management operations
+  const handleSaveSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subjectFormName.trim() || !subjectFormClassId) return;
+    try {
+      if (subjectEditingId) {
+        await updateDoc(doc(db, "subjects", subjectEditingId), {
+          subjectName: subjectFormName,
+          classId: subjectFormClassId,
+          order: subjectFormOrder === "" ? 0 : Number(subjectFormOrder)
+        });
+        showToast("Subject folder details modified.");
+      } else {
+        await addDoc(collection(db, "subjects"), {
+          subjectName: subjectFormName,
+          classId: subjectFormClassId,
+          order: subjectFormOrder === "" ? 0 : Number(subjectFormOrder),
+          createdAt: serverTimestamp()
+        });
+        showToast("Subject folder created safely.");
+      }
+      setSubjectEditingId(null);
+      setSubjectFormName("");
+      setSubjectFormOrder("");
+    } catch (err) {
+      console.error(err);
+      showToast("Error saving subject folder.", true);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string) => {
+    if (!window.confirm("Delete this subject folder and all files?")) return;
+    try {
+      await deleteDoc(doc(db, "subjects", id));
+      showToast("Subject and child chapters removed.");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Chapter operations
+  const handleSaveChapter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chapterFormName.trim() || !chapterFormSubjectId) return;
+    const subj = subjectsList.find(s => s.id === chapterFormSubjectId);
+    const associatedClassId = subj ? subj.classId : "";
+    try {
+      if (chapterEditingId) {
+        await updateDoc(doc(db, "chapters", chapterEditingId), {
+          chapterName: chapterFormName,
+          subjectId: chapterFormSubjectId,
+          classId: associatedClassId
+        });
+        showToast("Chapter folder renamed.");
+      } else {
+        await addDoc(collection(db, "chapters"), {
+          chapterName: chapterFormName,
+          subjectId: chapterFormSubjectId,
+          classId: associatedClassId,
+          createdAt: serverTimestamp()
+        });
+        showToast("Chapter folder created.");
+      }
+      setChapterEditingId(null);
+      setChapterFormName("");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteChapter = async (id: string) => {
+    if (!window.confirm("Delete this chapter? All folders within will be deleted.")) return;
+    try {
+      await deleteDoc(doc(db, "chapters", id));
+      showToast("Chapter database reference deleted.");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Dynamic uploads publishing
+  const handlePublishMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mTitle.trim() || !mUrl.trim() || !mClassId || !mSubjectId || !mChapterId) {
+      showToast("Please specify the complete Folder Directory path details.", true);
+      return;
+    }
+    try {
+      const cls = classesList.find(c => c.id === mClassId);
+      const isVideo = mType === "lecture" || mMaterialType === "video_lectures";
+      const data = {
+        title: mTitle,
+        description: mDesc,
+        url: mUrl,
+        fileUrl: mUrl,
+        type: mType,
+        fileType: isVideo ? "video" : "pdf",
+        materialType: mMaterialType,
+        classId: mClassId,
+        subjectId: mSubjectId,
+        chapterId: mChapterId,
+        classGroup: cls ? cls.className.replace('Class ', '').toLowerCase() : 'all',
+        thumbnailUrl: mThumbnailUrl || "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=400",
+        isHidden: mIsHidden,
+        downloadCount: 0,
+        bookmarks: [],
+        createdAt: serverTimestamp()
+      };
+
+      if (mEditingId) {
+        await updateDoc(doc(db, "materials", mEditingId), data);
+        showToast("Content file record in directory updated.");
+      } else {
+        await addDoc(collection(db, "materials"), data);
+        showToast("Published file successfully to folder directory!");
+      }
+
+      setMEditingId(null);
+      setMTitle("");
+      setMDesc("");
+      setMUrl("");
+      setMThumbnailUrl("");
+      setMIsHidden(false);
+    } catch (err) {
+      console.error(err);
+      showToast("Error updating materials file document.", true);
+    }
+  };
+
+  const handleEditMaterialDirect = (mat: any) => {
+    setMEditingId(mat.id);
+    setMTitle(mat.title);
+    setMDesc(mat.description || "");
+    setMUrl(mat.url);
+    setMType(mat.type || "note");
+    setMMaterialType(mat.materialType || "notes");
+    setMClassId(mat.classId || "");
+    setMSubjectId(mat.subjectId || "");
+    setMChapterId(mat.chapterId || "");
+    setMThumbnailUrl(mat.thumbnailUrl || "");
+    setMIsHidden(mat.isHidden || false);
+    setContentSubTab("upload_center");
+  };
+
+  const handleDeleteMaterialDirect = async (id: string) => {
+    if (!window.confirm("Delete this material resource?")) return;
+    try {
+      await deleteDoc(doc(db, "materials", id));
+      showToast("File deleted from workspace.");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleMaterialVisibilityDirect = async (id: string, current: boolean) => {
+    try {
+      await updateDoc(doc(db, "materials", id), {
+        isHidden: !current
+      });
+      showToast(`Material toggled to ${!current ? "private" : "public"}.`);
     } catch (e) {
       console.error(e);
     }
@@ -1872,6 +2181,20 @@ export default function AdminDashboard() {
         id="admin-translucent-tab-bar" 
         className="w-full bg-zinc-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 mb-8 shadow-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
+        <button
+          id="tab-btn-content-management"
+          onClick={() => {
+            setActiveTab("content_management");
+            setContentSubTab("classes");
+          }}
+          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === "content_management"
+              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+              : "text-white/60 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          📂 Content Management
+        </button>
         <button
           id="tab-btn-materials"
           onClick={() => setActiveTab("materials")}
@@ -5072,6 +5395,833 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "content_management" && (
+        <ContentManagement />
+      )}
+
+      {(activeTab as string) === "content_management_legacy" && (
+        <div className="w-full bg-zinc-900/40 border border-white/10 p-6 md:p-8 rounded-3xl relative text-left min-h-[600px] flex flex-col md:flex-row gap-8">
+          {/* Sub-navigation Sidebar Menu */}
+          <div className="w-full md:w-64 shrink-0 flex flex-col gap-2 border-b md:border-b-0 md:border-r border-white/5 pb-6 md:pb-0 md:pr-6">
+            <h3 className="text-sm font-black uppercase text-white/40 tracking-wider mb-2 select-none">Content Sections</h3>
+            {[
+              { id: "classes", label: "🏫 Classes Folder", icon: "Classes" },
+              { id: "subjects", label: "📚 Subjects List", icon: "Subjects" },
+              { id: "chapters", label: "📂 Chapters Folder", icon: "Chapters" },
+              { id: "materials", label: "📄 Search & File List", icon: "Materials" },
+              { id: "upload_center", label: "🚀 Live Upload Center", icon: "Upload Center" }
+            ].map((subb) => (
+              <button
+                key={subb.id}
+                onClick={() => setContentSubTab(subb.id as any)}
+                className={`w-full text-left p-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-between ${
+                  contentSubTab === subb.id
+                    ? "bg-primary text-zinc-950 shadow-md font-black scale-[1.01]"
+                    : "text-white/70 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <span>{subb.label}</span>
+                {subb.id === "classes" && (
+                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{classesList.length}</span>
+                )}
+                {subb.id === "subjects" && (
+                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{subjectsList.length}</span>
+                )}
+                {subb.id === "chapters" && (
+                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full">{chaptersList.length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Sub-navigation Content Pane */}
+          <div className="flex-1 space-y-6">
+            
+            {/* 1. Classes Directory Management */}
+            {contentSubTab === "classes" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold font-display text-white">Class Standards Directory</h3>
+                    <p className="text-xs text-white/50">Configure primary folder list elements like Class 11, JEE, NEET.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left panel: Add/Edit Class */}
+                  <div className="bg-white/5 p-5 rounded-2xl border border-white/5 h-fit">
+                    <h4 className="text-sm font-black uppercase text-primary mb-4">
+                      {classEditingId ? "Edit Class Details" : "Create New Class Standard"}
+                    </h4>
+                    <form onSubmit={handleSaveClass} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Class Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Class 11, JEE"
+                          value={classFormName}
+                          onChange={(e) => setClassFormName(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Sequence order index</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 1"
+                          value={classFormOrder}
+                          onChange={(e) => setClassFormOrder(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-primary text-zinc-950 font-black uppercase text-[10px] py-2 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                        >
+                          {classEditingId ? "Modify Class" : "Publish Class Standard"}
+                        </button>
+                        {classEditingId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setClassEditingId(null);
+                              setClassFormName("");
+                              setClassFormOrder("");
+                            }}
+                            className="bg-white/10 text-white font-bold uppercase text-[10px] px-3 py-2 rounded-xl hover:bg-white/15 transition-all cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Right panel: Class Standard Cards List */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {classesList.map((cls) => {
+                        const subCount = subjectsList.filter((s) => s.classId === cls.id).length;
+                        return (
+                          <div
+                            key={cls.id}
+                            className="p-5 rounded-2xl border border-white/10 bg-white/5 flex flex-col justify-between gap-4 group"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] uppercase tracking-wider font-mono text-primary/75">
+                                  Order index: {cls.order !== undefined ? cls.order : 0}
+                                </span>
+                                <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => handleReorderClass(cls.id, "up")}
+                                    className="p-1 hover:text-primary rounded"
+                                    title="Move Up"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    onClick={() => handleReorderClass(cls.id, "down")}
+                                    className="p-1 hover:text-primary rounded"
+                                    title="Move Down"
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
+                              </div>
+                              <h5 className="text-base font-bold text-white group-hover:text-primary transition-colors">
+                                {cls.className}
+                              </h5>
+                              <p className="text-xs text-white/40 mt-1 uppercase font-mono tracking-wider">
+                                {subCount} Subjects Configured
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-1.5 border-t border-white/5 pt-3">
+                              <button
+                                onClick={() => {
+                                  setExpClassId(cls.id);
+                                  setContentSubTab("subjects");
+                                }}
+                                className="py-1.5 rounded-lg bg-white/10 hover:bg-white/15 hover:text-primary text-[10px] font-black uppercase transition-colors cursor-pointer"
+                              >
+                                Open Folder
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setClassEditingId(cls.id);
+                                  setClassFormName(cls.className);
+                                  setClassFormOrder(cls.order !== undefined ? cls.order : "");
+                                }}
+                                className="py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[10px] font-black uppercase transition-colors cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClass(cls.id)}
+                                className="py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-black text-[10px] font-black uppercase transition-all cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+
+                            {/* Add Subject shortcut inline inside card */}
+                            <div className="border-t border-dashed border-white/5 pt-3 mt-1">
+                              <p className="text-[9px] uppercase tracking-wider text-white/40 mb-1 font-bold">Quick New Subject</p>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Chemistry"
+                                  id={`quick-subject-input-${cls.id}`}
+                                  className="flex-1 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-primary"
+                                />
+                                <button
+                                  onClick={async () => {
+                                    const el = document.getElementById(`quick-subject-input-${cls.id}`) as HTMLInputElement;
+                                    if (el && el.value.trim()) {
+                                      try {
+                                        await addDoc(collection(db, "subjects"), {
+                                          subjectName: el.value.trim(),
+                                          classId: cls.id,
+                                          order: 0,
+                                          createdAt: serverTimestamp()
+                                        });
+                                        el.value = "";
+                                        showToast("Subject standard folder created!");
+                                      } catch (err) {
+                                        console.error(err);
+                                      }
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-primary text-zinc-950 font-black rounded-lg text-[9px] uppercase hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {classesList.length === 0 && (
+                        <div className="p-8 text-center bg-white/5 border border-dashed border-white/10 rounded-2xl col-span-full">
+                          <p className="text-xs text-white/40">No class level standard created. Create one at the left.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Subjects List Management */}
+            {contentSubTab === "subjects" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold font-display text-white">Subjects Standard Folders</h3>
+                    <p className="text-xs text-white/50">
+                      {expClassId
+                        ? `Viewing folders of: ${classesList.find((c) => c.id === expClassId)?.className || expClassId}`
+                        : "Configure subjects, chapters and materials directories."}
+                    </p>
+                  </div>
+                  {expClassId && (
+                    <button
+                      onClick={() => setExpClassId(null)}
+                      className="p-1.5 px-3 rounded-lg text-xs font-bold bg-white/15 hover:text-primary transition-all cursor-pointer"
+                    >
+                      ← Back to All Subjects
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Create subject */}
+                  <div className="bg-white/5 p-5 rounded-2xl border border-white/5 h-fit">
+                    <h4 className="text-sm font-black uppercase text-primary mb-4">
+                      {subjectEditingId ? "Edit Subject Folder" : "Add New Subject Folder"}
+                    </h4>
+                    <form onSubmit={handleSaveSubject} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Class Standard Option *</label>
+                        <select
+                          required
+                          value={subjectFormClassId || expClassId || ""}
+                          onChange={(e) => setSubjectFormClassId(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          <option value="">-- Choose Class --</option>
+                          {classesList.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.className}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Subject Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Physics, Math"
+                          value={subjectFormName}
+                          onChange={(e) => setSubjectFormName(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Index order sequence</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 1"
+                          value={subjectFormOrder}
+                          onChange={(e) => setSubjectFormOrder(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-primary text-zinc-950 font-black uppercase text-[10px] py-2 rounded-xl hover:scale-[1.02] cursor-pointer"
+                        >
+                          {subjectEditingId ? "Modify Subject" : "Confirm Publish"}
+                        </button>
+                        {subjectEditingId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubjectEditingId(null);
+                              setSubjectFormName("");
+                              setSubjectFormOrder("");
+                            }}
+                            className="bg-white/15 px-3 py-2 text-[10px] font-bold uppercase rounded-xl hover:bg-white/20"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Right: Subjects table */}
+                  <div className="lg:col-span-2 space-y-3">
+                    {(() => {
+                      const list = expClassId
+                        ? subjectsList.filter((s) => s.classId === expClassId)
+                        : subjectsList;
+
+                      if (list.length === 0) {
+                        return (
+                          <div className="p-8 text-center bg-white/5 border border-dashed border-white/10 rounded-2xl">
+                            <p className="text-xs text-white/40">No subject folders created matching this selection path.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {list.map((subj) => {
+                            const parentClass = classesList.find((c) => c.id === subj.classId);
+                            const chapCount = chaptersList.filter((c) => c.subjectId === subj.id).length;
+                            return (
+                              <div
+                                key={subj.id}
+                                className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between gap-4 hover:border-primary/45 transition-all group"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 font-mono">
+                                      Class: {parentClass ? parentClass.className : "Unmapped"}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-primary/75">
+                                      Order: {subj.order || 0}
+                                    </span>
+                                  </div>
+
+                                  <h5 className="font-bold text-base text-white group-hover:text-primary transition-colors">
+                                    {subj.subjectName}
+                                  </h5>
+                                  <p className="text-xs text-white/40 mt-1 uppercase font-mono tracking-wider">
+                                    {chapCount} Chapter Directories
+                                  </p>
+                                </div>
+
+                                <div className="border-t border-white/5 pt-3 space-y-2">
+                                  <div className="grid grid-cols-3 gap-1 px-1">
+                                    <button
+                                      onClick={() => {
+                                        setExpSubjectId(subj.id);
+                                        setContentSubTab("chapters");
+                                      }}
+                                      className="py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[9px] font-black uppercase tracking-wider text-text-primary hover:text-primary cursor-pointer text-center"
+                                    >
+                                      Add Chapter
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        // Preset parameters
+                                        setMClassId(subj.classId || "");
+                                        setMSubjectId(subj.id);
+                                        // Go directly to Upload Center
+                                        setContentSubTab("upload_center");
+                                      }}
+                                      className="py-1 rounded-lg bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500 hover:text-black text-[9px] font-black uppercase tracking-wider cursor-pointer text-center"
+                                    >
+                                      Upload Content
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSubjectEditingId(subj.id);
+                                        setSubjectFormClassId(subj.classId || "");
+                                        setSubjectFormName(subj.subjectName);
+                                        setSubjectFormOrder(subj.order !== undefined ? subj.order : "");
+                                      }}
+                                      className="py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[9px] font-black uppercase tracking-wider cursor-pointer text-center"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteSubject(subj.id)}
+                                    className="w-full py-1.5 rounded-lg bg-red-500/15 text-red-500 hover:bg-red-500 hover:text-black text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer text-center"
+                                  >
+                                    Delete Subject
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Chapters Folders Management */}
+            {contentSubTab === "chapters" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold font-display text-white">Chapters Folders List</h3>
+                    <p className="text-xs text-white/50">Configure core chapter nodes inside subject modules.</p>
+                  </div>
+                  {expSubjectId && (
+                    <button
+                      onClick={() => setExpSubjectId(null)}
+                      className="p-1.5 px-3 rounded-lg text-xs font-bold bg-white/15 hover:text-primary transition-all cursor-pointer"
+                    >
+                      ← Back to All Chapters
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left panel */}
+                  <div className="bg-white/5 p-5 rounded-2xl border border-white/5 h-fit">
+                    <h4 className="text-sm font-black uppercase text-primary mb-4">
+                      {chapterEditingId ? "Rename Chapter" : "Create New Chapter"}
+                    </h4>
+                    <form onSubmit={handleSaveChapter} className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Subject Category *</label>
+                        <select
+                          required
+                          value={chapterFormSubjectId || expSubjectId || ""}
+                          onChange={(e) => setChapterFormSubjectId(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          <option value="">-- Choose Subject --</option>
+                          {subjectsList.map((s) => {
+                            const cStandard = classesList.find((c) => c.id === s.classId);
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {s.subjectName} ({cStandard ? cStandard.className : "No Standard Detail"})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Chapter Name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Kinematics, Integration"
+                          value={chapterFormName}
+                          onChange={(e) => setChapterFormName(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="flex-1 bg-primary text-zinc-950 font-black uppercase text-[10px] py-2 rounded-xl hover:scale-[1.02] cursor-pointer"
+                        >
+                          {chapterEditingId ? "Modify Chapter" : "Publish Chapter"}
+                        </button>
+                        {chapterEditingId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setChapterEditingId(null);
+                              setChapterFormName("");
+                            }}
+                            className="bg-white/15 px-3 py-2 text-[10px] font-bold uppercase rounded-xl hover:bg-white/20"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Right: Chapters list */}
+                  <div className="lg:col-span-2 space-y-3">
+                    {(() => {
+                      const list = expSubjectId
+                        ? chaptersList.filter((c) => c.subjectId === expSubjectId)
+                        : chaptersList;
+
+                      if (list.length === 0) {
+                        return (
+                          <div className="p-8 text-center bg-white/5 border border-dashed border-white/10 rounded-2xl">
+                            <p className="text-xs text-white/40">No chapters configured in this directory segment.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="bg-black/20 border border-white/5 rounded-2xl overflow-hidden divide-y divide-white/5">
+                          {list.map((chap) => {
+                            const matchingSubject = subjectsList.find((s) => s.id === chap.subjectId);
+                            const matchingClass = classesList.find((c) => c.id === chap.classId || (matchingSubject && c.id === matchingSubject.classId));
+                            return (
+                              <div
+                                key={chap.id}
+                                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-white/[0.02]"
+                              >
+                                <div>
+                                  <h5 className="font-bold text-sm text-white">{chap.chapterName}</h5>
+                                  <p className="text-[10px] text-white/40 font-mono mt-1">
+                                    Path: {matchingClass?.className || "Any Class"} / {matchingSubject?.subjectName || "Any Subject"}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setChapterEditingId(chap.id);
+                                      setChapterFormSubjectId(chap.subjectId || "");
+                                      setChapterFormName(chap.chapterName);
+                                    }}
+                                    className="p-1 px-2.5 rounded bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white transition-colors cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteChapter(chap.id)}
+                                    className="p-1 px-2.5 rounded bg-red-500/15 hover:bg-red-500 hover:text-black text-[10px] text-red-400 font-bold transition-all cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Complete Files Directory Search List */}
+            {contentSubTab === "materials" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-display font-black text-white">Consolidated Files Directory</h3>
+                  <p className="text-xs text-white/50">Manage individual file placements, change thumbnails, and toggle availability.</p>
+                </div>
+
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
+                  {materials.map((mat) => {
+                    const cStandard = classesList.find((c) => c.id === mat.classId);
+                    const sStandard = subjectsList.find((s) => s.id === mat.subjectId);
+                    const cChapter = chaptersList.find((c) => c.id === mat.chapterId);
+                    const isVideo = mat.type === 'lecture' || mat.materialType === 'video_lectures';
+
+                    return (
+                      <div
+                        key={mat.id}
+                        className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:bg-white/[0.02]"
+                      >
+                        <div className="flex gap-4 items-center">
+                          <img
+                            src={mat.thumbnailUrl || (isVideo ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120" : "https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&w=120")}
+                            className="w-12 h-12 rounded-xl object-cover shrink-0 border border-white/10 bg-black"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="text-left min-w-0">
+                            <h4 className="font-bold text-sm text-text-primary flex items-center gap-2">
+                              <span>{mat.title}</span>
+                              {mat.isHidden && (
+                                <span className="text-[8px] bg-red-500/25 border border-red-500/30 text-red-400 px-1.5 py-0.5 rounded uppercase font-mono tracking-widest">
+                                  Private
+                                </span>
+                              )}
+                            </h4>
+                            <p className="text-[10px] text-white/40 line-clamp-1 mt-0.5">{mat.description || "No summary notes."}</p>
+                            <p className="text-[9px] text-[#F15A29] font-mono uppercase tracking-wider mt-1 select-none">
+                              标准路径: {cStandard?.className || mat.classGroup || "Default"} standard / {sStandard?.subjectName || "General"} / {cChapter?.chapterName || "Folder ROOT"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => handleToggleMaterialVisibilityDirect(mat.id, mat.isHidden)}
+                            className={`p-1.5 px-3 rounded-lg text-[9px] uppercase font-black tracking-wider transition-colors cursor-pointer ${
+                              mat.isHidden
+                                ? "bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/20"
+                                : "bg-white/10 hover:bg-white/15 text-white/80"
+                            }`}
+                          >
+                            {mat.isHidden ? "Make Public" : "Make Private"}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleEditMaterialDirect(mat)}
+                            className="p-1.5 px-3 rounded-lg text-[9px] uppercase font-black tracking-wider bg-white/10 hover:bg-white/15 text-white cursor-pointer"
+                          >
+                            Move / Edit
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteMaterialDirect(mat.id)}
+                            className="p-1.5 px-3 rounded-lg text-[9px] uppercase font-black tracking-wider bg-red-500/15 text-red-400 hover:bg-red-500 hover:text-black transition-all cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {materials.length === 0 && (
+                    <div className="p-12 text-center bg-black/20 text-white/40">
+                      No files uploaded or synced in the catalog library yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 5. Live Upload Center */}
+            {contentSubTab === "upload_center" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-bold font-display text-white">Live Folder Upload Console</h3>
+                  <p className="text-xs text-white/50">Directly link resource PDFs, notes, assignments, PYQs, and class lectures to standard database folders.</p>
+                </div>
+
+                <div className="max-w-2xl bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8">
+                  <form onSubmit={handlePublishMaterial} className="space-y-6 text-left">
+                    
+                    {/* Folder Path Cascading Parameters Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Class Standard *</label>
+                        <select
+                          required
+                          value={mClassId}
+                          onChange={(e) => {
+                            setMClassId(e.target.value);
+                            setMSubjectId("");
+                            setMChapterId("");
+                          }}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          <option value="">-- Choose Class --</option>
+                          {classesList.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.className}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Subject Folder *</label>
+                        <select
+                          required
+                          value={mSubjectId}
+                          onChange={(e) => {
+                            setMSubjectId(e.target.value);
+                            setMChapterId("");
+                          }}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          <option value="">-- Choose Subject --</option>
+                          {subjectsList.filter((s) => s.classId === mClassId).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.subjectName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Chapter Folder *</label>
+                        <select
+                          required
+                          value={mChapterId}
+                          onChange={(e) => setMChapterId(e.target.value)}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          <option value="">-- Choose Chapter --</option>
+                          {chaptersList.filter((c) => c.subjectId === mSubjectId).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.chapterName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Choose Content Type Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Study Material Type *</label>
+                        <select
+                          required
+                          value={mMaterialType}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setMMaterialType(val as any);
+                            setMType(val === "video_lectures" ? "lecture" : "note");
+                          }}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          <option value="notes">📝 Notes (PDF)</option>
+                          <option value="pyqs">🏆 Previous Year Questions (PYQs)</option>
+                          <option value="assignments">📂 Class Assignments (PDF)</option>
+                          <option value="dpps">📚 Daily Practice Papers (DPPs)</option>
+                          <option value="video_lectures">🎥 Video Classes (Lectures)</option>
+                          <option value="formula_sheets">📐 Formula Sheets</option>
+                          <option value="tests">✏️ Subject Test modules</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Title / File name *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Newton's Laws Sheet, Electrostatics PYQs"
+                          value={mTitle}
+                          onChange={(e) => setMTitle(e.target.value)}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Summary / Description Details</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Provide deep details or summaries about the syllabus topics under this specific file..."
+                        value={mDesc}
+                        onChange={(e) => setMDesc(e.target.value)}
+                        className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Security resource URL (link) *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. https://example.com/sheet.pdf or secure video link"
+                          value={mUrl}
+                          onChange={(e) => setMUrl(e.target.value)}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Optional Card Image (Thumbnail URL)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://images.unsplash.com/..."
+                          value={mThumbnailUrl}
+                          onChange={(e) => setMThumbnailUrl(e.target.value)}
+                          className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Visibility status */}
+                    <div className="flex items-center gap-2.5 bg-black/30 border border-white/5 p-4 rounded-xl">
+                      <input
+                        type="checkbox"
+                        id="mIsHidden"
+                        checked={mIsHidden}
+                        onChange={(e) => setMIsHidden(e.target.checked)}
+                        className="w-4 h-4 text-primary bg-zinc-955 border-zinc-700 rounded focus:ring-primary focus:ring-offset-zinc-900 focus:ring-2"
+                      />
+                      <div>
+                        <label htmlFor="mIsHidden" className="text-xs font-black text-white hover:text-white/80 cursor-pointer block leading-none">
+                          Hide this document from Students (Private Mode)
+                        </label>
+                        <span className="text-[10px] text-white/40 block mt-1">If enabled, students cannot see this folder file in their directory explorer.</span>
+                      </div>
+                    </div>
+
+                    {/* Form Controls */}
+                    <div className="flex items-center gap-2 pt-4">
+                      <button
+                        type="submit"
+                        className="flex-1 bg-primary text-zinc-950 font-black uppercase tracking-wider text-xs py-3 rounded-xl hover:scale-[1.01] active:scale-[0.99] hover:bg-primary/90 transition-all cursor-pointer"
+                      >
+                        {mEditingId ? "💾 Confirm Move / Modify" : "🚀 Publish Content to Folder"}
+                      </button>
+                      {mEditingId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMEditingId(null);
+                            setMTitle("");
+                            setMDesc("");
+                            setMUrl("");
+                            setMThumbnailUrl("");
+                            setMIsHidden(false);
+                          }}
+                          className="bg-white/15 text-white font-bold uppercase text-xs px-5 py-3 rounded-xl hover:bg-white/20"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+
+                  </form>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

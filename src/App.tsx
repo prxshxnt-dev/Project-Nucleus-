@@ -5,7 +5,7 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
-import { AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import Lenis from 'lenis';
 
 // Pages
@@ -18,6 +18,7 @@ import Signup from './pages/Signup';
 import VerifyOtp from './pages/VerifyOtp';
 import ForgotPassword from './pages/ForgotPassword';
 import SelectStandard from './pages/SelectStandard';
+import Library from './pages/Library';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ThemeProvider from './components/ThemeProvider';
@@ -27,12 +28,26 @@ import { AIAssistantBot } from './components/AIAssistantBot';
 import PwaManager from './components/PwaManager';
 import LiquidGlassDock from './components/LiquidGlassDock';
 import GlobalLoader from './components/GlobalLoader';
+import OrbitalLoader from './components/OrbitalLoader';
 
 function AppContent() {
   const { setUser, setLoading, user, loading } = useAuthStore();
   const { setSettings } = useSettingsStore();
   const [localLoading, setLocalLoading] = useState(true);
+  const [routeTransitioning, setRouteTransitioning] = useState(false);
   const location = useLocation();
+  const prevPathRef = useRef(location.pathname);
+
+  useEffect(() => {
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      setRouteTransitioning(true);
+      const timer = setTimeout(() => {
+        setRouteTransitioning(false);
+      }, 750);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const lenis = new Lenis();
@@ -172,6 +187,21 @@ function AppContent() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {routeTransitioning && (
+          <motion.div
+            key="route-loader-layer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[999999] pointer-events-auto"
+          >
+            <OrbitalLoader size="fullscreen" text="Switching study sections..." />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30 ${(loading || localLoading) ? 'invisible h-0 overflow-hidden' : 'visible'}`}>
         <ScreenProtector />
         <ThemeProvider />
@@ -188,6 +218,7 @@ function AppContent() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/select-standard" element={<SelectStandard />} />
             <Route path="/learn" element={<Learn />} />
+            <Route path="/library" element={<Library />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

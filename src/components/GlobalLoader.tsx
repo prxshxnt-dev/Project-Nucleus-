@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettingsStore } from '../store/settingsStore';
+import OrbitalLoader from './OrbitalLoader';
 
 interface GlobalLoaderProps {
   onFullyLoaded?: () => void;
@@ -38,130 +39,301 @@ export default function GlobalLoader({ onFullyLoaded }: GlobalLoaderProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 1 }}
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-6 overflow-hidden select-none bg-[#0c0d0e]"
+      initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+      animate={{ opacity: 1, backdropFilter: 'blur(16px)' }}
+      exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+      transition={{ 
+        opacity: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
+        backdropFilter: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+      }}
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-6 overflow-hidden select-none bg-black/15 pointer-events-auto"
     >
-      {/* Morphing Liquid Background Curtain */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 fill-[#0c0d0e]" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <motion.path
-          initial={{ d: "M 0 100 C 30 100, 70 100, 100 100 L 100 100 C 70 100, 30 100, 0 100 Z" }}
-          animate={{ d: "M 0 0 C 30 0, 70 0, 100 0 L 100 100 C 70 100, 30 100, 0 100 Z" }}
-          exit={{ d: [
-            "M 0 0 C 30 0, 70 0, 100 0 L 100 100 C 70 100, 30 100, 0 100 Z",
-            "M 0 0 C 30 0, 70 0, 100 0 L 100 60 C 70 115, 30 115, 0 60 Z",
-            "M 0 0 C 30 0, 70 0, 100 0 L 100 0 C 70 0, 30 0, 0 0 Z"
-          ]}}
-          transition={{ 
-            duration: 0.9, 
-            ease: [0.76, 0, 0.24, 1] 
-          }}
-        />
-      </svg>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .pencil {
+          display: block;
+          width: 10em;
+          height: 10em;
+          color: var(--accent-primary, #4F46E5);
+        }
 
-      {/* Dynamic Grid Background mirroring whiteboard/coordinate paper */}
-      <div className="absolute inset-0 bg-[radial-gradient(#FA8339_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none z-[2]" />
+        .pencil__body1,
+        .pencil__body2,
+        .pencil__body3,
+        .pencil__eraser,
+        .pencil__eraser-skew,
+        .pencil__point,
+        .pencil__rotate,
+        .pencil__stroke {
+          animation-duration: 3s;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
 
-      {/* Radial ambient background splash glows */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] sm:w-[500px] sm:h-[500px] rounded-full bg-gradient-to-tr from-[#FE9E5C]/15 to-[#FA8339]/5 blur-[80px] pointer-events-none z-[2]" />
-      <div className="absolute top-1/3 left-1/4 w-[250px] h-[250px] rounded-full bg-purple-500/10 blur-[80px] pointer-events-none animate-pulse z-[2]" />
+        .pencil__body1,
+        .pencil__body2,
+        .pencil__body3 {
+          transform: rotate(-90deg);
+        }
 
-      <div className="relative flex flex-col items-center max-w-sm text-center z-10">
-        
-        {/* Playful Interactive Morphing Scalloped Container wrapper */}
-        <div className="relative w-32 h-32 sm:w-40 sm:h-40 flex items-center justify-center mb-8">
-          
-          {/* Animated Chalk Hand-drawn Outer Swirling Arrows / Circles */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" viewBox="0 0 100 100">
-            <motion.path
-              d="M 15 50 C 15 30.6, 30.6 15, 50 15 C 69.4 15, 85 30.6, 85 50 C 85 69.4, 69.4 85, 50 85"
-              fill="none"
-              stroke="#FA8339"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeDasharray="6 6"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-              className="origin-center opacity-85"
-            />
-            {/* Playful hand-drawn chalk dot annotations */}
-            <circle cx="85" cy="50" r="3.5" fill="#FA8339" className="opacity-90 animate-bounce" style={{ animationDelay: '0.2s' }} />
-            <circle cx="15" cy="50" r="2.5" fill="#a78bfa" className="opacity-90 animate-bounce" />
-            <circle cx="50" cy="15" r="3" fill="#fbbf24" className="opacity-90 animate-bounce" style={{ animationDelay: '0.4s' }} />
-          </svg>
+        .pencil__body1 {
+          animation-name: pencilBody1;
+        }
 
-          {/* Morphing Scalloped shape mimicking our gorgeous Home avatar badge */}
-          <svg className="absolute w-[85%] h-[85%]" viewBox="0 0 100 100">
-            <motion.path
-              d="M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
-              fill="#FA8339"
-              animate={{
-                scale: [1, 1.05, 0.98, 1.03, 1],
-                rotate: [0, 6, -4, 3, 0],
-              }}
-              transition={{
-                duration: 5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            />
-          </svg>
+        .pencil__body2 {
+          animation-name: pencilBody2;
+        }
 
-          {/* Centered Glowing Play Icon symbolizing playable learning */}
-          <div className="absolute z-20 flex flex-col items-center justify-center text-white scale-110 drop-shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
-            <motion.span 
-              className="text-4xl text-white select-none block"
-              animate={{ scale: [0.95, 1.15, 0.95] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            >
-              🎓
-            </motion.span>
-          </div>
+        .pencil__body3 {
+          animation-name: pencilBody3;
+        }
 
-          {/* Sparkles */}
-          <div className="absolute top-0 right-0 w-4 h-4 bg-yellow-400 rounded-full animate-ping z-30" />
-        </div>
+        .pencil__eraser {
+          animation-name: pencilEraser;
+          transform: rotate(-90deg) translate(49px, 0);
+        }
 
-        {/* Dynamic educational statement title */}
-        <h3 className="text-xl font-display font-black text-white tracking-tight mb-2 leading-tight uppercase font-mono">
-          Learning Sandbox Active
-        </h3>
+        .pencil__eraser-skew {
+          animation-name: pencilEraserSkew;
+          animation-timing-function: ease-in-out;
+        }
 
-        {/* Dynamic steps text */}
-        <div className="h-6 overflow-hidden w-full relative">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={stepIndex}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="text-sm font-semibold text-[#FE9E5C] font-mono tracking-wide whitespace-nowrap"
-            >
-              {steps[stepIndex]}
-            </motion.p>
-          </AnimatePresence>
-        </div>
+        .pencil__point {
+          animation-name: pencilPoint;
+          transform: rotate(-90deg) translate(49px, -30px);
+        }
 
-        {/* Bottom loading progress lines */}
-        <div className="w-48 h-1.5 bg-white/5 border border-white/10 rounded-full mt-6 overflow-hidden relative">
-          <motion.div
-            initial={{ width: "4%" }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 2.2, ease: "easeInOut" }}
-            className="h-full bg-gradient-to-r from-[#FA8339] to-yellow-400 rounded-full"
+        .pencil__rotate {
+          animation-name: pencilRotate;
+        }
+
+        .pencil__stroke {
+          animation-name: pencilStroke;
+          transform: translate(100px, 100px) rotate(-113deg);
+        }
+
+        /* Animations */
+        @keyframes pencilBody1 {
+          from,
+          to {
+            stroke-dashoffset: 351.86;
+            transform: rotate(-90deg);
+          }
+
+          50% {
+            stroke-dashoffset: 150.8;
+            transform: rotate(-225deg);
+          }
+        }
+
+        @keyframes pencilBody2 {
+          from,
+          to {
+            stroke-dashoffset: 406.84;
+            transform: rotate(-90deg);
+          }
+
+          50% {
+            stroke-dashoffset: 174.36;
+            transform: rotate(-225deg);
+          }
+        }
+
+        @keyframes pencilBody3 {
+          from,
+          to {
+            stroke-dashoffset: 296.88;
+            transform: rotate(-90deg);
+          }
+
+          50% {
+            stroke-dashoffset: 127.23;
+            transform: rotate(-225deg);
+          }
+        }
+
+        @keyframes pencilEraser {
+          from,
+          to {
+            transform: rotate(-45deg) translate(49px, 0);
+          }
+
+          50% {
+            transform: rotate(0deg) translate(49px, 0);
+          }
+        }
+
+        @keyframes pencilEraserSkew {
+          from,
+          32.5%,
+          67.5%,
+          to {
+            transform: skewX(0);
+          }
+
+          35%,
+          65% {
+            transform: skewX(-4deg);
+          }
+
+          37.5%,
+          62.5% {
+            transform: skewX(8deg);
+          }
+
+          40%,
+          45%,
+          50%,
+          55%,
+          60% {
+            transform: skewX(-15deg);
+          }
+
+          42.5%,
+          47.5%,
+          52.5%,
+          57.5% {
+            transform: skewX(15deg);
+          }
+        }
+
+        @keyframes pencilPoint {
+          from,
+          to {
+            transform: rotate(-90deg) translate(49px, -30px);
+          }
+
+          50% {
+            transform: rotate(-225deg) translate(49px, -30px);
+          }
+        }
+
+        @keyframes pencilRotate {
+          from {
+            transform: translate(100px, 100px) rotate(0);
+          }
+
+          to {
+            transform: translate(100px, 100px) rotate(720deg);
+          }
+        }
+
+        @keyframes pencilStroke {
+          from {
+            stroke-dashoffset: 439.82;
+            transform: translate(100px, 100px) rotate(-113deg);
+          }
+
+          50% {
+            stroke-dashoffset: 164.93;
+            transform: translate(100px, 100px) rotate(-113deg);
+          }
+
+          75%,
+          to {
+            stroke-dashoffset: 439.82;
+            transform: translate(100px, 100px) rotate(112deg);
+          }
+        }
+      ` }} />
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.05 }}
+        transition={{ 
+          opacity: { duration: 0.6, ease: "easeOut" },
+          scale: { duration: 0.8, ease: [0.16, 1, 0.3, 1] }
+        }}
+        className="relative z-10 flex flex-col items-center justify-center"
+      >
+        <svg
+          className="pencil"
+          viewBox="0 0 200 200"
+          width="200"
+          height="200"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <clipPath id="pencil-eraser">
+              <rect rx="5" ry="5" width="30" height="30" />
+            </clipPath>
+          </defs>
+          <circle
+            className="pencil__stroke"
+            r="70"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeDasharray="439.82 439.82"
+            strokeDashoffset="439.82"
+            strokeLinecap="round"
+            transform="rotate(-113,100,100)"
           />
-        </div>
-
-        {/* Playful Chalk arrows & decals background detail */}
-        <div className="absolute top-1/4 -left-12 opacity-50 text-slate-500 font-mono text-[9px] -rotate-12 select-none pointer-events-none">
-          ∫ dx = x + C ✏️
-        </div>
-        <div className="absolute bottom-1/4 -right-12 opacity-50 text-slate-500 font-mono text-[9px] rotate-12 select-none pointer-events-none">
-          E = mc² 💥
-        </div>
-      </div>
+          <g className="pencil__rotate" transform="translate(100,100)">
+            <g fill="none">
+              <circle
+                className="pencil__body1"
+                r="64"
+                stroke="hsl(30, 30%, 50%)"
+                strokeWidth="30"
+                strokeDasharray="402.12 402.12"
+                strokeDashoffset="402"
+                transform="rotate(-90)"
+              />
+              <circle
+                className="pencil__body2"
+                r="74"
+                stroke="hsl(30, 30%, 60%)"
+                strokeWidth="10"
+                strokeDasharray="464.96 464.96"
+                strokeDashoffset="465"
+                transform="rotate(-90)"
+              />
+              <circle
+                className="pencil__body3"
+                r="54"
+                stroke="hsl(30, 30%, 40%)"
+                strokeWidth="10"
+                strokeDasharray="339.29 339.29"
+                strokeDashoffset="339"
+                transform="rotate(-90)"
+              />
+            </g>
+            <g className="pencil__eraser" transform="rotate(-90) translate(49,0)">
+              <g className="pencil__eraser-skew">
+                <rect
+                  fill="hsl(30, 20%, 90%)"
+                  rx="5"
+                  ry="5"
+                  width="30"
+                  height="30"
+                />
+                <rect
+                  fill="hsl(30, 20%, 85%)"
+                  width="5"
+                  height="30"
+                  clipPath="url(#pencil-eraser)"
+                />
+                <rect fill="hsl(30, 20%, 80%)" width="30" height="20" />
+                <rect fill="hsl(30, 20%, 75%)" width="15" height="20" />
+                <rect fill="hsl(30, 20%, 85%)" width="5" height="20" />
+                <rect fill="hsla(30, 20%, 75%, 0.2)" y="6" width="30" height="2" />
+                <rect
+                  fill="hsla(30, 20%, 75%, 0.2)"
+                  y="13"
+                  width="30"
+                  height="2"
+                />
+              </g>
+            </g>
+            <g className="pencil__point" transform="rotate(-90) translate(49,-30)">
+              <polygon fill="hsl(33,90%,70%)" points="15 0,30 30,0 30" />
+              <polygon fill="hsl(33,90%,50%)" points="15 0,6 30,0 30" />
+              <polygon fill="hsl(223,10%,10%)" points="15 0,20 10,10 10" />
+            </g>
+          </g>
+        </svg>
+      </motion.div>
     </motion.div>
   );
 }

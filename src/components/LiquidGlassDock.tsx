@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore, THEME_PRESETS, ThemeConfig } from '../store/settingsStore';
-import { Home, BookOpen, Users, Smartphone, Sliders, Share2, HelpCircle, LayoutDashboard } from 'lucide-react';
+import { Home, BookOpen, Library as LibraryIcon, Users, Smartphone, Sliders, Share2, HelpCircle, LayoutDashboard } from 'lucide-react';
 import { signInWithGoogle } from '../lib/firebase';
 
 export default function LiquidGlassDock() {
@@ -48,6 +48,13 @@ export default function LiquidGlassDock() {
       label: 'Home',
       icon: Home,
       to: '/',
+      isAnchor: false,
+    },
+    {
+      id: 'library',
+      label: 'Library',
+      icon: LibraryIcon,
+      to: '/library',
       isAnchor: false,
     },
     {
@@ -138,6 +145,7 @@ export default function LiquidGlassDock() {
               {/* Active Dot under current tab */}
               {((app.to === '/' && location.pathname === '/') || 
                 (app.to === '/learn' && location.pathname === '/learn') ||
+                (app.to === '/library' && location.pathname === '/library') ||
                 (app.to === '/dashboard' && location.pathname === '/dashboard') ||
                 (app.to === '/admin' && location.pathname === '/admin')) && (
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-accent-primary rounded-full shadow-[0_0_8px_rgba(229,210,165,0.8)]" />

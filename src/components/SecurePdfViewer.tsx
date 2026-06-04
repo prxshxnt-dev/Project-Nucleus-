@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSettingsStore } from '../store/settingsStore';
 import { useAuthStore } from '../store/authStore';
-import { Loader, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
+import OrbitalLoader from './OrbitalLoader';
 
 interface SecurePdfViewerProps {
   url: string;
@@ -95,9 +96,8 @@ export default function SecurePdfViewer({ url, title }: SecurePdfViewerProps) {
       <div className="relative flex-1 w-full h-full bg-zinc-950">
         
         {loading && (
-          <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center gap-3 text-zinc-400 font-mono text-xs z-20">
-            <Loader className="w-6 h-6 animate-spin text-[#E5D2A5]" />
-            <span>Establishing sandbox view stream...</span>
+          <div className="absolute inset-0 bg-zinc-950/75 backdrop-blur-md flex flex-col items-center justify-center gap-3 text-zinc-400 font-mono text-xs z-20">
+            <OrbitalLoader size="md" text="Establishing sandbox view stream..." className="bg-transparent border-none shadow-none" />
           </div>
         )}
 

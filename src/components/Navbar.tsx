@@ -70,6 +70,7 @@ export default function Navbar() {
 
   const isHomeActive = location.pathname === '/';
   const isLearnActive = location.pathname === '/learn';
+  const isLibraryActive = location.pathname === '/library';
   const isDashboardActive = location.pathname === '/dashboard';
   const isAdminActive = location.pathname === '/admin';
 
@@ -157,6 +158,14 @@ export default function Navbar() {
                   }`}
                 >
                   {settings.syllabusSectionName || 'Syllabus'}
+                </Link>
+                <Link 
+                  to="/library" 
+                  className={`text-xs xl:text-sm font-semibold px-3 py-2 xl:px-4 rounded-xl transition-all shrink-0 ${
+                    isLibraryActive ? 'text-accent-primary bg-accent-primary/10 font-bold' : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  Study Library
                 </Link>
                 <Link 
                   to="/dashboard" 
