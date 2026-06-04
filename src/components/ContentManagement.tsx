@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useContentStore } from "../store/contentStore";
 import { ContentCard } from "./ContentCard";
 import { RefreshCw, Search, Plus, Trash2, Edit2, FolderOpen, Video, FileText } from "lucide-react";
+import { parseYouTubeVideoId } from "./CustomVideoPlayer";
 
 export function ContentManagement() {
   const {
@@ -167,11 +168,29 @@ export function ContentManagement() {
     if (!matUrl.trim()) return showToast("Secure Link URL is required", true);
 
     const isVideo = matType === "lecture" || matCategory === "video_lectures";
+    let finalUrl = matUrl;
+    let extractedVideoId = "";
+
+    if (isVideo) {
+      const isYouTubeUrl = matUrl.includes("youtube.com") || matUrl.includes("youtu.be") || matUrl.includes("shorts/");
+      const youtubeId = parseYouTubeVideoId(matUrl);
+      
+      if (isYouTubeUrl && !youtubeId) {
+        return showToast("Invalid YouTube URL! We could not parse a valid 11-digit Video ID.", true);
+      }
+      
+      if (youtubeId) {
+        finalUrl = `https://www.youtube.com/embed/${youtubeId}`;
+        extractedVideoId = youtubeId;
+      }
+    }
+
     const payload = {
       title: matTitle,
       description: matDesc,
-      url: matUrl,
-      fileUrl: matUrl,
+      url: finalUrl,
+      fileUrl: finalUrl,
+      videoId: extractedVideoId,
       type: matType,
       fileType: (isVideo ? "video" : "pdf") as any,
       materialType: matCategory,
@@ -987,6 +1006,45 @@ export function ContentManagement() {
                           onChange={(e) => setMatUrl(e.target.value)}
                           className="w-full bg-zinc-950/60 border border-white/10 hover:border-white/20 focus:border-primary focus:ring-1 focus:ring-primary/30 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/25 outline-none transition-all duration-200 font-mono text-[11px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]"
                         />
+                        
+                        {(matType === "lecture" || matCategory === "video_lectures") && matUrl.trim() && (
+                          <div className="mt-2.5 space-y-2 text-left">
+                            {(() => {
+                              const isYouTube = matUrl.includes("youtube.com") || matUrl.includes("youtu.be") || matUrl.includes("shorts/");
+                              const parsedId = parseYouTubeVideoId(matUrl);
+                              if (isYouTube) {
+                                if (parsedId) {
+                                  return (
+                                    <div className="space-y-1.5 p-3 rounded-xl bg-green-500/5 border border-green-500/10 max-w-sm">
+                                      <span className="text-[10px] text-green-400 font-mono flex items-center gap-1 font-bold">
+                                        ● Valid YouTube Video ID: {parsedId}
+                                      </span>
+                                      <div className="border border-white/10 rounded-lg overflow-hidden aspect-video bg-black mt-1">
+                                        <iframe
+                                          src={`https://www.youtube.com/embed/${parsedId}?controls=1`}
+                                          className="w-full h-full"
+                                          allowFullScreen
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <span className="text-[10px] text-red-500 font-mono flex items-center gap-1 font-bold bg-red-500/5 border border-red-500/10 px-2.5 py-1.5 rounded-lg w-fit animate-pulse">
+                                      ⚠️ Invalid YouTube URL format: Unable to extract 11-character ID.
+                                    </span>
+                                  );
+                                }
+                              } else {
+                                return (
+                                  <span className="text-[10px] text-zinc-400 font-mono bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-lg block w-fit">
+                                    ℹ️ Non-YouTube link. Playback will use default direct controls.
+                                  </span>
+                                );
+                              }
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -1476,7 +1476,7 @@ export default function Library() {
                     </div>
                   ) : previewMaterial.fileType === 'video' ? (
                     <div className="w-full h-full max-w-2xl mx-auto rounded-2xl overflow-hidden bg-black flex items-center justify-center shadow-lg">
-                      <CustomVideoPlayer url={secureFileUrl} playing={true} />
+                      <CustomVideoPlayer url={secureFileUrl} playing={true} course={previewMaterial} />
                     </div>
                   ) : previewMaterial.fileType === 'image' ? (
                     <div className="max-w-md mx-auto rounded-2xl overflow-hidden bg-white border p-3 flex items-center justify-center shadow-md">

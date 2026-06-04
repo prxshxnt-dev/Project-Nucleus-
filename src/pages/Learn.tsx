@@ -88,22 +88,45 @@ export default function Learn() {
     
     if (hasAccess) {
       setFetchingUrl(true);
-      if (selectedMaterial.url) {
-        setSecureUrl(selectedMaterial.url);
-        setFetchingUrl(false);
-      } else {
-        getDoc(doc(db, 'materials_secure', selectedMaterial.id)).then((d) => {
-          if (d.exists()) {
-            setSecureUrl(d.data().url);
+      getDoc(doc(db, 'materials_secure', selectedMaterial.id)).then((d) => {
+        if (d.exists() && d.data().url) {
+          setSecureUrl(d.data().url);
+          setFetchingUrl(false);
+        } else {
+          // Fallback to live materials collection document
+          getDoc(doc(db, 'materials', selectedMaterial.id)).then((mSnap) => {
+            if (mSnap.exists()) {
+              const mData = mSnap.data();
+              setSecureUrl(mData.url || mData.fileUrl || '');
+            } else {
+              setSecureUrl('');
+            }
+          }).catch(err => {
+            console.error("Learn.tsx fallback fetch error:", err);
+            setSecureUrl(selectedMaterial.url || '');
+          }).finally(() => {
+            setFetchingUrl(false);
+          });
+        }
+      }).catch(err => {
+        console.error("Learn.tsx error fetching from materials_secure, trying backup:", err);
+        // Backup live fetch from main details
+        getDoc(doc(db, 'materials', selectedMaterial.id)).then((mSnap) => {
+          if (mSnap.exists()) {
+            const mData = mSnap.data();
+            setSecureUrl(mData.url || mData.fileUrl || '');
+          } else {
+            setSecureUrl(selectedMaterial.url || '');
           }
-        }).catch(err => {
-          handleFirestoreError(err, OperationType.GET, `materials_secure/${selectedMaterial.id}`);
+        }).catch(fallbackErr => {
+          console.error("Learn.tsx double fallback failure:", fallbackErr);
+          setSecureUrl(selectedMaterial.url || '');
         }).finally(() => {
           setFetchingUrl(false);
         });
-      }
+      });
     }
-  }, [selectedMaterial?.id, selectedMaterial?.url, user?.uid, user?.role, user?.unlockedMaterials?.join(',')]);
+  }, [selectedMaterial?.id, user?.uid, user?.role, user?.unlockedMaterials?.join(',')]);
 
   // Tracking study minutes when learning in the Learn page as well!
   useEffect(() => {
@@ -357,7 +380,7 @@ export default function Learn() {
                      <OrbitalLoader size="md" text="Securing academic URL streams..." />
                   </div>
                 ) : (activeMaterial.type === 'video' || activeMaterial.type === 'lecture') || ReactPlayer.canPlay(secureUrl || activeMaterial.url) ? (
-                  <CustomVideoPlayer url={secureUrl || activeMaterial.url} playing={!!selectedMaterial} />
+                  <CustomVideoPlayer url={secureUrl || activeMaterial.url} playing={!!selectedMaterial} course={activeMaterial} />
                 ) : (
                   <SecurePdfViewer url={secureUrl || activeMaterial.url} title={activeMaterial.title} />
                 )}

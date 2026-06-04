@@ -111,7 +111,47 @@ export function parseDriveVideoUrl(url: string): string | null {
   return null;
 }
 
-export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomVideoPlayerProps) => {
+export function parseYouTubeVideoId(url: string): string | null {
+  if (!url) return null;
+  const clean = url.trim();
+
+  // 1. YouTube Shorts Match (e.g. /shorts/VIDEO_ID)
+  const shortsMatch = clean.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (shortsMatch && shortsMatch[1]) {
+    return shortsMatch[1];
+  }
+
+  // 2. Standard regex for watch and embed patterns
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = clean.match(regExp);
+  if (match && match[2] && match[2].length === 11) {
+    return match[2];
+  }
+
+  // 3. Fallback URL query parameters & paths
+  try {
+    const parsed = new URL(clean.startsWith('http') ? clean : 'https://' + clean);
+    const vParam = parsed.searchParams.get('v');
+    if (vParam && vParam.length === 11) return vParam;
+    
+    const paths = parsed.pathname.split('/');
+    for (const segment of paths) {
+      if (segment.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(segment)) {
+        if (segment !== 'watch' && segment !== 'embed' && segment !== 'shorts') {
+          return segment;
+        }
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+interface CustomVideoPlayerPropsExtended extends CustomVideoPlayerProps {
+  course?: any;
+}
+
+export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }: CustomVideoPlayerPropsExtended) => {
   const { user } = useAuthStore();
   const { settings } = useSettingsStore();
 
@@ -123,8 +163,14 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [hasError, setHasError] = useState(false);
   
   const [watermarkPos, setWatermarkPos] = useState({ top: '30%', left: '20%' });
+
+  // Reset error on URL changes
+  useEffect(() => {
+    setHasError(false);
+  }, [url]);
 
   const playerRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -361,8 +407,85 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
     }
   };
 
+  const youtubeId = parseYouTubeVideoId(url);
   const vdoData = parseVdoCipher(url);
   const drivePreviewUrl = parseDriveVideoUrl(url);
+
+  // Requirement 9: Debugging System logs
+  console.log("Course Data:", course || null);
+  console.log("Video URL:", url || "");
+  console.log("Video ID:", youtubeId || null);
+  console.log("Embed URL:", youtubeId ? `https://www.youtube.com/embed/${youtubeId}?controls=1&rel=0&modestbranding=1` : null);
+
+  // Requirement 8: Fallback Unavailable Video UI
+  if (hasError || !url || (!youtubeId && !vdoData && !drivePreviewUrl && !url.includes('.mp4'))) {
+    console.warn("Attempted to render unparseable or broken video stream. Activating admin fallback screen. Input url:", url);
+    return (
+      <div className="relative w-full aspect-video bg-zinc-950 flex flex-col items-center justify-center p-6 text-center border border-white/5 rounded-xl shadow-[0_0_40px_rgba(239,68,68,0.05)]">
+        <AlertCircle className="w-12 h-12 text-amber-500 mb-3" />
+        <h3 className="text-white font-medium text-base mb-1">This video is currently unavailable.</h3>
+        <p className="text-zinc-500 text-xs max-w-sm">Please contact the administrator.</p>
+      </div>
+    );
+  }
+
+  // Requirement 3 & 4: Proper YouTube Embedded Player
+  if (youtubeId) {
+    const embedUrl = `https://www.youtube.com/embed/${youtubeId}?autoplay=${playing ? 1 : 0}&controls=1&rel=0&modestbranding=1&cc_load_policy=1`;
+    return (
+      <div 
+        ref={playerContainerRef} 
+        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+        onContextMenu={(e) => { e.preventDefault(); }}
+      >
+        {/* Dynamic Moving Security Watermark */}
+        {settings.secVideoWatermarkEnabled !== false && user && (
+          <motion.div
+            animate={{
+              top: watermarkPos.top,
+              left: watermarkPos.left
+            }}
+            transition={{
+              type: 'tween',
+              duration: 1.8,
+              ease: 'easeInOut'
+            }}
+            style={{
+              position: 'absolute',
+              fontSize: `${settings.secWatermarkSize || 12}px`,
+              opacity: settings.secWatermarkOpacity !== undefined ? settings.secWatermarkOpacity : 0.35,
+              color: 'rgba(255,255,255,0.85)',
+              textShadow: '1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9)',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(0,0,0,0.2)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              pointerEvents: 'none',
+              zIndex: 40,
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {getWatermarkText()}
+          </motion.div>
+        )}
+
+        <iframe
+          key={youtubeId}
+          src={embedUrl}
+          style={{
+            height: '100%',
+            width: '100%',
+            border: '0',
+          }}
+          className="w-full aspect-video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+          loading="lazy"
+        />
+      </div>
+    );
+  }
 
   if (vdoData) {
     return (
@@ -404,6 +527,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
         )}
 
         <iframe
+          key={`${vdoData.otp}-${vdoData.playbackInfo}`}
           src={`https://player.vdocipher.com/v2/?otp=${vdoData.otp}&playbackInfo=${vdoData.playbackInfo}`}
           style={{
             height: '100%',
@@ -413,7 +537,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
           className="w-full aspect-video"
           allow="encrypted-media"
           allowFullScreen
-          referrerPolicy="no-referrer"
+          loading="lazy"
         />
       </div>
     );
@@ -459,6 +583,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
         )}
 
         <iframe
+          key={drivePreviewUrl}
           src={drivePreviewUrl}
           style={{
             height: '100%',
@@ -468,7 +593,6 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
           className="w-full aspect-video"
           allow="autoplay; encrypted-media"
           allowFullScreen
-          referrerPolicy="no-referrer"
         />
       </div>
     );
@@ -529,6 +653,10 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true }: CustomV
             volume={volume}
             muted={muted}
             playsInline
+            onError={(err: any) => {
+              console.error("ReactPlayerComponent has failed to load the given URL stream:", err);
+              setHasError(true);
+            }}
             onProgress={(state: any) => {
               setPlayed(state.played);
               setLoaded(state.loaded);

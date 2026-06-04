@@ -35,6 +35,7 @@ import {
 } from "../store/settingsStore";
 import { SyllabusRenderer, getDefaultSyllabus } from "../components/SyllabusRenderer";
 import { ContentManagement } from "../components/ContentManagement";
+import { parseYouTubeVideoId } from "../components/CustomVideoPlayer";
 
 const PRESET_INFO: Record<
   string,
@@ -1205,11 +1206,31 @@ export default function AdminDashboard() {
     try {
       const cls = classesList.find(c => c.id === mClassId);
       const isVideo = mType === "lecture" || mMaterialType === "video_lectures";
+      
+      let finalUrl = mUrl;
+      let extractedVideoId = "";
+
+      if (isVideo) {
+        const isYouTubeUrl = mUrl.includes("youtube.com") || mUrl.includes("youtu.be") || mUrl.includes("shorts/");
+        const youtubeId = parseYouTubeVideoId(mUrl);
+        
+        if (isYouTubeUrl && !youtubeId) {
+          showToast("Invalid YouTube URL! We could not parse a valid 11-digit Video ID.", true);
+          return;
+        }
+        
+        if (youtubeId) {
+          finalUrl = `https://www.youtube.com/embed/${youtubeId}`;
+          extractedVideoId = youtubeId;
+        }
+      }
+
       const data = {
         title: mTitle,
         description: mDesc,
-        url: mUrl,
-        fileUrl: mUrl,
+        url: finalUrl,
+        fileUrl: finalUrl,
+        videoId: extractedVideoId,
         type: mType,
         fileType: isVideo ? "video" : "pdf",
         materialType: mMaterialType,
@@ -1224,12 +1245,19 @@ export default function AdminDashboard() {
         createdAt: serverTimestamp()
       };
 
+      let matId = mEditingId;
+
       if (mEditingId) {
         await updateDoc(doc(db, "materials", mEditingId), data);
         showToast("Content file record in directory updated.");
       } else {
-        await addDoc(collection(db, "materials"), data);
+        const docRef = await addDoc(collection(db, "materials"), data);
+        matId = docRef.id;
         showToast("Published file successfully to folder directory!");
+      }
+
+      if (finalUrl && matId) {
+        await setDoc(doc(db, "materials_secure", matId), { url: finalUrl });
       }
 
       setMEditingId(null);
@@ -1874,11 +1902,33 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!user) return;
     try {
+      const isVideo = type === "lecture";
+      let finalUrl = url;
+      let extractedVideoId = "";
+
+      if (isVideo) {
+        const isYouTubeUrl = url.includes("youtube.com") || url.includes("youtu.be") || url.includes("shorts/");
+        const youtubeId = parseYouTubeVideoId(url);
+        
+        if (isYouTubeUrl && !youtubeId) {
+          showToast("Invalid YouTube URL! We could not parse a valid 11-digit Video ID.", true);
+          return;
+        }
+        
+        if (youtubeId) {
+          finalUrl = `https://www.youtube.com/embed/${youtubeId}`;
+          extractedVideoId = youtubeId;
+        }
+      }
+
       if (editingMaterialId) {
         await updateDoc(doc(db, "materials", editingMaterialId), {
           title,
           description: desc,
           type,
+          url: finalUrl,
+          fileUrl: finalUrl,
+          videoId: extractedVideoId,
           thumbnailUrl,
           requiredPlan: plan,
           classGroup,
@@ -1886,13 +1936,16 @@ export default function AdminDashboard() {
           isHidden: isHidden || false,
           updatedAt: serverTimestamp(),
         });
-        await setDoc(doc(db, "materials_secure", editingMaterialId), { url });
+        await setDoc(doc(db, "materials_secure", editingMaterialId), { url: finalUrl });
         setEditingMaterialId(null);
       } else {
         const docRef = await addDoc(collection(db, "materials"), {
           title,
           description: desc,
           type,
+          url: finalUrl,
+          fileUrl: finalUrl,
+          videoId: extractedVideoId,
           thumbnailUrl,
           requiredPlan: plan,
           classGroup,
@@ -1902,7 +1955,7 @@ export default function AdminDashboard() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
-        await setDoc(doc(db, "materials_secure", docRef.id), { url });
+        await setDoc(doc(db, "materials_secure", docRef.id), { url: finalUrl });
       }
 
       setTitle("");
@@ -5173,6 +5226,9 @@ export default function AdminDashboard() {
             {/* Violation logs sidebar */}
             <div className="space-y-6">
               
+              {/* YOUTUBE DRM SYSTEM AUTO-REPAIR ASSISTANT */}
+              <YoutubeDiagnosticConsole />
+              
               {/* NATIVE INTEGRATED DRM SIMULATION SUITE */}
               <DrmSimulatorDashboard />
 
@@ -6160,6 +6216,45 @@ export default function AdminDashboard() {
                           onChange={(e) => setMUrl(e.target.value)}
                           className="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary"
                         />
+                        
+                        {(mType === "lecture" || mMaterialType === "video_lectures") && mUrl.trim() && (
+                          <div className="mt-2.5 space-y-2 text-left">
+                            {(() => {
+                              const isYouTube = mUrl.includes("youtube.com") || mUrl.includes("youtu.be") || mUrl.includes("shorts/");
+                              const parsedId = parseYouTubeVideoId(mUrl);
+                              if (isYouTube) {
+                                if (parsedId) {
+                                  return (
+                                    <div className="space-y-1.5 p-3 rounded-xl bg-green-500/5 border border-green-500/10 max-w-sm">
+                                      <span className="text-[10px] text-green-400 font-mono flex items-center gap-1 font-bold">
+                                        ● Valid YouTube Video ID: {parsedId}
+                                      </span>
+                                      <div className="border border-white/10 rounded-lg overflow-hidden aspect-video bg-black mt-1">
+                                        <iframe
+                                          src={`https://www.youtube.com/embed/${parsedId}?controls=1`}
+                                          className="w-full h-full"
+                                          allowFullScreen
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <span className="text-[10px] text-red-500 font-mono flex items-center gap-1 font-bold bg-red-500/5 border border-red-500/10 px-2.5 py-1.5 rounded-lg w-fit animate-pulse">
+                                      ⚠️ Invalid YouTube URL format: Unable to extract 11-character ID.
+                                    </span>
+                                  );
+                                }
+                              } else {
+                                return (
+                                  <span className="text-[10px] text-zinc-400 font-mono bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-lg block w-fit">
+                                    ℹ️ Non-YouTube link. Playback will use default direct controls.
+                                  </span>
+                                );
+                              }
+                            })()}
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -6285,6 +6380,45 @@ export default function AdminDashboard() {
                 onChange={(e) => setUrl(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
               />
+              
+              {type === "lecture" && url.trim() && (
+                <div className="mt-1 space-y-2 text-left">
+                  {(() => {
+                    const isYouTube = url.includes("youtube.com") || url.includes("youtu.be") || url.includes("shorts/");
+                    const parsedId = parseYouTubeVideoId(url);
+                    if (isYouTube) {
+                      if (parsedId) {
+                        return (
+                          <div className="space-y-1.5 p-3 rounded-xl bg-green-500/5 border border-green-500/10 max-w-sm">
+                            <span className="text-[10px] text-green-400 font-mono flex items-center gap-1 font-bold">
+                              ● Valid YouTube Video ID: {parsedId}
+                            </span>
+                            <div className="border border-white/10 rounded-lg overflow-hidden aspect-video bg-black mt-1">
+                              <iframe
+                                src={`https://www.youtube.com/embed/${parsedId}?controls=1`}
+                                className="w-full h-full"
+                                allowFullScreen
+                              />
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <span className="text-[10px] text-red-500 font-mono flex items-center gap-1 font-bold bg-red-500/5 border border-red-500/10 px-2.5 py-1.5 rounded-lg w-fit animate-pulse">
+                            ⚠️ Invalid YouTube URL format: Unable to extract 11-character ID.
+                          </span>
+                        );
+                      }
+                    } else {
+                      return (
+                        <span className="text-[10px] text-zinc-400 font-mono bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-lg block w-fit">
+                          ℹ️ Non-YouTube link. Playback will use default direct controls.
+                        </span>
+                      );
+                    }
+                  })()}
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="w-full sm:w-1/2">
                   <input
@@ -7197,6 +7331,181 @@ function ApiGatewayTelemetryConsole() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function YoutubeDiagnosticConsole() {
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState<{
+    totalVideos: number;
+    faultyVideos: number;
+    faultyList: { id: string; title: string; url: string; videoId?: string; isSecureSyncMissing: boolean }[];
+  } | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<string>("");
+
+  const runDiagnostics = async () => {
+    setLoading(true);
+    setRepairResult("");
+    try {
+      const mSnap = await getDocs(collection(db, "materials"));
+      const allMaterials = mSnap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      const vids = allMaterials.filter(m => m.type === "lecture" || m.fileType === "video" || m.materialType === "video_lectures");
+      
+      const faulty: { id: string; title: string; url: string; videoId?: string; isSecureSyncMissing: boolean }[] = [];
+      
+      for (const v of vids) {
+        const isYouTube = v.url && (v.url.includes("youtube.com") || v.url.includes("youtu.be") || v.url.includes("shorts/"));
+        const idFromUrl = parseYouTubeVideoId(v.url || "");
+        
+        const isNotEmbed = isYouTube && idFromUrl && !v.url.includes("/embed/");
+        const isVideoIdMissing = isYouTube && idFromUrl && !v.videoId;
+        
+        const secureSnap = await getDoc(doc(db, "materials_secure", v.id));
+        const isSecureSyncMissing = !secureSnap.exists() || !secureSnap.data()?.url;
+        
+        if (isNotEmbed || isVideoIdMissing || isSecureSyncMissing) {
+          faulty.push({
+            id: v.id,
+            title: v.title,
+            url: v.url || "",
+            videoId: v.videoId || idFromUrl || undefined,
+            isSecureSyncMissing
+          });
+        }
+      }
+      
+      setReport({
+        totalVideos: vids.length,
+        faultyVideos: faulty.length,
+        faultyList: faulty
+      });
+    } catch (err: any) {
+      console.error(err);
+      alert("Diagnostics failed: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const executeRepair = async () => {
+    if (!report || report.faultyVideos === 0) return;
+    setRepairing(true);
+    setRepairResult("");
+    try {
+      let repairCount = 0;
+      for (const item of report.faultyList) {
+        const parsedId = parseYouTubeVideoId(item.url);
+        if (parsedId) {
+          const embedUrl = `https://www.youtube.com/embed/${parsedId}`;
+          await updateDoc(doc(db, "materials", item.id), {
+            url: embedUrl,
+            fileUrl: embedUrl,
+            videoId: parsedId,
+            fileType: "video",
+          });
+          
+          await setDoc(doc(db, "materials_secure", item.id), { url: embedUrl });
+          repairCount++;
+        } else {
+          if (item.url && item.isSecureSyncMissing) {
+            await setDoc(doc(db, "materials_secure", item.id), { url: item.url });
+            repairCount++;
+          }
+        }
+      }
+      setRepairResult(`Successfully repaired and authorized ${repairCount} legacy educational videos!`);
+      await runDiagnostics();
+    } catch (err: any) {
+      console.error(err);
+      setRepairResult("Repair encountered an error: " + err.message);
+    } finally {
+      setRepairing(false);
+    }
+  };
+
+  return (
+    <div className="border border-red-500/30 rounded-2xl bg-red-950/20 p-5 space-y-4 text-left">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-bold text-red-100 tracking-wider flex items-center gap-1.5 font-mono uppercase">
+          <span>🛠️ YouTube System Auto-Repair Assistant</span>
+        </h4>
+        <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 font-mono text-[8px] font-bold uppercase tracking-widest">DRM Auditor</span>
+      </div>
+      
+      <p className="text-[10px] text-zinc-400 leading-relaxed font-sans mt-1">
+        Analyze all course video folders to verify URL embedding formats, isolate missing indices, detect non-migrated secure streams, and secure legacy materials database records dynamically in a single tap.
+      </p>
+
+      {!report && (
+        <button
+          type="button"
+          onClick={runDiagnostics}
+          disabled={loading}
+          className="w-full text-center py-2 bg-red-900/40 hover:bg-red-900/60 text-red-200 border border-red-500/20 rounded-xl text-xs font-bold cursor-pointer transition-all uppercase tracking-wider font-mono animate-pulse"
+        >
+          {loading ? "Scanning core directories..." : "Scan Video Playback Ecosystem"}
+        </button>
+      )}
+
+      {report && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-[11px]">
+            <div>
+              <span className="text-zinc-500 block uppercase text-[8px]">Examined Videos</span>
+              <span className="text-white font-bold">{report.totalVideos}</span>
+            </div>
+            <div>
+              <span className="text-zinc-500 block uppercase text-[8px]">Anomalies Found</span>
+              <span className={`font-bold ${report.faultyVideos > 0 ? 'text-red-400 animate-pulse' : 'text-green-400'}`}>
+                {report.faultyVideos}
+              </span>
+            </div>
+          </div>
+
+          {report.faultyVideos > 0 ? (
+            <div className="space-y-3">
+              <div className="max-h-[160px] overflow-y-auto space-y-2 border border-white/5 rounded-xl p-2.5 bg-black/20">
+                {report.faultyList.map(item => (
+                  <div key={item.id} className="text-[11px] font-mono p-2 rounded bg-white/5 hover:bg-white/10 transition-colors">
+                    <span className="text-white block truncate font-sans font-bold">{item.title}</span>
+                    <span className="text-red-400 text-[10px] block truncate mt-1">Fault: Legacy Format / Missing DRM Link</span>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={executeRepair}
+                disabled={repairing}
+                className="w-full text-center py-2.5 bg-[var(--primary-custom,#F15A29)] hover:brightness-110 text-white rounded-xl text-xs font-bold cursor-pointer transition-all uppercase tracking-widest shadow-md"
+              >
+                {repairing ? "Executing repair routine..." : "Instant Safe Repair Ecosystem"}
+              </button>
+            </div>
+          ) : (
+            <div className="p-3 bg-green-500/5 border border-green-500/10 text-green-400 rounded-xl text-xs font-sans flex items-center gap-2">
+              <span>✓ All video links verified! URLs are embedded, video IDs correspond, and DRM structures are completely synchronized.</span>
+            </div>
+          )}
+
+          {repairResult && (
+            <div className="p-3 bg-blue-500/5 border border-blue-500/10 text-blue-400 rounded-xl text-[11px] font-mono text-left animate-fade-in uppercase">
+              {repairResult}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={runDiagnostics}
+            className="text-center w-full text-zinc-500 hover:text-zinc-300 text-[10px] uppercase font-mono tracking-wider pt-1 block"
+          >
+            Re-scan Database Status
+          </button>
+        </div>
+      )}
     </div>
   );
 }

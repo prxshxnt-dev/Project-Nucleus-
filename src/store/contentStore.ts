@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  setDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
@@ -298,12 +299,15 @@ export const useContentStore = create<ContentState>((set, get) => ({
   addMaterial: async (material) => {
     const path = "materials";
     try {
-      await addDoc(collection(db, path), {
+      const docRef = await addDoc(collection(db, path), {
         ...material,
         downloadCount: 0,
         bookmarks: [],
         createdAt: serverTimestamp(),
       });
+      if (material.url) {
+        await setDoc(doc(db, "materials_secure", docRef.id), { url: material.url });
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, path);
     }
@@ -313,6 +317,9 @@ export const useContentStore = create<ContentState>((set, get) => ({
     const path = `materials/${id}`;
     try {
       await updateDoc(doc(db, "materials", id), material);
+      if (material.url) {
+        await setDoc(doc(db, "materials_secure", id), { url: material.url });
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
     }
@@ -322,6 +329,7 @@ export const useContentStore = create<ContentState>((set, get) => ({
     const path = `materials/${id}`;
     try {
       await deleteDoc(doc(db, "materials", id));
+      await deleteDoc(doc(db, "materials_secure", id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, path);
     }
