@@ -61,6 +61,7 @@ import SecurePdfViewer from '../components/SecurePdfViewer';
 import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
 import { FloatingStickers } from '../components/FloatingStickers';
 import OrbitalLoader from '../components/OrbitalLoader';
+import QuickNoteButton from '../components/QuickNoteButton';
 
 // Define TS Types matches firebase-blueprint.json
 interface ClassItem {
@@ -1534,6 +1535,16 @@ export default function Library() {
               </div>
             </div>
           </div>
+          
+          {/* Quick mind note floating trigger */}
+          {user && secureFileUrl && (
+            <QuickNoteButton
+              materialId={previewMaterial.id}
+              materialTitle={previewMaterial.title}
+              userId={user.uid}
+              userEmail={user.email || ''}
+            />
+          )}
         </div>
       )}
 

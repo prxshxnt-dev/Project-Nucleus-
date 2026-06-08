@@ -215,17 +215,66 @@ async function startServer() {
   // ==========================================
   //     SECURE EMAIL OTP AUTH SYSTEM
   // ==========================================
-  const SMTP_USER = process.env.SMTP_USER || "";
-  const SMTP_PASS = process.env.SMTP_PASS || "";
   const JWT_SECRET = process.env.JWT_SECRET || "nucleus_cc_auth_jwt_super_secret_key_987!";
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-  });
+  let smtpConfig = {
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: process.env.SMTP_SECURE === "true", // Default false for 587, true for 465
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || ""
+  };
+
+  // If port is 465, direct secure SSL is typically true
+  if (process.env.SMTP_PORT === "465" && !process.env.SMTP_SECURE) {
+    smtpConfig.secure = true;
+  } else if (process.env.SMTP_PORT === "587" && !process.env.SMTP_SECURE) {
+    smtpConfig.secure = false;
+  }
+
+  // Load SMTP from Firestore dynamically
+  const syncSmtpFromDb = async () => {
+    if (db) {
+       try {
+         const smtpDoc = await db.collection("settings").doc("smtp_config").get();
+         if (smtpDoc.exists) {
+           const data = smtpDoc.data();
+           if (data) {
+             if (data.host) smtpConfig.host = data.host;
+             if (data.port) smtpConfig.port = parseInt(data.port);
+             if (data.secure !== undefined) smtpConfig.secure = data.secure === true;
+             if (data.user) smtpConfig.user = data.user;
+             if (data.pass) smtpConfig.pass = data.pass;
+             console.log("Successfully synchronized active SMTP settings from settings/smtp_config document in firestore.");
+           }
+         }
+       } catch (err) {
+         console.warn("Dynamic SMTP settings load bypassed:", err instanceof Error ? err.message : err);
+       }
+    }
+  };
+
+  // Seed configuration immediately during server setup
+  await syncSmtpFromDb();
+
+  // Helper helper to get current active transporter
+  const getTransporter = () => {
+    if (!smtpConfig.user || !smtpConfig.pass) {
+      return null;
+    }
+    return nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      secure: smtpConfig.secure,
+      auth: {
+        user: smtpConfig.user,
+        pass: smtpConfig.pass,
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+  };
 
   // Local backups to prevent disruptions
   const fallbackOtps = new Map<string, { otp: string; expiresAt: number; type: string; lastSentAt: number }>();
@@ -281,6 +330,24 @@ async function startServer() {
     }
     return false;
   };
+
+  // Endpoint: Sync SMTP Config from Firestore on request
+  app.post("/api/auth/smtp-config-sync", async (req, res) => {
+    try {
+      const { host, port, secure, user, pass } = req.body;
+      if (host) smtpConfig.host = host.trim();
+      if (port) smtpConfig.port = parseInt(port);
+      if (secure !== undefined) smtpConfig.secure = secure === true;
+      if (user) smtpConfig.user = user.trim();
+      if (pass) smtpConfig.pass = pass.trim();
+
+      console.log(`[SMTP CONFIG SYNC] Active transporter configuration refreshed via Admin request. Active User: ${smtpConfig.user}`);
+      return res.json({ success: true, message: "Server-side SMTP configuration successfully synchronized." });
+    } catch (err: any) {
+      console.error("Failed to sync SMTP:", err);
+      return res.status(500).json({ error: err?.message || "Internal sync failure." });
+    }
+  });
 
   // Endpoint: Send OTP (OTP strictly delivered via Email)
   app.post("/api/auth/send-otp", async (req, res) => {
@@ -374,10 +441,11 @@ async function startServer() {
       let emailSent = false;
       let reason = "";
 
-      if (SMTP_USER && SMTP_PASS) {
+      const activeTransporter = getTransporter();
+      if (activeTransporter) {
         try {
           const mailOptions = {
-            from: `"Nucleus.CC" <${SMTP_USER}>`,
+            from: `"Nucleus.CC" <${smtpConfig.user}>`,
             to: emailClean,
             subject: `📚 Nucleus.CC Verification Code - ${otp}`,
             html: `
@@ -400,7 +468,7 @@ async function startServer() {
               </div>
             `
           };
-          await transporter.sendMail(mailOptions);
+          await activeTransporter.sendMail(mailOptions);
           emailSent = true;
           console.log(`Email OTP successfully sent to ${emailClean}`);
         } catch (mailErr: any) {
@@ -408,7 +476,7 @@ async function startServer() {
           reason = mailErr?.message || "SMTP server rejected transaction.";
         }
       } else {
-        reason = "SMTP credentials missing in env.";
+        reason = "SMTP credentials missing or unconfigured on workspace/database.";
       }
 
       // Always return simulated state as well (or backup details) so student can read from simulation mode instantly!
@@ -422,7 +490,7 @@ async function startServer() {
         email: emailClean,
         message: emailSent
           ? `A secure verification code has been dispatched to your email: ${obfuscatedEmail}`
-          : `[Simulation Mode] Verification OTP (${otp}) generated for email ${emailClean}.`
+          : `[Simulation Mode] Verification code generated! Check server console log or developer tools.`
       });
     } catch (err: any) {
       console.error("OTP Send error:", err);
@@ -736,10 +804,11 @@ async function startServer() {
       await storeOtpCode(emailClean, otp, "reset");
 
       let emailSent = false;
-      if (SMTP_USER && SMTP_PASS) {
+      const activeTransporter = getTransporter();
+      if (activeTransporter) {
         try {
           const mailOptions = {
-            from: `"Nucleus.CC Support" <${SMTP_USER}>`,
+            from: `"Nucleus.CC Support" <${smtpConfig.user}>`,
             to: emailClean,
             subject: `📚 Reset security credentials - Nucleus.CC`,
             html: `
@@ -755,7 +824,7 @@ async function startServer() {
               </div>
             `
           };
-          await transporter.sendMail(mailOptions);
+          await activeTransporter.sendMail(mailOptions);
           emailSent = true;
         } catch (mailErr) {
           console.error("Nodemailer Forgot Password SMTP failed:", mailErr);

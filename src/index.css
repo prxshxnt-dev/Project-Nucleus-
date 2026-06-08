@@ -211,33 +211,33 @@ html.lenis {
 :root {
   --font-sans-custom: "Inter", sans-serif;
   --font-display-custom: "Poppins", sans-serif;
-  --background-custom: #FAFAFC;
-  --foreground-custom: #0F172A;
-  --primary-custom: #4F46E5;
-  --primary-dark-custom: #3730A3;
-  --muted-custom: #6B7280;
+  --background-custom: #FDF5E6;
+  --foreground-custom: #1F1F1F;
+  --primary-custom: #F15A29;
+  --primary-dark-custom: #D4471B;
+  --muted-custom: #7A7A7A;
 
   /* Smart Contrast Variables Baseline Defaults */
-  --bg-primary: #FAFAFC;
-  --bg-secondary: #EEF2F6;
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
-  --accent-primary: #4F46E5;
-  --accent-contrast: #FFFFFF;
-  --border-color: rgba(15, 23, 42, 0.08);
-  --card-bg: rgba(255, 255, 255, 0.82);
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --button-text: #FFFFFF;
-  --navbar-text: #0F172A;
+  --bg-primary: #FDF5E6;
+  --bg-secondary: #F5EBD6;
+  --text-primary: #1F1F1F;
+  --text-secondary: #4A4A4A;
+  --text-muted: #7A7A7A;
+  --accent-primary: #F15A29;
+  --accent-contrast: #FDF5E6;
+  --border-color: rgba(31, 31, 31, 0.08);
+  --card-bg: rgba(255, 253, 249, 0.9);
+  --glass-bg: rgba(255, 253, 249, 0.85);
+  --button-text: #FDF5E6;
+  --navbar-text: #1F1F1F;
 
   --theme-btn-radius: 12px;
   --theme-card-radius: 20px;
-  --theme-card-border: rgba(15, 23, 42, 0.06);
+  --theme-card-border: rgba(31, 31, 31, 0.06);
   --theme-card-blur: blur(12px);
   --theme-anim-intensity: 1;
-  --theme-accent-glow: #4F46E5;
-  --theme-shadow-glow: 0 4px 20px rgba(79, 70, 229, 0.08);
+  --theme-accent-glow: #F15A29;
+  --theme-shadow-glow: 0 4px 20px rgba(241, 90, 41, 0.08);
 }
 
 .theme-btn-themed {

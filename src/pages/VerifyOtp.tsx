@@ -116,21 +116,24 @@ export default function VerifyOtp() {
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pasteData = e.clipboardData.getData('text').trim();
-    if (!/^\d+$/.test(pasteData)) {
-      toast.error('Please paste only numeric digits.');
+    
+    // Automatically strip any non-digit characters like spaces, letters, or hyphens
+    const cleanedDigits = pasteData.replace(/\D/g, '');
+    if (cleanedDigits.length === 0) {
+      toast.error('Could not find any numeric digits in the pasted text.');
       return;
     }
-    const digits = pasteData.slice(0, 6).split('');
+    
+    const digits = cleanedDigits.slice(0, 6).split('');
     const newOtp = [...otp];
     for (let i = 0; i < 6; i++) {
-      if (digits[i]) {
-        newOtp[i] = digits[i];
-      }
+      newOtp[i] = digits[i] || '';
     }
     setOtp(newOtp);
-    // Focus last filled input or next available
+    // Focus the last filled input box
     const focusIndex = Math.min(digits.length - 1, 5);
     inputRefs.current[focusIndex]?.focus();
+    toast.success(`Successfully pasted ${digits.length}-digit code!`);
   };
 
   // Handle Box Backspace / Navigation keys
@@ -304,13 +307,13 @@ export default function VerifyOtp() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md p-8 bg-[#FFFDF9] rounded-3xl border border-black/10 shadow-xl text-[#1F1F1F]"
       >
-        {/* Back Link */}
+        {/* Back Link / Change Email */}
         <button 
           onClick={() => navigate(state?.type === 'register' ? '/signup' : '/login')}
-          className="inline-flex items-center gap-1 text-sm font-bold text-[#7A7A7A] hover:text-primary mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-primary hover:text-[#D4471B] mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
+          <span>Change Email Address / Start Over</span>
         </button>
 
         {/* Header */}
@@ -326,8 +329,7 @@ export default function VerifyOtp() {
           </p>
         </div>
 
-        {/* Sandbox Instruction Simulator Badge removed for clean client design */}
-
+        {/* Verification Form */}
         <form onSubmit={handleVerify} className="space-y-6">
           {/* OTP Number Boxes Input Row */}
           <div className="flex justify-between gap-2 max-w-xs mx-auto">

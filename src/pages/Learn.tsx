@@ -13,6 +13,7 @@ import SecurePdfViewer from '../components/SecurePdfViewer';
 import { FloatingStickers } from '../components/FloatingStickers';
 import { SyllabusRenderer, getDefaultSyllabus } from '../components/SyllabusRenderer';
 import OrbitalLoader from '../components/OrbitalLoader';
+import QuickNoteButton from '../components/QuickNoteButton';
 
 const planTiers = {
   free: 0,
@@ -385,6 +386,16 @@ export default function Learn() {
                   <SecurePdfViewer url={secureUrl || activeMaterial.url} title={activeMaterial.title} />
                 )}
               </div>
+
+              {/* Float Quick Note button if student has valid unlocks/access */}
+              {user && (user?.unlockedMaterials?.includes(activeMaterial.id) || user?.role === 'admin' || user?.role === 'superadmin') && (
+                <QuickNoteButton 
+                  materialId={activeMaterial.id} 
+                  materialTitle={activeMaterial.title}
+                  userId={user.uid}
+                  userEmail={user.email || ''}
+                />
+              )}
             </div>
           )}
         </DialogContent>

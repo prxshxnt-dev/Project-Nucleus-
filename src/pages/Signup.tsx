@@ -12,11 +12,13 @@ import {
   GraduationCap, 
   BookOpen, 
   ShieldCheck, 
-  Chrome 
+  Chrome,
+  RefreshCw
 } from 'lucide-react';
-import { signInWithGoogle, auth } from '../lib/firebase';
+import { signInWithGoogle } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
+import FloatingLabelInput from '../components/FloatingLabelInput';
 
 export default function Signup() {
   const { user, loading } = useAuthStore();
@@ -34,7 +36,11 @@ export default function Signup() {
   // Auto-redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard', { replace: true });
+      if (user.role === 'admin' || user.role === 'superadmin') {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
   }, [user, loading, navigate]);
 
@@ -68,6 +74,22 @@ export default function Signup() {
     return true;
   };
 
+  const getPasswordStrength = (pass: string) => {
+    if (!pass) return { label: '', color: 'bg-transparent', width: 'w-0' };
+    let score = 0;
+    if (pass.length >= 6) score += 1;
+    if (pass.length >= 8) score += 1;
+    if (/[A-Z]/.test(pass)) score += 1;
+    if (/[0-9]/.test(pass)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+
+    if (score <= 1) return { label: 'Weak Account Security', color: 'bg-red-500', width: 'w-1/3' };
+    if (score <= 3) return { label: 'Medium Account Security', color: 'bg-amber-500', width: 'w-2/3' };
+    return { label: 'Strong Account Security', color: 'bg-green-500', width: 'w-full' };
+  };
+
+  const strength = getPasswordStrength(password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
@@ -89,20 +111,20 @@ export default function Signup() {
         throw new Error(data.error || 'Failed to dispatch verification security code.');
       }
 
-      toast.success(data.message || 'OTP sent successfully!');
+      toast.success(data.message || 'Verification PIN sent successfully!');
       
-      // Navigate to OTP verification page and pass the registration state
-      navigate('/verify-otp', { 
-        state: { 
+      // Cleanly navigate to separate verify standalone screen
+      navigate('/verify-otp', {
+        state: {
           email: email.toLowerCase().trim(),
           phone: phone.trim(),
           name: name.trim(),
-          password,
-          classGroup,
+          password: password,
+          classGroup: classGroup,
           type: 'register',
-          simulated: data.simulated,
-          simulatedOtp: data.otp
-        } 
+          simulated: !!data.simulated,
+          simulatedOtp: data.otp || null
+        }
       });
     } catch (err: any) {
       const errMsg = err.message || '';
@@ -120,10 +142,18 @@ export default function Signup() {
           }
         });
       } else {
-        toast.error(errMsg || 'An error occurred. Please try again.');
+        toast.error(errMsg || 'An error occurred during registration. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      toast.error(err.message || 'Google signup connection failed.');
     }
   };
 
@@ -142,129 +172,126 @@ export default function Signup() {
             <span>Nucleus.CC Coaching Centre</span>
           </div>
           <h2 className="font-display font-extrabold text-3xl text-[#1F1F1F]">Create Account</h2>
-          <p className="text-[#7A7A7A] text-sm mt-1">Managed by Academic experts (IITians & Doctors)</p>
+          <p className="text-[#7A7A7A] text-sm mt-1">Managed & taught by elite IITians and Doctors</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Name Field */}
-          <div className="relative">
-            <label className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider block mb-1.5 ml-1">Full Name</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
-                <User className="w-5 h-5" />
-              </span>
-              <input 
-                type="text" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Prashant Kumar"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-              />
-            </div>
-          </div>
+          <FloatingLabelInput
+            label="Full Name"
+            icon={<User className="w-5 h-5" />}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            id="register-name-field"
+          />
 
           {/* Email Field */}
-          <div className="relative">
-            <label className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider block mb-1.5 ml-1">Email Address</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
-                <Mail className="w-5 h-5" />
-              </span>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="student@nucleus.cc"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-              />
-            </div>
-          </div>
+          <FloatingLabelInput
+            label="Email Address"
+            icon={<Mail className="w-5 h-5" />}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            id="register-email-field"
+          />
 
           {/* Phone Field */}
-          <div className="relative">
-            <label className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider block mb-1.5 ml-1">Mobile Phone Number</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
-                <Smartphone className="w-5 h-5" />
-              </span>
-              <input 
-                type="tel" 
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-              />
-            </div>
-          </div>
+          <FloatingLabelInput
+            label="Mobile Phone Number"
+            icon={<Smartphone className="w-5 h-5" />}
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            id="register-phone-field"
+          />
 
           {/* Password Field */}
           <div className="relative">
-            <label className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider block mb-1.5 ml-1">Password</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
-                <Lock className="w-5 h-5" />
-              </span>
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                className="w-full pl-12 pr-12 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-              />
-              <button 
-                type="button" 
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7A7A7A] hover:text-[#1F1F1F] transition-colors"
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-            </div>
+            <FloatingLabelInput
+              label="Password Security Key"
+              icon={<Lock className="w-5 h-5" />}
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              id="register-password-field"
+            />
+            <button 
+              type="button" 
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 mt-1 text-[#7A7A7A] hover:text-[#1F1F1F] transition-all"
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
           </div>
 
-          {/* Target Prep Batch / Class Group */}
+          {/* Real-time Password Strength feedback bar */}
+          {password && (
+            <div className="px-1 space-y-1.5 animate-fadeIn">
+              <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
+                <span className="text-[#7A7A7A]">Password Strength</span>
+                <span className={strength.label.includes('Strong') ? 'text-green-600' : strength.label.includes('Medium') ? 'text-amber-600' : 'text-red-500'}>
+                  {strength.label}
+                </span>
+              </div>
+              <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden">
+                <div className={`h-full ${strength.color} ${strength.width} transition-all duration-500 ease-in-out`} />
+              </div>
+            </div>
+          )}
+
+          {/* Target prep segment */}
           <div>
             <label className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider block mb-1.5 ml-1">Target Academic Segment</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A] pointer-events-none">
                 <GraduationCap className="w-5 h-5" />
               </span>
               <select 
                 value={classGroup}
                 onChange={(e) => setClassGroup(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium"
+                className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium cursor-pointer"
               >
                 <option value="6">Class 6th Foundation</option>
                 <option value="7">Class 7th Foundation</option>
                 <option value="8">Class 8th Foundation</option>
                 <option value="9">Class 9th Foundation</option>
                 <option value="10">Class 10th Foundation</option>
-                <option value="11">Class 11th (JEE / NEET Main prep)</option>
-                <option value="12">Class 12th Board & Competitive</option>
+                <option value="11 font-bold text-primary">Class 11th (JEE / NEET Main prep)</option>
+                <option value="12">Class 12th Board & Competitive Focus</option>
                 <option value="dropper">Droppers Batch (Repeaters Focus)</option>
               </select>
             </div>
           </div>
 
-          {/* Guidelines info */}
+          {/* Guard Statement */}
           <div className="p-3.5 bg-primary/5 rounded-2xl border border-primary/10 flex gap-2 w-full text-xs text-[#1F1F1F]/80">
             <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <p>We respect your privacy. A 6-digit OTP verification code will be sent instantly to verify your email address.</p>
+            <p>A 6-digit verification code will be sent instantly to confirm your student email account.</p>
           </div>
 
-          {/* Register Button */}
+          {/* Submit Action CTA */}
           <motion.button 
             type="submit" 
             disabled={isSubmitting}
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
-            className={`w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-primary-dark transition-all duration-200 shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`w-full py-4 bg-primary text-[#FDF5E6] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            <span>{isSubmitting ? 'Sending Verification Code...' : 'Register & Send Verification Code'}</span>
-            {!isSubmitting && <ArrowRight className="w-5 h-5" />}
+            {isSubmitting ? (
+              <>
+                <RefreshCw className="w-5 h-5 animate-spin" />
+                <span>Sending Verification...</span>
+              </>
+            ) : (
+              <>
+                <span>Register & Send Verification Code</span>
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
           </motion.button>
         </form>
 
@@ -275,9 +302,9 @@ export default function Signup() {
           <div className="flex-grow border-t border-black/10"></div>
         </div>
 
-        {/* Google Register */}
+        {/* Google Registration trigger */}
         <motion.button 
-          onClick={() => signInWithGoogle()}
+          onClick={handleGoogleRegister}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           className="w-full py-3 px-4 bg-transparent hover:bg-black/5 border border-black/10 rounded-2xl text-[#1F1F1F] font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer"
@@ -286,13 +313,17 @@ export default function Signup() {
           <span>Register with Google Portal</span>
         </motion.button>
 
-        {/* Navigation back */}
+        {/* Back navigation */}
         <p className="text-center text-sm text-[#7A7A7A] mt-6">
-          Already part of Nucleus?{' '}
+          Already registered?{' '}
           <Link to="/login" className="text-primary font-bold hover:underline">
             Log In here
           </Link>
         </p>
+
+        <div className="text-center mt-6 text-[10px] text-[#7A7A7A]">
+          © 2026 Nucleus.CC (Coaching Centre managed by IITians and Doctors)
+        </div>
       </motion.div>
     </div>
   );

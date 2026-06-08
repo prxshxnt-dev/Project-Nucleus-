@@ -118,6 +118,26 @@ service cloud.firestore {
         && data.deviceInfo is map;
     }
 
+    function isValidNote(data) {
+      return data.userId is string && data.userId.size() <= 128 && data.userId == request.auth.uid
+        && data.email is string && data.email.size() <= 200
+        && data.materialId is string && data.materialId.size() <= 128
+        && data.materialTitle is string && data.materialTitle.size() <= 200
+        && data.text is string && data.text.size() <= 10000
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidNoteUpdate(data) {
+      return data.userId == existing().userId
+        && data.email == existing().email
+        && data.materialId == existing().materialId
+        && data.materialTitle == existing().materialTitle
+        && data.text is string && data.text.size() <= 10000
+        && data.createdAt == existing().createdAt
+        && data.updatedAt == request.time;
+    }
+
     match /users/{userId} {
       allow get: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || userId.matches('^student-.*');
       allow list: if isAdmin();
@@ -227,6 +247,14 @@ service cloud.firestore {
     match /security_violations/{violId} {
       allow create: if isSignedIn() && isValidId(violId) && isValidViolation(incoming()) && incoming().userId == request.auth.uid;
       allow read: if isAdmin();
+    }
+    
+    match /notes/{noteId} {
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(noteId) && isValidNote(incoming());
+      allow update: if isSignedIn() && isValidId(noteId) && isValidNoteUpdate(incoming()) && (existing().userId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && isValidId(noteId) && (existing().userId == request.auth.uid || isAdmin());
     }
   }
 }

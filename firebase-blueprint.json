@@ -22,6 +22,11 @@
           "enum": ["free", "notes", "lectures", "premium"],
           "description": "The user's active subscription plan."
         },
+        "authProvider": {
+          "type": "string",
+          "enum": ["Email", "Google"],
+          "description": "The authentication provider used by the user."
+        },
         "classGroup": {
           "type": "string",
           "enum": ["all", "6", "7", "8", "9", "10", "11", "12", "dropper"],
@@ -191,9 +196,28 @@
         "status": { "type": "string", "enum": ["logged", "reviewed"] }
       },
       "required": ["userId", "email", "displayName", "violationType", "detail", "timestamp", "ipAddress", "deviceInfo", "batchName", "status"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Student quick study note associated with educational material.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner userId of the note." },
+        "email": { "type": "string" },
+        "materialId": { "type": "string", "description": "Associated material document ID." },
+        "materialTitle": { "type": "string" },
+        "text": { "type": "string", "description": "Text content of the note input." },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "email", "materialId", "materialTitle", "text", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
+    "notes/{noteId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "Stores user text thoughts on materials."
+    },
     "users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profiles, roles, and active plans."

@@ -29,12 +29,12 @@ export interface ThemeConfig {
 export const THEME_PRESETS: Record<string, ThemeConfig> = {
   default: {
     activeTheme: 'default',
-    primaryColor: '#4F46E5',
-    secondaryColor: '#0F172A',
-    accentGlowColor: '#4F46E5',
-    backgroundColor: '#FAFAFC',
-    gradientStart: '#4F46E5',
-    gradientEnd: '#FAFAFC',
+    primaryColor: '#F15A29',
+    secondaryColor: '#1F1F1F',
+    accentGlowColor: '#F15A29',
+    backgroundColor: '#FDF5E6',
+    gradientStart: '#F15A29',
+    gradientEnd: '#FDF5E6',
     buttonStyle: 'rounded',
     borderRadius: 20,
     fontFamily: 'Inter',

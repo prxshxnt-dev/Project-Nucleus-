@@ -5,41 +5,41 @@ import {
   ArrowRight, 
   Lock, 
   Mail, 
-  Smartphone,
   Eye, 
   EyeOff, 
   BookOpen, 
   Chrome, 
-  RefreshCw 
+  RefreshCw,
+  ArrowLeft
 } from 'lucide-react';
 import { signInWithGoogle } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { toast, Toaster } from 'sonner';
+import FloatingLabelInput from '../components/FloatingLabelInput';
 
 export default function Login() {
   const { user, setUser, setLoading, loading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Switch between 'password' and 'otp'
+  // Switch between 'password' and 'otp' login method
   const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
   
-  // OTP sub-targets
-  const [otpTarget, setOtpTarget] = useState<'email' | 'phone'>('email');
-  const [otpIdentifier, setOtpIdentifier] = useState('');
-
-  // Password Login Inputs State
+  // Password Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Pre-fill email/phone identifier if passed from Signup or password resets
+  // OTP Login identifier - Email
+  const [otpEmail, setOtpEmail] = useState('');
+
+  // Pre-fill email identifier if passed from Signup or password resets
   useEffect(() => {
     if (location.state && (location.state as any).email) {
       const stateEmail = (location.state as any).email;
       setEmail(stateEmail);
-      setOtpIdentifier(stateEmail);
+      setOtpEmail(stateEmail);
     }
   }, [location.state]);
 
@@ -89,7 +89,7 @@ export default function Login() {
         throw new Error(data.error || 'Failed to authenticate student.');
       }
 
-      // Store custom email login session credentials locally
+      // Store credentials locally
       localStorage.setItem('currentUser', JSON.stringify(data.user));
       localStorage.setItem('accessToken', data.token);
       localStorage.setItem('isLoggedIn', 'true');
@@ -112,38 +112,24 @@ export default function Login() {
 
   const handleOtpLoginRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetClean = otpIdentifier.trim();
+    const targetClean = otpEmail.trim();
     if (!targetClean) {
-      toast.error(`Please enter your registered ${otpTarget === 'email' ? 'email address' : 'phone number'}.`);
+      toast.error('Please enter your registered email address.');
       return;
     }
 
-    if (otpTarget === 'email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(targetClean)) {
-        toast.error('Please provide a valid email address structure.');
-        return;
-      }
-    } else {
-      if (targetClean.length < 8) {
-        toast.error('Please enter a valid phone number.');
-        return;
-      }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(targetClean)) {
+      toast.error('Please provide a valid email address structure.');
+      return;
     }
 
     setIsSubmitting(true);
     try {
-      const payload: any = { type: 'login' };
-      if (otpTarget === 'email') {
-        payload.email = targetClean.toLowerCase();
-      } else {
-        payload.phone = targetClean;
-      }
-
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ type: 'login', email: targetClean.toLowerCase() }),
       });
 
       const data = await response.json();
@@ -151,16 +137,15 @@ export default function Login() {
         throw new Error(data.error || 'Failed to send verification code.');
       }
 
-      toast.success(data.message || 'Dynamic login code dispatched!');
+      toast.success(data.message || 'Verification login PIN dispatched!');
       
-      // Navigate to verify page with identity details
+      // Standalone redirect to `/verify-otp` with state
       navigate('/verify-otp', {
         state: {
-          email: data.email || (otpTarget === 'email' ? targetClean.toLowerCase() : ''),
-          phone: otpTarget === 'phone' ? targetClean : '',
+          email: targetClean.toLowerCase(),
           type: 'login',
-          simulated: data.simulated,
-          simulatedOtp: data.otp
+          simulated: !!data.simulated,
+          simulatedOtp: data.otp || null
         }
       });
     } catch (err: any) {
@@ -192,7 +177,7 @@ export default function Login() {
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full text-primary text-xs font-semibold mb-3">
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Nucleus.CC IIT & Medical</span>
+            <span>Nucleus Era IIT & Medical</span>
           </div>
           <h2 className="font-display font-extrabold text-3xl">Student Entry</h2>
           <p className="text-[#7A7A7A] text-sm mt-1">Managed and taught by elite IITians & Doctors</p>
@@ -205,88 +190,139 @@ export default function Login() {
           </p>
           <Link
             to="/signup"
-            className="inline-flex items-center justify-center gap-2 w-full py-2.5 bg-[#F15A29]/10 hover:bg-[#F15A29]/20 text-[#F15A29] font-extrabold text-[#F15A29] text-[11px] uppercase tracking-wider rounded-xl border border-[#F15A29]/20 transition-all duration-200"
+            className="inline-flex items-center justify-center gap-2 w-full py-2.5 bg-[#F15A29]/10 hover:bg-[#F15A29]/20 text-[#F15A29] font-extrabold text-[11px] uppercase tracking-wider rounded-xl border border-[#F15A29]/20 transition-all"
           >
             <span>First Create Account</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        {/* Password Login form container exclusively */}
+        {/* Login Method Toggle Tabs */}
+        <div className="flex gap-2 mb-6 bg-[#FDF5E6] p-1 rounded-2xl border border-black/10">
+          <button
+            type="button"
+            onClick={() => setLoginMethod('password')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${loginMethod === 'password' ? 'bg-primary text-white shadow-sm font-black' : 'text-[#7A7A7A] hover:text-[#1F1F1F]'}`}
+          >
+            Password Login
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginMethod('otp')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${loginMethod === 'otp' ? 'bg-primary text-white shadow-sm font-black' : 'text-[#7A7A7A] hover:text-[#1F1F1F]'}`}
+          >
+            Email OTP Login
+          </button>
+        </div>
+
+        {/* Logins Container */}
         <div className="space-y-4">
-          {/* Form controls for Email/Password */}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            {/* Email input field */}
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider block mb-1.5 ml-1">Student Email</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
-                  <Mail className="w-5 h-5" />
-                </span>
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="student@nucleus.cc"
-                  required
-                  className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-                />
-              </div>
-            </div>
+          {loginMethod === 'password' ? (
+            /* Email / Password Form */
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              {/* Email Input */}
+              <FloatingLabelInput 
+                id="login-email-field"
+                label="Student Email"
+                icon={<Mail className="w-5 h-5" />}
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setOtpEmail(e.target.value); // keep in sync
+                }}
+                required
+              />
 
-            {/* Password field */}
-            <div>
-              <div className="flex justify-between items-center mb-1.5 ml-1">
-                <label className="text-xs font-bold uppercase tracking-wider block">Password</label>
-                <Link to="/forgot-password" className="text-xs text-primary font-bold hover:underline">
-                  Forgot Password?
-                </Link>
+              {/* Password Input with Forgot link & Show Button */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center px-1">
+                  <Link to="/forgot-password" className="text-xs text-primary font-bold hover:underline ml-auto">
+                    Forgot Password?
+                  </Link>
+                </div>
+                
+                <div className="relative">
+                  <FloatingLabelInput 
+                    id="login-password-field"
+                    label="Account Password"
+                    icon={<Lock className="w-5 h-5" />}
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 mt-1 text-[#7A7A7A] hover:text-[#1F1F1F] transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7A7A7A]">
-                  <Lock className="w-5 h-5" />
-                </span>
-                <input 
-                  type={showPassword ? 'text' : 'password'} 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full pl-12 pr-12 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7A7A7A] hover:text-black transition-colors"
-                  id="password-toggle-btn"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
 
-            {/* Submit element */}
-            <motion.button 
-              type="submit" 
-              disabled={isSubmitting}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              className={`w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-primary-dark transition-all duration-200 shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
-              id="login-submit-btn"
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  <span>Verifying credentials...</span>
-                </>
-              ) : (
-                <>
-                  <span>Enter Classroom Portal</span>
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </motion.button>
-          </form>
+              {/* Submit Button */}
+              <motion.button 
+                type="submit" 
+                disabled={isSubmitting}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                className={`w-full py-4 bg-primary text-[#FDF5E6] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                id="login-submit-btn"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Enter Classroom Portal</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </motion.button>
+            </form>
+          ) : (
+            /* Email OTP Request Form */
+            <form onSubmit={handleOtpLoginRequest} className="space-y-4">
+              <FloatingLabelInput 
+                id="login-otp-email-field"
+                label="Student Email Address"
+                icon={<Mail className="w-5 h-5" />}
+                type="email"
+                value={otpEmail}
+                onChange={(e) => {
+                  setOtpEmail(e.target.value);
+                  setEmail(e.target.value); // keep in sync
+                }}
+                required
+              />
+
+              {/* Submit Button */}
+              <motion.button 
+                type="submit" 
+                disabled={isSubmitting}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                className={`w-full py-4 bg-primary text-[#FDF5E6] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                id="login-otp-request-btn"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>Sending Verification code...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Send Login OTP Code</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </motion.button>
+            </form>
+          )}
         </div>
 
         {/* Third Party Divider */}
@@ -296,7 +332,7 @@ export default function Login() {
           <div className="flex-grow border-t border-black/10"></div>
         </div>
 
-        {/* Google Authentication popup */}
+        {/* Google Authentication Portal Popup */}
         <motion.button 
           onClick={handleGoogleLogin}
           whileHover={{ scale: 1.01 }}
@@ -316,7 +352,7 @@ export default function Login() {
           </Link>
         </p>
 
-        <div className="text-center mt-6 text-[11px] text-[#7A7A7A]">
+        <div className="text-center mt-6 text-[10px] text-[#7A7A7A]">
           © 2026 Nucleus.CC (Coaching Centre managed by IITians and Doctors)
         </div>
       </motion.div>

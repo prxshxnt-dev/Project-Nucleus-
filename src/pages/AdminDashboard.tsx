@@ -606,6 +606,15 @@ export default function AdminDashboard() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSavingAiSettings, setIsSavingAiSettings] = useState(false);
 
+  // SMTP Config States
+  const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpSecure, setSmtpSecure] = useState("false");
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPass, setSmtpPass] = useState("");
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [isSavingSmtpSettings, setIsSavingSmtpSettings] = useState(false);
+
   // Customizable Study Stickers States
   const [studySticker1Emoji, setStudySticker1Emoji] = useState("📚");
   const [studySticker1Title, setStudySticker1Title] = useState("STUDY FORCE");
@@ -1014,6 +1023,22 @@ export default function AdminDashboard() {
         }
       } catch (aiErr) {
         console.error("Error loading secure AI config:", aiErr);
+      }
+
+      // Fetch SMTP config
+      try {
+        const smtpDocRef = doc(db, "settings", "smtp_config");
+        const smtpDocSnap = await getDoc(smtpDocRef);
+        if (smtpDocSnap.exists()) {
+          const smtpData = smtpDocSnap.data();
+          if (smtpData.host) setSmtpHost(smtpData.host);
+          if (smtpData.port) setSmtpPort(smtpData.port.toString());
+          if (smtpData.secure !== undefined) setSmtpSecure(smtpData.secure.toString());
+          if (smtpData.user) setSmtpUser(smtpData.user);
+          if (smtpData.pass) setSmtpPass(smtpData.pass);
+        }
+      } catch (smtpErr) {
+        console.error("Error loading secure SMTP config:", smtpErr);
       }
     } catch (e) {
       console.error(e);
@@ -1855,6 +1880,55 @@ export default function AdminDashboard() {
       alert("Failed to save AI settings: " + err.message);
     } finally {
       setIsSavingAiSettings(false);
+    }
+  };
+
+  const handleSaveSmtpSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (user?.role !== "superadmin" && user?.role !== "admin") {
+      alert("Only administrators can update SMTP settings.");
+      return;
+    }
+    setIsSavingSmtpSettings(true);
+    try {
+      await setDoc(
+        doc(db, "settings", "smtp_config"),
+        {
+          host: smtpHost.trim(),
+          port: parseInt(smtpPort) || 587,
+          secure: smtpSecure === "true",
+          user: smtpUser.trim(),
+          pass: smtpPass.trim(),
+        },
+        { merge: true }
+      );
+
+      // Save to server backup cache by notifying the server about the update
+      try {
+        await fetch("/api/auth/smtp-config-sync", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            host: smtpHost.trim(),
+            port: parseInt(smtpPort) || 587,
+            secure: smtpSecure === "true",
+            user: smtpUser.trim(),
+            pass: smtpPass.trim(),
+            userEmail: user?.email,
+          }),
+        });
+      } catch (backupErr) {
+        console.error("Failed to update backend SMTP config backup:", backupErr);
+      }
+
+      alert("SMTP dynamic configuration saved and synchronized successfully!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to save SMTP settings: " + err.message);
+    } finally {
+      setIsSavingSmtpSettings(false);
     }
   };
 
@@ -4871,6 +4945,106 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* SMTP Dynamic Mail Credentials Form */}
+            <div className="pt-8 mt-8 border-t border-white/10 space-y-6">
+              <div>
+                <h4 className="text-base font-medium text-[var(--primary-custom, #F15A29)] flex items-center gap-2">
+                  <span>✉️ Dynamic SMTP Mail Server Config</span>
+                </h4>
+                <p className="text-xs text-white/40 mt-1">
+                  Configure outgoing OTP email credentials here. These settings are stored securely in Firestore and override system default environment configurations for real-time delivery.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveSmtpSettings} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">SMTP Outgoing Host</label>
+                    <input
+                      type="text"
+                      value={smtpHost}
+                      onChange={(e) => setSmtpHost(e.target.value)}
+                      placeholder="e.g. smtp.gmail.com"
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">SMTP Port</label>
+                    <input
+                      type="text"
+                      value={smtpPort}
+                      onChange={(e) => setSmtpPort(e.target.value)}
+                      placeholder="e.g. 587 or 465"
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">Secure (SSL/TLS)</label>
+                    <select
+                      value={smtpSecure}
+                      onChange={(e) => setSmtpSecure(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs"
+                    >
+                      <option value="false">False (Port 587 / STARTTLS)</option>
+                      <option value="true">True (Port 465 / Direct SSL)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">SMTP Auth User (Email)</label>
+                    <input
+                      type="email"
+                      value={smtpUser}
+                      onChange={(e) => setSmtpUser(e.target.value)}
+                      placeholder="e.g. your_email@gmail.com"
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2 uppercase tracking-wide">SMTP Auth Password / App Secret</label>
+                    <div className="relative">
+                      <input
+                        type={showSmtpPass ? "text" : "password"}
+                        value={smtpPass}
+                        onChange={(e) => setSmtpPass(e.target.value)}
+                        placeholder="16-character secure app password"
+                        required
+                        className="w-full px-4 py-3 pr-16 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpPass(!showSmtpPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-white/60 hover:text-white uppercase font-bold"
+                      >
+                        {showSmtpPass ? "HIDE" : "SHOW"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+                  <span className="text-[10px] text-amber-300 font-mono">
+                    * Note: For security, use Google's 16-character "App Password", not your master Google password.
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={isSavingSmtpSettings}
+                    className="px-6 py-2.5 rounded-xl bg-primary text-zinc-950 font-medium hover:brightness-110 disabled:opacity-50 transition-colors text-xs flex items-center gap-1 cursor-pointer w-full sm:w-auto justify-center font-bold"
+                  >
+                    {isSavingSmtpSettings ? "Saving SMTP..." : "Save SMTP credentials"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
