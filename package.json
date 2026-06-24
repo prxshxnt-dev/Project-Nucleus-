@@ -9,10 +9,18 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "cap:sync": "cap sync",
+    "cap:copy": "cap copy",
+    "android:add": "cap add android",
+    "android:open": "cap open android",
+    "ios:add": "cap add ios",
+    "ios:open": "cap open ios",
+    "mobile:build": "vite build && cap sync"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
+    "@capacitor/core": "^8.4.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@google-cloud/firestore": "^8.6.0",
     "@google/genai": "^1.29.0",
@@ -49,6 +57,9 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",

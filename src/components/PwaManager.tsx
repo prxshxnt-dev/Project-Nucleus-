@@ -248,8 +248,8 @@ export default function PwaManager() {
               exit={{ scale: 0.9, opacity: 0 }}
               className="relative w-full max-w-sm bg-zinc-950 border border-white/10 rounded-2xl p-6 shadow-2xl text-left overflow-hidden"
             >
-              {/* Water drip shape decor in orange bg */}
-              <div className="absolute top-[-30px] right-[-30px] w-24 h-24 bg-[#ff7a00]/15 rounded-full blur-xl pointer-events-none" />
+              {/* Water drip shape decor in indigo bg */}
+              <div className="absolute top-[-30px] right-[-30px] w-24 h-24 bg-[#6366F1]/15 rounded-full blur-xl pointer-events-none" />
 
               <button 
                 onClick={() => setShowIosGuide(false)}
@@ -259,12 +259,12 @@ export default function PwaManager() {
               </button>
 
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-[#ff7a00]/30 flex items-center justify-center text-[#ff7a00]">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-[#6366F1]/30 flex items-center justify-center text-[#6366F1]">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-md font-bold text-white">IOS Installation Guide</h3>
-                  <p className="text-[10px] text-[#ff7a00] font-mono tracking-wider uppercase">Safari browser feature</p>
+                  <p className="text-[10px] text-[#6366F1] font-mono tracking-wider uppercase">Safari browser feature</p>
                 </div>
               </div>
 
@@ -275,31 +275,31 @@ export default function PwaManager() {
 
                 <div className="space-y-3">
                   <div className="flex items-start gap-3 bg-white/[0.02] border border-white/5 p-2 rounded-xl">
-                    <span className="w-6 h-6 rounded-full bg-[#ff7a00]/20 text-[#ff7a00] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="w-6 h-6 rounded-full bg-[#6366F1]/20 text-[#6366F1] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
                       1
                     </span>
                     <div>
                       <p className="text-xs font-bold text-white">Tap Safari's Share Icon</p>
                       <p className="text-[10px] text-white/50 mt-0.5 flex items-center gap-1">
-                        Find <Share2 className="w-3 h-3 inline text-[#ff7a00]" /> in Safari navigation menu bar.
+                        Find <Share2 className="w-3 h-3 inline text-[#6366F1]" /> in Safari navigation menu bar.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3 bg-white/[0.02] border border-white/5 p-2 rounded-xl">
-                    <span className="w-6 h-6 rounded-full bg-[#ff7a00]/20 text-[#ff7a00] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="w-6 h-6 rounded-full bg-[#6366F1]/20 text-[#6366F1] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
                       2
                     </span>
                     <div>
                       <p className="text-xs font-bold text-white">Tap 'Add to Home Screen'</p>
                       <p className="text-[10px] text-white/50 mt-0.5 flex items-center gap-1">
-                        Scroll options list & tap <PlusSquare className="w-3 h-3 inline text-[#ff7a00]" /> option.
+                        Scroll options list & tap <PlusSquare className="w-3 h-3 inline text-[#6366F1]" /> option.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3 bg-white/[0.02] border border-white/5 p-2 rounded-xl">
-                    <span className="w-6 h-6 rounded-full bg-[#ff7a00]/20 text-[#ff7a00] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="w-6 h-6 rounded-full bg-[#6366F1]/20 text-[#6366F1] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
                       3
                     </span>
                     <div>

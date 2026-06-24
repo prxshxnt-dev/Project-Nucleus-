@@ -300,7 +300,7 @@ export default function VerifyOtp() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#FDF5E6]">
+    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#F8FAFC]">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -310,7 +310,7 @@ export default function VerifyOtp() {
         {/* Back Link / Change Email */}
         <button 
           onClick={() => navigate(state?.type === 'register' ? '/signup' : '/login')}
-          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-primary hover:text-[#D4471B] mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-primary hover:text-[#3730A3] mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Change Email Address / Start Over</span>
@@ -346,7 +346,7 @@ export default function VerifyOtp() {
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
                 onPaste={handlePaste}
-                className="w-12 h-14 text-center text-2xl font-extrabold bg-[#FDF5E6] border border-black/15 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+                className="w-12 h-14 text-center text-2xl font-extrabold bg-[#F8FAFC] border border-black/15 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
               />
             ))}
           </div>

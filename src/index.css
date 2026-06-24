@@ -211,33 +211,33 @@ html.lenis {
 :root {
   --font-sans-custom: "Inter", sans-serif;
   --font-display-custom: "Poppins", sans-serif;
-  --background-custom: #FDF5E6;
+  --background-custom: #F8FAFC;
   --foreground-custom: #1F1F1F;
-  --primary-custom: #F15A29;
-  --primary-dark-custom: #D4471B;
+  --primary-custom: #4F46E5;
+  --primary-dark-custom: #3730A3;
   --muted-custom: #7A7A7A;
 
   /* Smart Contrast Variables Baseline Defaults */
-  --bg-primary: #FDF5E6;
-  --bg-secondary: #F5EBD6;
-  --text-primary: #1F1F1F;
-  --text-secondary: #4A4A4A;
-  --text-muted: #7A7A7A;
-  --accent-primary: #F15A29;
-  --accent-contrast: #FDF5E6;
-  --border-color: rgba(31, 31, 31, 0.08);
-  --card-bg: rgba(255, 253, 249, 0.9);
-  --glass-bg: rgba(255, 253, 249, 0.85);
-  --button-text: #FDF5E6;
-  --navbar-text: #1F1F1F;
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #F1F5F9;
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  --accent-primary: #4F46E5;
+  --accent-contrast: #FFFFFF;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --button-text: #FFFFFF;
+  --navbar-text: #0F172A;
 
   --theme-btn-radius: 12px;
   --theme-card-radius: 20px;
-  --theme-card-border: rgba(31, 31, 31, 0.06);
+  --theme-card-border: rgba(15, 23, 42, 0.06);
   --theme-card-blur: blur(12px);
   --theme-anim-intensity: 1;
-  --theme-accent-glow: #F15A29;
-  --theme-shadow-glow: 0 4px 20px rgba(241, 90, 41, 0.08);
+  --theme-accent-glow: #4F46E5;
+  --theme-shadow-glow: 0 4px 20px rgba(79, 70, 229, 0.08);
 }
 
 .theme-btn-themed {
@@ -286,14 +286,64 @@ html.lenis {
   border-radius: 9999px;
 }
 .chatbot-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(229, 210, 165, 0.3); /* Matches #E5D2A5 with opacity */
+  background: rgba(99, 102, 241, 0.3); /* Matches #E5D2A5 with opacity */
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .chatbot-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(229, 210, 165, 0.6); /* Highlights to stronger tone on hover */
+  background: rgba(99, 102, 241, 0.6); /* Highlights to stronger tone on hover */
 }
 .chatbot-scrollbar {
   scrollbar-width: auto;
-  scrollbar-color: rgba(229, 210, 165, 0.3) rgba(255, 255, 255, 0.05);
+  scrollbar-color: rgba(99, 102, 241, 0.3) rgba(255, 255, 255, 0.05);
+}
+
+/* Precise Overrides: Disable all floating, pulsing, bouncing, and glowing animations/shadow styles across the board */
+@keyframes pulse {
+  0%, 100% { opacity: 1 !important; }
+  50% { opacity: 1 !important; }
+}
+@keyframes bounce {
+  0%, 100% { transform: none !important; }
+  50% { transform: none !important; }
+}
+@keyframes spin {
+  from { transform: none !important; }
+  to { transform: none !important; }
+}
+@keyframes float {
+  0%, 100% { transform: none !important; }
+  50% { transform: none !important; }
+}
+
+.animate-pulse, 
+.animate-bounce, 
+.animate-spin-slow, 
+.animate-bounce-slow, 
+.animate-float,
+[class*="animate-pulse"],
+[class*="animate-bounce"],
+[class*="animate-float"] {
+  animation: none !important;
+  transform: none !important;
+}
+
+/* Completely strip modern glow intensities and soft backdrop highlight gradients */
+:root {
+  --theme-shadow-glow: none !important;
+  --theme-accent-glow: transparent !important;
+  --theme-text-glow: none !important;
+  --theme-text-shadow: none !important;
+}
+
+/* Ensure no shadows/reflections can act as artificial neon glows on hover */
+*, *::before, *::after {
+  text-shadow: none !important;
+}
+
+.theme-card-themed:hover, 
+button:hover,
+a:hover,
+div:hover {
+  box-shadow: none !important;
 }

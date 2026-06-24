@@ -63,16 +63,7 @@ export default function Footer() {
                     Telegram
                   </a>
                 )}
-                {settings.socialDiscordShow !== false && settings.socialDiscordUrl && (
-                  <a 
-                    href={settings.socialDiscordUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-white/50 hover:text-white transition-all text-base font-medium tracking-wide"
-                  >
-                    Discord
-                  </a>
-                )}
+
                 {settings.socialLinkedinShow !== false && settings.socialLinkedinUrl && (
                   <a 
                     href={settings.socialLinkedinUrl} 

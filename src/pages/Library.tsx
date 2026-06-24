@@ -103,8 +103,8 @@ interface MaterialItem {
 }
 
 const CATEGORIES = [
-  { id: 'notes', label: 'Notes', color: 'from-amber-500 to-orange-600' },
-  { id: 'pyqs', label: 'PYQs', color: 'from-orange-500 to-red-600' },
+  { id: 'notes', label: 'Notes', color: 'from-amber-500 to-indigo-600' },
+  { id: 'pyqs', label: 'PYQs', color: 'from-indigo-500 to-red-600' },
   { id: 'assignments', label: 'Assignments', color: 'from-red-500 to-rose-600' },
   { id: 'dpps', label: 'DPPs', color: 'from-pink-500 to-rose-600' },
   { id: 'practice_sheets', label: 'Practice Sheets', color: 'from-purple-500 to-indigo-600' },
@@ -711,7 +711,7 @@ export default function Library() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className={`fixed top-28 right-6 z-50 px-6 py-3.5 rounded-2xl shadow-xl text-white text-xs font-semibold flex items-center gap-2 ${
-              toastMessage.error ? 'bg-red-600' : 'bg-orange-600'
+              toastMessage.error ? 'bg-red-600' : 'bg-indigo-600'
             }`}
           >
             <span>✨</span>
@@ -722,9 +722,9 @@ export default function Library() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-12">
         {/* Core Header Panel */}
-        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-orange-100 rounded-3xl p-6 shadow-sm">
+        <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-indigo-100 rounded-3xl p-6 shadow-sm">
           <div>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-orange-600 mb-1">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-widest font-bold text-indigo-600 mb-1">
               <BookOpen className="w-4 h-4 animate-pulse" />
               <span>Nucleus Content Library</span>
             </div>
@@ -750,7 +750,7 @@ export default function Library() {
                   setAdminAction('upload_material');
                   setShowAdminModal(true);
                 }}
-                className="px-4 py-2 text-xs font-bold bg-orange-600 text-white hover:bg-orange-700 rounded-xl transition duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                className="px-4 py-2 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl transition duration-200 flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Admin Actions</span>
@@ -792,17 +792,17 @@ export default function Library() {
                       }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                         activeTab === item.id 
-                          ? 'bg-orange-50 text-orange-600 shadow-sm' 
+                          ? 'bg-indigo-50 text-indigo-600 shadow-sm' 
                           : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-50'
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <Icon className={`w-4 h-4 ${activeTab === item.id ? 'text-orange-600' : 'text-zinc-400'}`} />
+                        <Icon className={`w-4 h-4 ${activeTab === item.id ? 'text-indigo-600' : 'text-zinc-400'}`} />
                         <span>{item.label}</span>
                       </div>
                       {item.count !== null && (
                         <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                          activeTab === item.id ? 'bg-orange-100 text-orange-600' : 'bg-zinc-100 text-zinc-500'
+                          activeTab === item.id ? 'bg-indigo-100 text-indigo-600' : 'bg-zinc-100 text-zinc-500'
                         }`}>
                           {item.count}
                         </span>
@@ -825,11 +825,11 @@ export default function Library() {
                     }}
                     className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left text-xs font-bold transition cursor-pointer ${
                       selectedCategory === cat.id
-                        ? 'bg-orange-50 text-orange-700 border-l-2 border-orange-500'
+                        ? 'bg-indigo-50 text-indigo-700 border-l-2 border-indigo-500'
                         : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
                     }`}
                   >
-                    <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
                     <span>{cat.label}</span>
                   </button>
                 ))}
@@ -837,10 +837,10 @@ export default function Library() {
             </div>
 
             {/* Premium Plan Info Spot */}
-            <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-16 h-16 bg-orange-400/15 rounded-full pointer-events-none blur-sm" />
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-400/15 rounded-full pointer-events-none blur-sm" />
               <div className="z-10 relative">
-                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-widest flex items-center gap-1.5">
+                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Batch Sync Active</span>
                 </p>
@@ -863,21 +863,21 @@ export default function Library() {
                   placeholder="Search notes, formula guides, PYQs, tests..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-white border border-zinc-200 focus:border-orange-400 focus:ring-1 focus:ring-orange-200 outline-none rounded-2xl transition duration-150"
+                  className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-white border border-zinc-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 outline-none rounded-2xl transition duration-150"
                 />
               </div>
 
               <div className="flex items-center justify-between sm:justify-end gap-2 bg-white border border-zinc-200 rounded-2xl p-1 shrink-0">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-xl transition cursor-pointer ${viewMode === 'grid' ? 'bg-orange-100 text-orange-600' : 'text-zinc-400 hover:text-zinc-600'}`}
+                  className={`p-1.5 rounded-xl transition cursor-pointer ${viewMode === 'grid' ? 'bg-indigo-100 text-indigo-600' : 'text-zinc-400 hover:text-zinc-600'}`}
                   title="Grid View"
                 >
                   <Grid className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-xl transition cursor-pointer ${viewMode === 'list' ? 'bg-orange-100 text-orange-600' : 'text-zinc-400 hover:text-zinc-600'}`}
+                  className={`p-1.5 rounded-xl transition cursor-pointer ${viewMode === 'list' ? 'bg-indigo-100 text-indigo-600' : 'text-zinc-400 hover:text-zinc-600'}`}
                   title="List View"
                 >
                   <List className="w-4 h-4" />
@@ -894,7 +894,7 @@ export default function Library() {
                   setSelectedChapterId(null);
                   setSelectedCategory(null);
                 }}
-                className="hover:text-orange-600 cursor-pointer text-[11px]"
+                className="hover:text-indigo-600 cursor-pointer text-[11px]"
               >
                 Study Library
               </button>
@@ -908,7 +908,7 @@ export default function Library() {
                       setSelectedChapterId(null);
                       setSelectedCategory(null);
                     }}
-                    className="hover:text-orange-600 cursor-pointer text-[11px]"
+                    className="hover:text-indigo-600 cursor-pointer text-[11px]"
                   >
                     {classes.find(c => c.id === selectedClassId)?.className || selectedClassId}
                   </button>
@@ -923,7 +923,7 @@ export default function Library() {
                       setSelectedChapterId(null);
                       setSelectedCategory(null);
                     }}
-                    className="hover:text-orange-600 cursor-pointer text-[11px]"
+                    className="hover:text-indigo-600 cursor-pointer text-[11px]"
                   >
                     {subjects.find(s => s.id === selectedSubjectId)?.subjectName || selectedSubjectId}
                   </button>
@@ -937,7 +937,7 @@ export default function Library() {
                     onClick={() => {
                       setSelectedCategory(null);
                     }}
-                    className="hover:text-orange-600 cursor-pointer text-[11px]"
+                    className="hover:text-indigo-600 cursor-pointer text-[11px]"
                   >
                     {chapters.find(c => c.id === selectedChapterId)?.chapterName || selectedChapterId}
                   </button>
@@ -947,7 +947,7 @@ export default function Library() {
               {selectedCategory && (
                 <>
                   <ChevronRight className="w-3.5 h-3.5 text-zinc-300" />
-                  <span className="text-orange-600 text-[11px] font-bold">
+                  <span className="text-indigo-600 text-[11px] font-bold">
                     {CATEGORIES.find(c => c.id === selectedCategory)?.label || selectedCategory}
                   </span>
                 </>
@@ -960,9 +960,9 @@ export default function Library() {
                 {/* Visual Banners and Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Bookmarks Hub spot */}
-                  <div className="bg-white border border-zinc-200 p-6 rounded-3xl relative overflow-hidden shadow-sm shadow-orange-100 flex flex-col justify-between">
+                  <div className="bg-white border border-zinc-200 p-6 rounded-3xl relative overflow-hidden shadow-sm shadow-indigo-100 flex flex-col justify-between">
                     <div>
-                      <div className="w-9 h-9 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 mb-4">
+                      <div className="w-9 h-9 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600 mb-4">
                         <BookMarked className="w-5 h-5 animate-pulse" />
                       </div>
                       <h3 className="text-sm font-black text-zinc-900 uppercase tracking-tight">Bookmarks Vault</h3>
@@ -974,7 +974,7 @@ export default function Library() {
                         <div 
                           key={m.id} 
                           onClick={() => setPreviewMaterial(m)}
-                          className="p-2 border border-zinc-100 bg-zinc-50 hover:bg-orange-50/50 rounded-xl flex items-center justify-between text-xs font-bold text-zinc-800 cursor-pointer transition"
+                          className="p-2 border border-zinc-100 bg-zinc-50 hover:bg-indigo-50/50 rounded-xl flex items-center justify-between text-xs font-bold text-zinc-800 cursor-pointer transition"
                         >
                           <span className="truncate max-w-[80%]">{m.title}</span>
                           <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
@@ -987,7 +987,7 @@ export default function Library() {
                   </div>
 
                   {/* Syllabus Match Indicator Card */}
-                  <div className="bg-white border border-zinc-200 p-6 rounded-3xl relative overflow-hidden shadow-sm shadow-orange-100 flex flex-col justify-between">
+                  <div className="bg-white border border-zinc-200 p-6 rounded-3xl relative overflow-hidden shadow-sm shadow-indigo-100 flex flex-col justify-between">
                     <div>
                       <div className="w-9 h-9 rounded-2xl bg-[#ff8a9e]/10 flex items-center justify-center text-[#ff8a9e] mb-4">
                         <Award className="w-5 h-5 animate-bounce" />
@@ -999,7 +999,7 @@ export default function Library() {
                     <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between">
                       <div>
                         <span className="text-[10px] text-zinc-400 uppercase tracking-wider block">My Current Standard</span>
-                        <span className="text-xs font-black text-orange-600 uppercase">Class {user?.classGroup || 'All'}</span>
+                        <span className="text-xs font-black text-indigo-600 uppercase">Class {user?.classGroup || 'All'}</span>
                       </div>
                       <Link 
                         to="/dashboard"
@@ -1022,7 +1022,7 @@ export default function Library() {
                           setSelectedClassId(cls.id);
                           setActiveTab('classes');
                         }}
-                        className="bg-white p-5 border border-zinc-200 rounded-3xl hover:border-orange-400/60 hover:shadow-md transition duration-250 cursor-pointer text-center relative group"
+                        className="bg-white p-5 border border-zinc-200 rounded-3xl hover:border-indigo-400/60 hover:shadow-md transition duration-250 cursor-pointer text-center relative group"
                       >
                         {isAdmin && (
                           <button 
@@ -1032,7 +1032,7 @@ export default function Library() {
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <div className="w-12 h-12 bg-orange-100/35 rounded-2xl flex items-center justify-center mx-auto text-orange-500 mb-3 group-hover:scale-110 transition duration-200">
+                        <div className="w-12 h-12 bg-indigo-100/35 rounded-2xl flex items-center justify-center mx-auto text-indigo-500 mb-3 group-hover:scale-110 transition duration-200">
                           <Folder className="w-6 h-6 fill-current" />
                         </div>
                         <span className="text-xs font-black text-zinc-900 block truncate">{cls.className}</span>
@@ -1049,13 +1049,13 @@ export default function Library() {
                       <div
                         key={m.id}
                         onClick={() => setPreviewMaterial(m)}
-                        className="p-4 border border-zinc-200 bg-white hover:border-orange-300 rounded-2xl flex items-center gap-4 transition cursor-pointer"
+                        className="p-4 border border-zinc-200 bg-white hover:border-indigo-300 rounded-2xl flex items-center gap-4 transition cursor-pointer"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
                           {m.fileType === 'pdf' ? <FileText className="w-5 h-5" /> : m.fileType === 'video' ? <Video className="w-5 h-5" /> : <Archive className="w-5 h-5" />}
                         </div>
                         <div className="overflow-hidden flex-1 text-left">
-                          <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wide">{m.materialType}</span>
+                          <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">{m.materialType}</span>
                           <h4 className="text-xs font-bold text-zinc-900 truncate leading-snug">{m.title}</h4>
                           <p className="text-[10px] text-zinc-500 truncate mt-0.5">{m.description}</p>
                         </div>
@@ -1076,7 +1076,7 @@ export default function Library() {
                       <div
                         key={m.id}
                         onClick={() => setPreviewMaterial(m)}
-                        className="p-4 border border-zinc-200 bg-white hover:border-orange-300 rounded-2xl flex items-center gap-4 transition cursor-pointer"
+                        className="p-4 border border-zinc-200 bg-white hover:border-indigo-300 rounded-2xl flex items-center gap-4 transition cursor-pointer"
                       >
                         <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
                           <Download className="w-5 h-5" />
@@ -1110,7 +1110,7 @@ export default function Library() {
                           onClick={() => {
                             setSelectedClassId(cls.id);
                           }}
-                          className="bg-white p-5 border border-zinc-200 rounded-3xl hover:border-orange-400/60 hover:shadow-md transition duration-250 cursor-pointer text-center relative group"
+                          className="bg-white p-5 border border-zinc-200 rounded-3xl hover:border-indigo-400/60 hover:shadow-md transition duration-250 cursor-pointer text-center relative group"
                         >
                           {isAdmin && (
                             <button 
@@ -1120,7 +1120,7 @@ export default function Library() {
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <div className="w-12 h-12 bg-orange-100/35 rounded-2xl flex items-center justify-center mx-auto text-orange-500 mb-3 group-hover:scale-110 transition duration-200">
+                          <div className="w-12 h-12 bg-indigo-100/35 rounded-2xl flex items-center justify-center mx-auto text-indigo-500 mb-3 group-hover:scale-110 transition duration-200">
                             <Folder className="w-6 h-6 fill-current" />
                           </div>
                           <span className="text-xs font-black text-zinc-900 block truncate">{cls.className}</span>
@@ -1151,7 +1151,7 @@ export default function Library() {
                         <div
                           key={subj.id}
                           onClick={() => setSelectedSubjectId(subj.id)}
-                          className="bg-white p-5 border border-zinc-200 rounded-3xl hover:border-orange-400/65 hover:shadow-md transition duration-250 cursor-pointer text-center relative group"
+                          className="bg-white p-5 border border-zinc-200 rounded-3xl hover:border-indigo-400/65 hover:shadow-md transition duration-250 cursor-pointer text-center relative group"
                         >
                           {isAdmin && (
                             <button 
@@ -1195,9 +1195,9 @@ export default function Library() {
                         <div
                           key={chap.id}
                           onClick={() => setSelectedChapterId(chap.id)}
-                          className="bg-white p-4 border border-zinc-200 rounded-2xl hover:border-orange-400/60 transition duration-250 cursor-pointer flex items-center gap-3 relative group text-left"
+                          className="bg-white p-4 border border-zinc-200 rounded-2xl hover:border-indigo-400/60 transition duration-250 cursor-pointer flex items-center gap-3 relative group text-left"
                         >
-                          <div className="w-9 h-9 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
                             <Folder className="w-5 h-5 fill-current" />
                           </div>
                           <div className="flex-1 overflow-hidden">
@@ -1244,7 +1244,7 @@ export default function Library() {
                           <div
                             key={cat.id}
                             onClick={() => setSelectedCategory(cat.id)}
-                            className="bg-white border border-zinc-200 p-5 rounded-3xl hover:border-orange-400/60 hover:shadow-sm transition cursor-pointer text-center relative group"
+                            className="bg-white border border-zinc-200 p-5 rounded-3xl hover:border-indigo-400/60 hover:shadow-sm transition cursor-pointer text-center relative group"
                           >
                             <div className={`w-11 h-11 rounded-2xl bg-gradient-to-tr ${cat.color} opacity-85 text-white flex items-center justify-center mx-auto mb-3`}>
                               <Folder className="w-5.5 h-5.5 fill-current" />
@@ -1291,22 +1291,22 @@ export default function Library() {
                         <div
                           key={mat.id}
                           onClick={() => setPreviewMaterial(mat)}
-                          className="bg-white border border-zinc-200 hover:border-orange-400/50 hover:shadow-md rounded-2xl p-5 transition duration-200 flex flex-col justify-between cursor-pointer relative group text-left"
+                          className="bg-white border border-zinc-200 hover:border-indigo-400/50 hover:shadow-md rounded-2xl p-5 transition duration-200 flex flex-col justify-between cursor-pointer relative group text-left"
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2 mb-2">
-                              <span className="px-2 py-0.5 rounded-lg bg-orange-50 text-[10px] uppercase font-black tracking-wide text-orange-600">
+                              <span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-[10px] uppercase font-black tracking-wide text-indigo-600">
                                 {CATEGORIES.find(c => c.id === mat.materialType)?.label || mat.materialType}
                               </span>
 
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={(e) => toggleBookmark(mat.id, e)}
-                                  className="p-1.5 text-zinc-400 hover:text-orange-500 rounded-lg hover:bg-zinc-100 transition"
+                                  className="p-1.5 text-zinc-400 hover:text-indigo-500 rounded-lg hover:bg-zinc-100 transition"
                                   title="Bookmark"
                                 >
                                   {isBookmarked ? (
-                                    <BookmarkCheck className="w-3.5 h-3.5 text-orange-600 fill-current" />
+                                    <BookmarkCheck className="w-3.5 h-3.5 text-indigo-600 fill-current" />
                                   ) : (
                                     <Bookmark className="w-3.5 h-3.5" />
                                   )}
@@ -1324,7 +1324,7 @@ export default function Library() {
                                         setAdminAction('move_material');
                                         setShowAdminModal(true);
                                       }}
-                                      className="p-1.5 text-zinc-400 hover:text-orange-600 rounded-lg hover:bg-zinc-100 transition"
+                                      className="p-1.5 text-zinc-400 hover:text-indigo-600 rounded-lg hover:bg-zinc-100 transition"
                                       title="Move Materials"
                                     >
                                       <Move className="w-3.5 h-3.5" />
@@ -1379,7 +1379,7 @@ export default function Library() {
                           className="p-4 flex items-center justify-between gap-4 hover:bg-zinc-50/50 cursor-pointer transition text-left"
                         >
                           <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="w-9 h-9 rounded-xl bg-orange-100/40 text-orange-600 flex items-center justify-center flex-shrink-0">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-100/40 text-indigo-600 flex items-center justify-center flex-shrink-0">
                               {mat.fileType === 'pdf' ? (
                                 <FileText className="w-4 h-4" />
                               ) : mat.fileType === 'video' ? (
@@ -1405,10 +1405,10 @@ export default function Library() {
                             
                             <button
                               onClick={(e) => toggleBookmark(mat.id, e)}
-                              className="p-1 text-zinc-400 hover:text-orange-500 rounded-lg transition"
+                              className="p-1 text-zinc-400 hover:text-indigo-500 rounded-lg transition"
                             >
                               {isBookmarked ? (
-                                <BookmarkCheck className="w-4 h-4 text-orange-600 fill-current" />
+                                <BookmarkCheck className="w-4 h-4 text-indigo-600 fill-current" />
                               ) : (
                                 <Bookmark className="w-4 h-4" />
                               )}
@@ -1448,7 +1448,7 @@ export default function Library() {
           <div className="w-full max-w-4xl bg-white rounded-3xl border border-zinc-200 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="bg-zinc-50 px-6 py-4 border-b border-zinc-200 flex justify-between items-center shrink-0">
               <div className="text-left">
-                <span className="text-[10px] font-bold text-orange-600 uppercase tracking-widest bg-orange-50 px-2 py-0.5 rounded-md">
+                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">
                   Preview Study Document
                 </span>
                 <h3 className="text-sm font-black text-zinc-950 block truncate mt-1">
@@ -1492,7 +1492,7 @@ export default function Library() {
                           incrementDownload(previewMaterial.id);
                           window.open(secureFileUrl, '_blank');
                         }}
-                        className="px-6 py-2.5 text-xs font-bold bg-orange-600 text-white rounded-xl shadow hover:bg-orange-700 transition flex items-center gap-1.5 mx-auto cursor-pointer"
+                        className="px-6 py-2.5 text-xs font-bold bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 transition flex items-center gap-1.5 mx-auto cursor-pointer"
                       >
                         <Download className="w-4 h-4" />
                         <span>Download Extension File Now</span>
@@ -1522,13 +1522,13 @@ export default function Library() {
                     }}
                     className="px-4 py-2 text-xs font-bold border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
                   >
-                    <Download className="w-4 h-4 text-orange-600" />
+                    <Download className="w-4 h-4 text-indigo-600" />
                     <span>Download File</span>
                   </button>
                 )}
                 <button 
                   onClick={() => setPreviewMaterial(null)}
-                  className="px-5 py-2 text-xs font-bold bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition cursor-pointer"
+                  className="px-5 py-2 text-xs font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition cursor-pointer"
                 >
                   Return to Directory
                 </button>
@@ -1551,10 +1551,10 @@ export default function Library() {
       {/* Admin Operations Dialog Panel drawer */}
       {showAdminModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg bg-[#FAF9F5] border border-orange-100 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="w-full max-w-lg bg-[#FAF9F5] border border-indigo-100 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="bg-white border-b border-zinc-200 px-6 py-4 flex items-center justify-between">
               <div className="text-left">
-                <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1">
+                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1">
                   <Sliders className="w-3.5 h-3.5" />
                   <span>Admin Library Workspace</span>
                 </span>
@@ -1581,7 +1581,7 @@ export default function Library() {
                   key={act.id}
                   onClick={() => setAdminAction(act.id as any)}
                   className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wide rounded-lg whitespace-nowrap transition cursor-pointer ${
-                    adminAction === act.id ? 'bg-orange-600 text-white shadow-sm' : 'text-zinc-500 hover:bg-zinc-50'
+                    adminAction === act.id ? 'bg-indigo-600 text-white shadow-sm' : 'text-zinc-500 hover:bg-zinc-50'
                   }`}
                 >
                   {act.label}
@@ -1602,12 +1602,12 @@ export default function Library() {
                       placeholder="e.g. Class 11, Class 12, JEE, NEET"
                       value={newClassName}
                       onChange={(e) => setNewClassName(e.target.value)}
-                      className="w-full text-xs font-medium border border-zinc-200 focus:border-orange-400 p-2.5 rounded-xl bg-white outline-none"
+                      className="w-full text-xs font-medium border border-zinc-200 focus:border-indigo-400 p-2.5 rounded-xl bg-white outline-none"
                     />
                   </div>
                   <button
                     onClick={handleCreateClass}
-                    className="w-full text-xs font-bold py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
+                    className="w-full text-xs font-bold py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
                   >
                     Create Structure Node
                   </button>
@@ -1635,12 +1635,12 @@ export default function Library() {
                       placeholder="e.g. Physics, Chemistry, Biology"
                       value={newSubjectName}
                       onChange={(e) => setNewSubjectName(e.target.value)}
-                      className="w-full text-xs font-medium border border-zinc-200 focus:border-orange-400 p-2.5 rounded-xl bg-white outline-none"
+                      className="w-full text-xs font-medium border border-zinc-200 focus:border-indigo-400 p-2.5 rounded-xl bg-white outline-none"
                     />
                   </div>
                   <button
                     onClick={handleCreateSubject}
-                    className="w-full text-xs font-bold py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
+                    className="w-full text-xs font-bold py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
                   >
                     Catalog Subject Node
                   </button>
@@ -1677,7 +1677,7 @@ export default function Library() {
                   </div>
                   <button
                     onClick={handleCreateChapter}
-                    className="w-full text-xs font-bold py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
+                    className="w-full text-xs font-bold py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
                   >
                     Create Chapter Subfolder
                   </button>
@@ -1784,17 +1784,17 @@ export default function Library() {
                     />
                     <label 
                       htmlFor="admin-library-uploader-file"
-                      className="mt-2 text-[10px] uppercase tracking-wider bg-orange-600 text-white font-bold p-1 px-3 rounded-md hover:bg-orange-700 transition cursor-pointer"
+                      className="mt-2 text-[10px] uppercase tracking-wider bg-indigo-600 text-white font-bold p-1 px-3 rounded-md hover:bg-indigo-700 transition cursor-pointer"
                     >
                       Select Document ...
                     </label>
                     {selectedFile && (
                       <div className="mt-3 w-full space-y-1.5">
-                        <p className="text-[10px] text-orange-600 font-bold truncate">File: {selectedFile.name}</p>
+                        <p className="text-[10px] text-indigo-600 font-bold truncate">File: {selectedFile.name}</p>
                         <button
                           onClick={uploadFileToServer}
                           disabled={isUploading}
-                          className="px-4 py-1.5 bg-orange-600 text-white rounded-lg text-[10px] font-bold hover:bg-orange-700 transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                          className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
                         >
                           {isUploading ? `Uploading ${uploadProgress}%` : 'Execute Sandbox Upload'}
                         </button>
@@ -1808,7 +1808,7 @@ export default function Library() {
                   <button
                     onClick={handleUploadMaterial}
                     disabled={!directFileUrl}
-                    className="w-full text-xs font-bold py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow transition mt-2 disabled:bg-zinc-300 cursor-pointer"
+                    className="w-full text-xs font-bold py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow transition mt-2 disabled:bg-zinc-300 cursor-pointer"
                   >
                     Catalog Study material
                   </button>
@@ -1872,7 +1872,7 @@ export default function Library() {
 
                   <button
                     onClick={handleMoveMaterial}
-                    className="w-full text-xs font-bold py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
+                    className="w-full text-xs font-bold py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow transition mt-2 cursor-pointer"
                   >
                     Move Document Item
                   </button>

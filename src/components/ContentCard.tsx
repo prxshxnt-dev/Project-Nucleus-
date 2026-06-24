@@ -1,5 +1,5 @@
 import React from "react";
-import { Folder, FolderOpen, FileText, Video, Eye, Download, Bookmark, Trash2, Edit2, Lock, Sparkles } from "lucide-react";
+import { Folder, FolderOpen, FileText, Video, Eye, Download, Bookmark, Trash2, Edit2, Lock, Sparkles, Cloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ContentCardProps {
@@ -20,6 +20,7 @@ export interface ContentCardProps {
   onDownload?: (e: React.MouseEvent) => void;
   onBookmark?: (e: React.MouseEvent) => void;
   className?: string;
+  isCloudSynced?: boolean;
 }
 
 export const ContentCard: React.FC<ContentCardProps> = ({
@@ -39,14 +40,15 @@ export const ContentCard: React.FC<ContentCardProps> = ({
   onDownload,
   onBookmark,
   className,
+  isCloudSynced = false,
 }) => {
   const isVideo = materialType === "video_lectures";
 
   // Define Folder styles and icons
   let FolderIcon = Folder;
-  let folderBgColor = "bg-orange-500/10 text-orange-500 border-orange-500/20";
+  let folderBgColor = "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
   if (folderType === "class") {
-    folderBgColor = "bg-orange-500/10 text-orange-500 border-orange-500/20";
+    folderBgColor = "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
   } else if (folderType === "subject") {
     folderBgColor = "bg-amber-500/10 text-amber-500 border-amber-500/20";
   } else if (folderType === "chapter") {
@@ -156,6 +158,11 @@ export const ContentCard: React.FC<ContentCardProps> = ({
 
             {/* Badges */}
             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              {isCloudSynced && (
+                <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-1" title="Synced to cloud">
+                  <Cloud className="w-3 h-3 fill-current" /> Synced
+                </span>
+              )}
               <span className="text-[9px] font-black uppercase tracking-wider bg-zinc-500/10 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded-md border border-zinc-200/25">
                 {getMaterialLabel()}
               </span>

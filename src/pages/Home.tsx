@@ -313,43 +313,19 @@ export default function Home() {
         onClick={() => setActiveStickerId(null)}
       >
         
-        {/* Soft colorful blobs floating in back */}
+        {/* Soft colorful blobs in back */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
-          <motion.div 
-            animate={{ 
-              x: [0, 40, -20, 0],
-              y: [0, -30, 40, 0],
-            }}
-            style={{ 
-              y: blobSpeed1, 
-              skewX: blobSkewX1, 
-              skewY: blobSkewY1, 
-              scale: blobScale1, 
-              rotate: blobRotate1 
-            }}
-            transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+          <div 
             className="absolute top-[10%] left-[5%] w-[380px] h-[380px] rounded-full bg-gradient-to-tr from-accent-primary/15 to-transparent blur-[100px]"
           />
-          <motion.div 
-            animate={{ 
-              x: [0, -50, 30, 0],
-              y: [0, 40, -30, 0],
-            }}
-            style={{ 
-              y: blobSpeed2, 
-              skewX: blobSkewX2, 
-              skewY: blobSkewY2, 
-              scale: blobScale2, 
-              rotate: blobRotate2 
-            }}
-            transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
+          <div 
             className="absolute bottom-[20%] right-[10%] w-[450px] h-[450px] rounded-full bg-gradient-to-tr from-[#ff82a0]/15 to-transparent blur-[120px]"
           />
           {/* Subtle learning theme grid outline */}
           <div className="absolute inset-0 bg-[radial-gradient(#e5d2a5_1px,transparent_1px)] [background-size:24px_24px] opacity-15" />
         </div>
 
-        {/* Dynamic Custom Orange Splatter Pop Splash with Academic/Targeted Photo */}
+        {/* Dynamic Custom Indigo Splatter Pop Splash with Academic/Targeted Photo */}
         {settings.aboutCornerImageUrl !== "none" && (
           <div className="absolute top-16 xs:top-20 sm:top-24 right-4 xs:right-6 lg:right-12 z-30 w-24 h-24 xs:w-28 xs:h-28 sm:w-36 sm:h-36 md:w-44 md:h-44 xl:w-52 xl:h-52 pointer-events-auto">
             {/* Pop Splash / Water Spill Background Effect */}
@@ -357,7 +333,7 @@ export default function Home() {
               <div className="absolute inset-0 pointer-events-none scale-140 z-0 select-none" style={{ animationDuration: '4s' }}>
                 {settings.aboutCornerBackground === "water_spread" ? (
                   // WATER SPREAD - smooth organic irregular liquid spread flat spill pattern
-                  <svg viewBox="0 0 100 100" className="w-full h-full text-accent-primary fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(241,90,41,0.35)]">
+                  <svg viewBox="0 0 100 100" className="w-full h-full text-accent-primary fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(79, 70, 229,0.35)]">
                     <path d="M50 8 C68 5, 87 14, 91 32 C95 48, 81 56, 85 70 C89 84, 69 94, 50 90 C31 86, 12 84, 8 66 C4 48, 16 40, 14 26 C12 11, 32 11, 50 8 Z" />
                     {/* Scattered uneven water drop splatters of varying sizes */}
                     <circle cx="86" cy="18" r="4" />
@@ -371,7 +347,7 @@ export default function Home() {
                   </svg>
                 ) : (
                   // BALLOON BURST POP - high energy spiking blast with splattered dots
-                  <svg viewBox="0 0 100 100" className="w-full h-full text-accent-primary fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(241,90,41,0.35)]">
+                  <svg viewBox="0 0 100 100" className="w-full h-full text-accent-primary fill-current opacity-90 filter drop-shadow-[0_16px_32px_rgba(79, 70, 229,0.35)]">
                     <path d="M50 14 C64 6, 79 10, 85 24 C91 38, 96 48, 88 64 C80 80, 70 88, 54 90 C38 92, 22 84, 15 72 C8 60, 5 40, 14 26 C23 12, 36 22, 50 14 Z" />
                     {/* Popping spike rays */}
                     <line x1="50" y1="14" x2="52" y2="2" stroke="var(--accent-primary)" strokeWidth="2" strokeLinecap="round" />
@@ -521,7 +497,7 @@ export default function Home() {
                 }}
                 className={`absolute pointer-events-auto cursor-pointer select-none flex items-center gap-1.5 xs:gap-2.5 px-2 py-1.5 xs:px-3.5 xs:py-2.5 rounded-xl xs:rounded-2xl border backdrop-blur-md transition-all duration-300 group ${
                   isActive 
-                    ? "shadow-[0_0_35px_rgba(229,210,165,0.45)] ring-2 ring-accent-primary brightness-110 z-40 scale-110" 
+                    ? "shadow-[0_0_35px_rgba(99, 102, 241,0.45)] ring-2 ring-accent-primary brightness-110 z-40 scale-110" 
                     : "shadow-lg z-20"
                 }`}
                 style={{
@@ -588,7 +564,7 @@ export default function Home() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       {/* Triangle Pointer */}
-                      <div className={`absolute bottom-full border-[8px] border-transparent border-b-zinc-950/95 filter drop-shadow-[0_-1px_1px_rgba(229,210,165,0.2)] ${
+                      <div className={`absolute bottom-full border-[8px] border-transparent border-b-zinc-950/95 filter drop-shadow-[0_-1px_1px_rgba(99, 102, 241,0.2)] ${
                         st.align === "left" 
                           ? "left-6" 
                           : st.align === "right" 
@@ -656,7 +632,7 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto mx-auto">
                 <button 
                   onClick={handleCTA}
-                  className="theme-btn-themed px-10 py-4.5 bg-accent-primary text-button-text font-bold hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_8px_25px_rgba(229,210,165,0.35)] w-full sm:w-auto flex items-center justify-center gap-2 group cursor-pointer"
+                  className="theme-btn-themed px-10 py-4.5 bg-accent-primary text-button-text font-bold hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_8px_25px_rgba(99, 102, 241,0.35)] w-full sm:w-auto flex items-center justify-center gap-2 group cursor-pointer"
                   style={{ borderRadius: 'var(--theme-btn-radius, 9999px)' }}
                 >
                   <span>{settings.heroCta1Text || 'Start Learning Info'}</span>
@@ -678,23 +654,15 @@ export default function Home() {
           <div className="lg:col-span-5 h-full relative flex items-center justify-center">
             <div className="relative w-full max-w-[420px]">
               <div 
-                className="relative w-full aspect-[10/16] bg-gradient-to-b from-[#FE9E5C] to-[#FA8339] rounded-[44px] border-[6px] border-white shadow-[0_24px_50px_rgba(251,148,81,0.25)] overflow-hidden flex flex-col items-center justify-center p-4"
+                className="relative w-full aspect-[10/16] bg-gradient-to-b from-[#4F46E5] to-[#312E81] rounded-[44px] border-[6px] border-white shadow-[0_24px_50px_rgba(79,70,229,0.15)] overflow-hidden flex flex-col items-center justify-center p-4"
               >
                 {/* Background SVG Flow Overlay with Crayon Chalk style lines and arrow highlights */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 160">
                   <defs>
                     <clipPath id="scallopClipHomeHero">
                       {/* Precise quadratic flower-petal scalloped mask */}
-                      <motion.path 
+                      <path 
                         d="M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
-                        animate={{ 
-                          d: [
-                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z",
-                            "M 50 8 Q 57 12 64 6 Q 72 12 78 9 Q 84 14 90 12 Q 92 21 97 21 Q 97 30 99 34 Q 97 43 97 49 Q 97 55 99 64 Q 97 68 97 77 Q 92 77 90 86 Q 84 84 78 92 Q 72 88 64 94 Q 57 88 50 94 Q 43 88 36 94 Q 28 88 22 92 Q 16 84 10 86 Q 8 77 3 77 Q 3 68 1 64 Q 3 55 3 49 Q 3 43 1 34 Q 3 30 3 21 Q 8 21 10 12 Q 16 14 22 9 Q 28 12 36 6 Q 43 12 50 8 Z",
-                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
-                          ]
-                        }}
-                        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
                       />
                     </clipPath>
                   </defs>
@@ -771,7 +739,7 @@ export default function Home() {
                 {/* Top-Right Cloud */}
                 <div className="absolute top-[6%] right-[3%] z-20">
                   <div className="relative w-36 xs:w-40 sm:w-44 select-none group cursor-pointer transition-transform duration-300 hover:scale-105 hover:-rotate-1">
-                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(253,148,81,0.2)]" viewBox="0 0 100 60" fill="#FFFFFF">
+                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(0,0,0,0.12)]" viewBox="0 0 100 60" fill="#FFFFFF">
                       <path d="M 20,45 C 15,45 10,41 10,36 C 10,30 15,25 21,25 C 23,17 30,11 39,11 C 47,11 54,16 57,23 C 60,19 65,16 71,16 C 79,16 86,23 86,31 C 86,32 86,34 85,35 C 89,35 92,39 92,43 C 92,48 88,52 83,52 L 20,52 Z" />
                     </svg>
                     <div className="absolute inset-x-0 bottom-4 top-5 flex flex-col items-center justify-center p-2 text-center">
@@ -788,19 +756,11 @@ export default function Home() {
                 {/* Center Scallop Avatar Frame */}
                 <div className="absolute top-[28%] left-[50%] -translate-x-1/2 z-20">
                   <div className="relative w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center select-none group cursor-pointer">
-                    <svg className="absolute w-[108%] h-[108%] filter drop-shadow-[0_16px_32px_rgba(0,0,0,0.2)]" viewBox="0 0 100 100">
+                    <svg className="absolute w-[108%] h-[108%] filter drop-shadow-[0_16px_32px_rgba(0,0,0,0.15)]" viewBox="0 0 100 100">
                       {/* Radiant Background outline shadow layer / glowing scallop */}
-                      <motion.path 
+                      <path 
                         d="M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
-                        fill="#FEE2E2" 
-                        animate={{ 
-                          d: [
-                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z",
-                            "M 50 8 Q 57 12 64 6 Q 72 12 78 9 Q 84 14 90 12 Q 92 21 97 21 Q 97 30 99 34 Q 97 43 97 49 Q 97 55 99 64 Q 97 68 97 77 Q 92 77 90 86 Q 84 84 78 92 Q 72 88 64 94 Q 57 88 50 94 Q 43 88 36 94 Q 28 88 22 92 Q 16 84 10 86 Q 8 77 3 77 Q 3 68 1 64 Q 3 55 3 49 Q 3 43 1 34 Q 3 30 3 21 Q 8 21 10 12 Q 16 14 22 9 Q 28 12 36 6 Q 43 12 50 8 Z",
-                            "M 50 5 Q 58 11 65 5 Q 73 11 79 7 Q 85 15 91 13 Q 93 22 98 22 Q 98 31 100 35 Q 98 44 98 50 Q 98 56 100 65 Q 98 69 98 78 Q 93 78 91 87 Q 85 85 79 93 Q 73 89 65 95 Q 58 89 50 95 Q 42 89 35 95 Q 27 89 21 93 Q 15 85 9 87 Q 7 78 2 78 Q 2 69 0 65 Q 2 56 2 50 Q 2 44 0 35 Q 2 31 2 22 Q 7 22 9 13 Q 15 15 21 7 Q 27 11 35 5 Q 42 11 50 5 Z"
-                          ]
-                        }}
-                        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+                        fill="#EEF2F6" 
                         className="transform scale-[1.03] origin-center opacity-90 transition-transform duration-300 group-hover:scale-[1.05]"
                       />
                       <g clipPath="url(#scallopClipHomeHero)">
@@ -823,7 +783,7 @@ export default function Home() {
                 {/* Middle-Left Cloud */}
                 <div className="absolute top-[48%] left-[3%] z-20">
                   <div className="relative w-[146px] xs:w-[160px] sm:w-[174px] select-none group cursor-pointer transition-transform duration-300 hover:scale-105 hover:rotate-1">
-                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(253,148,81,0.2)]" viewBox="0 0 100 60" fill="#FFFFFF">
+                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(0,0,0,0.12)]" viewBox="0 0 100 60" fill="#FFFFFF">
                       <path d="M 20,45 C 15,45 10,41 10,36 C 10,30 15,25 21,25 C 23,17 30,11 39,11 C 47,11 54,16 57,23 C 60,19 65,16 71,16 C 79,16 86,23 86,31 C 86,32 86,34 85,35 C 89,35 92,39 92,43 C 92,48 88,52 83,52 L 20,52 Z" />
                     </svg>
                     <div className="absolute inset-x-0 bottom-4 top-5 flex flex-col items-center justify-center p-2 text-center">
@@ -840,7 +800,7 @@ export default function Home() {
                 {/* Bottom-Center Cloud */}
                 <div className="absolute bottom-[6%] left-[28%] z-20">
                   <div className="relative w-40 xs:w-44 sm:w-48 select-none group cursor-pointer transition-transform duration-300 hover:scale-105 hover:-rotate-1">
-                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(253,148,81,0.2)]" viewBox="0 0 100 60" fill="#FFFFFF">
+                    <svg className="w-full h-auto drop-shadow-[0_8px_16px_rgba(0,0,0,0.12)]" viewBox="0 0 100 60" fill="#FFFFFF">
                       <path d="M 20,45 C 15,45 10,41 10,36 C 10,30 15,25 21,25 C 23,17 30,11 39,11 C 47,11 54,16 57,23 C 60,19 65,16 71,16 C 79,16 86,23 86,31 C 86,32 86,34 85,35 C 89,35 92,39 92,43 C 92,48 88,52 83,52 L 20,52 Z" />
                     </svg>
                     <div className="absolute inset-x-0 bottom-4 top-5 flex flex-col items-center justify-center p-2 text-center">
@@ -928,9 +888,9 @@ export default function Home() {
                 
                 {/* Underneath Notebook Page: Chemistry/Uses of Graphite */}
                 <div 
-                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-slate-200/60 dark:border-zinc-800 p-5 md:p-6 flex flex-col text-left transition-all duration-500 origin-bottom group-hover:rotate-[-6deg] group-hover:translate-x-[-12px] group-hover:translate-y-[-8px]"
+                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-slate-200/60 dark:border-zinc-800 p-5 md:p-6 flex flex-col text-left transition-all duration-300 origin-bottom"
                   style={{
-                    transform: 'rotate(-4deg) translateY(20px) translateX(-5px)',
+                    transform: 'none',
                     backgroundImage: 'repeating-linear-gradient(#ffffff 0px, #ffffff 21px, #eef2f6 22px)',
                     backgroundSize: '100% 22px'
                   }}
@@ -942,7 +902,7 @@ export default function Home() {
                   <div className="pl-6 pt-2 font-handwriting text-[9px] md:text-[10px] text-slate-700 dark:text-slate-300 font-medium leading-[22px] overflow-hidden">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px] md:text-[12px]"># USES OF GRAPHITE</span>
-                      <span className="text-[8px] px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-200 rounded font-bold font-mono rotate-3">RANK #1 TIPS</span>
+                      <span className="text-[8px] px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-200 rounded font-bold font-mono border-none select-none">RANK #1 TIPS</span>
                     </div>
 
                     <div className="mt-2 font-mono flex items-center justify-between">
@@ -969,9 +929,9 @@ export default function Home() {
 
                 {/* Top Overlay Notebook Page: Hydrocarbons & Formulas */}
                 <div 
-                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-700 p-5 md:p-6 flex flex-col text-left transition-all duration-500 origin-bottom group-hover:rotate-[3deg] group-hover:translate-x-[12px] group-hover:translate-y-[-10px]"
+                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-700 p-5 md:p-6 flex flex-col text-left transition-all duration-300 origin-bottom"
                   style={{
-                    transform: 'rotate(1deg) translateY(35px) translateX(10px)',
+                    transform: 'translateY(12px)',
                     backgroundImage: 'repeating-linear-gradient(#ffffff 0px, #ffffff 21px, #e2e8f0 22px)',
                     backgroundSize: '100% 22px'
                   }}
@@ -1308,8 +1268,8 @@ export default function Home() {
                 <br className="sm:hidden" />
                 <span className="relative inline-block whitespace-nowrap p-1">
                   Nucleus Classes!
-                  {/* Custom orange highlighter/felt-tip pen double underline */}
-                  <svg className="absolute -bottom-3.5 left-0 w-full h-4 text-orange-500 opacity-95" viewBox="0 0 100 10" preserveAspectRatio="none">
+                  {/* Custom indigo highlighter/felt-tip pen double underline */}
+                  <svg className="absolute -bottom-3.5 left-0 w-full h-4 text-indigo-500 opacity-95" viewBox="0 0 100 10" preserveAspectRatio="none">
                     <path d="M 2 5 C 30 3, 70 2, 98 4" fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
                     <path d="M 12 9 C 42 7, 72 6, 88 8" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                   </svg>
@@ -1362,7 +1322,7 @@ export default function Home() {
                 scale: activePricingCard === 'notes' ? 1.04 : 0.94,
                 opacity: activePricingCard === 'notes' ? 1 : 0.55,
                 borderColor: activePricingCard === 'notes' ? 'var(--accent-primary, #e5d2a5)' : 'rgba(255,255,255,0.08)',
-                boxShadow: activePricingCard === 'notes' ? '0 15px 40px rgba(229, 210, 165, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: activePricingCard === 'notes' ? '0 15px 40px rgba(99, 102, 241, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
                 y: activePricingCard === 'notes' ? -8 : 0,
               }}
               transition={{ type: 'spring', stiffness: 220, damping: 25 }}
@@ -1429,7 +1389,7 @@ export default function Home() {
                 scale: activePricingCard === 'lectures' ? 1.04 : 0.94,
                 opacity: activePricingCard === 'lectures' ? 1 : 0.55,
                 borderColor: activePricingCard === 'lectures' ? 'var(--accent-primary, #e5d2a5)' : 'rgba(255,255,255,0.08)',
-                boxShadow: activePricingCard === 'lectures' ? '0 15px 40px rgba(229, 210, 165, 0.25)' : '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: activePricingCard === 'lectures' ? '0 15px 40px rgba(99, 102, 241, 0.25)' : '0 4px 12px rgba(0,0,0,0.1)',
                 y: activePricingCard === 'lectures' ? -8 : 0,
               }}
               transition={{ type: 'spring', stiffness: 220, damping: 25 }}
@@ -1572,7 +1532,7 @@ export default function Home() {
                   onClick={() => scrollToPlan(plan)}
                   className={`h-2.5 rounded-full transition-all duration-300 hover:opacity-100 cursor-pointer ${
                     isActive 
-                      ? `${dotActiveBg} w-6 shadow-[0_0_12px_rgba(229,210,165,0.4)]` 
+                      ? `${dotActiveBg} w-6 shadow-[0_0_12px_rgba(99, 102, 241,0.4)]` 
                       : 'bg-[#f2f2f2]/10 w-2.5 hover:bg-[#f2f2f2]/25'
                   }`}
                   aria-label={`Scroll to plan ${i + 1}`}

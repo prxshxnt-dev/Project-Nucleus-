@@ -302,7 +302,7 @@ export default function Learn() {
                               key={mat.id}
                               initial={{ opacity: 0, y: 5 }}
                               animate={{ opacity: 1, y: 0 }}
-                              whileHover={{ scale: 1.015, y: -2, boxShadow: "0 10px 25px rgba(241, 90, 41, 0.08)" }}
+                              whileHover={{ scale: 1.015, y: -2, boxShadow: "0 10px 25px rgba(79, 70, 229, 0.08)" }}
                               whileTap={{ scale: 0.985 }}
                               transition={{ type: "spring", stiffness: 380, damping: 30 }}
                               className="relative overflow-hidden p-4 rounded-xl bg-card border border-border-color/80 flex items-center justify-between text-left shadow-sm hover:border-accent-primary cursor-pointer transition-colors duration-200"

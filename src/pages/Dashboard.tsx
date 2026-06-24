@@ -732,7 +732,7 @@ export default function Dashboard() {
                     <p className="text-[10px] text-text-muted font-bold tracking-wider uppercase leading-none">Study Batch</p>
                     <span className="text-[9px] font-black uppercase text-accent-primary bg-accent-primary/10 px-1 py-0.5 rounded border border-accent-primary/15 tracking-wide">Edit</span>
                   </div>
-                  <p className="text-lg font-black text-text-primary leading-none capitalize mt-1 text-[#F15A29]">
+                  <p className="text-lg font-black text-text-primary leading-none capitalize mt-1 text-[#4F46E5]">
                     {user.classGroup === 'all' || !user.classGroup ? 'All Classes' : `Class ${user.classGroup}`}
                   </p>
                 </div>
@@ -763,7 +763,7 @@ export default function Dashboard() {
               { id: 'class_9', label: 'Class 9', glow: 'from-pink-500/10' },
               { id: 'class_10', label: 'Class 10', glow: 'from-rose-500/10' },
               { id: 'class_11', label: 'Class 11', glow: 'from-amber-500/10' },
-              { id: 'class_12', label: 'Class 12', glow: 'from-orange-500/10' },
+              { id: 'class_12', label: 'Class 12', glow: 'from-violet-500/10' },
               { id: 'class_jee', label: 'JEE Main/Adv', glow: 'from-emerald-500/10' },
               { id: 'class_neet', label: 'NEET', glow: 'from-teal-500/10' },
               { id: 'class_droppers', label: 'Droppers', glow: 'from-cyan-500/10' }
@@ -1331,7 +1331,7 @@ export default function Dashboard() {
                 scale: activeDashboardPricingCard === 'notes' ? 1.04 : 0.94,
                 opacity: activeDashboardPricingCard === 'notes' ? 1 : 0.7,
                 borderColor: activeDashboardPricingCard === 'notes' ? 'var(--accent-primary, #e5d2a5)' : 'rgba(255,255,255,0.08)',
-                boxShadow: activeDashboardPricingCard === 'notes' ? '0 15px 40px rgba(229, 210, 165, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: activeDashboardPricingCard === 'notes' ? '0 15px 40px rgba(99, 102, 241, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
                 y: activeDashboardPricingCard === 'notes' ? -4 : 0,
               }}
               transition={{ type: 'spring', stiffness: 220, damping: 25 }}
@@ -1367,7 +1367,7 @@ export default function Dashboard() {
                 scale: activeDashboardPricingCard === 'lectures' ? 1.04 : 0.94,
                 opacity: activeDashboardPricingCard === 'lectures' ? 1 : 0.7,
                 borderColor: activeDashboardPricingCard === 'lectures' ? 'var(--accent-primary, #e5d2a5)' : 'rgba(255,255,255,0.08)',
-                boxShadow: activeDashboardPricingCard === 'lectures' ? '0 15px 40px rgba(229, 210, 165, 0.25)' : '0 4px 12px rgba(0,0,0,0.1)',
+                boxShadow: activeDashboardPricingCard === 'lectures' ? '0 15px 40px rgba(99, 102, 241, 0.25)' : '0 4px 12px rgba(0,0,0,0.1)',
                 y: activeDashboardPricingCard === 'lectures' ? -4 : 0,
               }}
               transition={{ type: 'spring', stiffness: 220, damping: 25 }}
@@ -1453,7 +1453,7 @@ export default function Dashboard() {
                   onClick={() => scrollDashboardToPlan(plan)}
                   className={`h-2.5 rounded-full transition-all duration-300 hover:opacity-100 cursor-pointer ${
                     isActive 
-                      ? `${dotActiveBg} w-6 shadow-[0_0_12px_rgba(229,210,165,0.4)]` 
+                      ? `${dotActiveBg} w-6 shadow-[0_0_12px_rgba(99, 102, 241,0.4)]` 
                       : 'bg-[#f2f2f2]/10 w-2.5 hover:bg-[#f2f2f2]/25'
                   }`}
                   aria-label={`Scroll to dashboard plan ${i + 1}`}

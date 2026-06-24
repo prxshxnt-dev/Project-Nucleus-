@@ -170,13 +170,13 @@ export default function QuickNoteButton({ materialId, materialTitle, userId, use
           whileHover={{ scale: 1.1, translateY: -2 }}
           whileTap={{ scale: 0.9 }}
           title="Open dynamic Quick Notes panel"
-          className="bg-primary hover:bg-[#D4471B] text-white p-4 rounded-full shadow-2xl flex items-center justify-center border border-white/20 select-none group transition-all duration-300"
+          className="bg-primary hover:bg-[#3730A3] text-white p-4 rounded-full shadow-2xl flex items-center justify-center border border-white/20 select-none group transition-all duration-300"
         >
           <FileText className="w-6 h-6 transition-transform duration-300 group-hover:rotate-12" />
           <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-500 ease-in-out font-display text-xs font-black uppercase tracking-wider pl-0 group-hover:pl-2 whitespace-nowrap">
             Quick Notes
           </span>
-          <span className="absolute -top-1.5 -right-1.5 bg-[#1F1F1F] text-[#FDF5E6] text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border border-primary">
+          <span className="absolute -top-1.5 -right-1.5 bg-[#1F1F1F] text-[#F8FAFC] text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border border-primary">
             {loading ? '..' : notes.length}
           </span>
         </motion.button>
@@ -200,7 +200,7 @@ export default function QuickNoteButton({ materialId, materialTitle, userId, use
               className="w-full max-w-md h-full bg-[#FFFDF9] border-l border-black/15 shadow-2xl flex flex-col text-[#1F1F1F]"
             >
               {/* Sidebar Header */}
-              <div className="p-6 border-b border-black/10 flex items-center justify-between bg-[#FDF5E6]">
+              <div className="p-6 border-b border-black/10 flex items-center justify-between bg-[#F8FAFC]">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 bg-primary/10 text-primary rounded-xl">
                     <FileText className="w-5 h-5" />
@@ -250,7 +250,7 @@ export default function QuickNoteButton({ materialId, materialTitle, userId, use
                       rows={4}
                       maxLength={1000}
                       required
-                      className="w-full p-4 bg-[#FDF5E6] border border-black/10 rounded-2xl text-sm font-semibold text-[#1F1F1F] placeholder-[#7A7A7A]/75 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-300 resize-none shadow-inner"
+                      className="w-full p-4 bg-[#F8FAFC] border border-black/10 rounded-2xl text-sm font-semibold text-[#1F1F1F] placeholder-[#7A7A7A]/75 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-300 resize-none shadow-inner"
                     />
                     <div className="text-right text-[10px] text-[#7A7A7A] font-semibold">
                       {currentText.length}/1000 characters
@@ -262,7 +262,7 @@ export default function QuickNoteButton({ materialId, materialTitle, userId, use
                     disabled={saving}
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    className="w-full py-3.5 bg-primary text-[#FDF5E6] rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors"
+                    className="w-full py-3.5 bg-primary text-[#F8FAFC] rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors"
                   >
                     {saving ? (
                       <>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -8,17 +8,20 @@ import { useSettingsStore } from './store/settingsStore';
 import { motion, AnimatePresence } from 'motion/react';
 import Lenis from 'lenis';
 
-// Pages
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Learn from './pages/Learn';
-import AdminDashboard from './pages/AdminDashboard';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import VerifyOtp from './pages/VerifyOtp';
-import ForgotPassword from './pages/ForgotPassword';
-import SelectStandard from './pages/SelectStandard';
-import Library from './pages/Library';
+// Lazy loaded page components for optimal performance & instant loading
+const Home = lazy(() => import('./pages/Home'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Learn = lazy(() => import('./pages/Learn'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const VerifyOtp = lazy(() => import('./pages/VerifyOtp'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const SelectStandard = lazy(() => import('./pages/SelectStandard'));
+const Library = lazy(() => import('./pages/Library'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ThemeProvider from './components/ThemeProvider';
@@ -27,38 +30,34 @@ import ScreenProtector from './components/ScreenProtector';
 import { AIAssistantBot } from './components/AIAssistantBot';
 import PwaManager from './components/PwaManager';
 import LiquidGlassDock from './components/LiquidGlassDock';
-import GlobalLoader from './components/GlobalLoader';
 import OrbitalLoader from './components/OrbitalLoader';
 
 function AppContent() {
   const { setUser, setLoading, user, loading } = useAuthStore();
   const { setSettings } = useSettingsStore();
-  const [localLoading, setLocalLoading] = useState(true);
-  const [routeTransitioning, setRouteTransitioning] = useState(false);
   const location = useLocation();
-  const prevPathRef = useRef(location.pathname);
 
   useEffect(() => {
-    if (prevPathRef.current !== location.pathname) {
-      prevPathRef.current = location.pathname;
-      setRouteTransitioning(true);
-      const timer = setTimeout(() => {
-        setRouteTransitioning(false);
-      }, 750);
-      return () => clearTimeout(timer);
+    // Check if device supports touch input or maxTouchPoints is active to bypass Lenis
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) {
+      // Allow pure native inertial momentum scrolling on mobile to completely prevent standard jitter/lag
+      return;
     }
-  }, [location.pathname]);
 
-  useEffect(() => {
-    const lenis = new Lenis();
+    const lenis = new Lenis({
+      duration: 1.1,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    });
     (window as any).lenisInstance = lenis;
 
     function raf(time: number) {
       lenis.raf(time);
       requestAnimationFrame(raf);
     }
-    requestAnimationFrame(raf);
+    let rafId = requestAnimationFrame(raf);
     return () => {
+      cancelAnimationFrame(rafId);
       lenis.destroy();
       delete (window as any).lenisInstance;
     };
@@ -72,10 +71,7 @@ function AppContent() {
     }
   }, [location.pathname]);
 
-  // Trigger the premium loader for all internal routing page/section transitions
-  useEffect(() => {
-    setLocalLoading(true);
-  }, [location.pathname, location.search, location.hash]);
+
 
   useEffect(() => {
     // Fetch global settings
@@ -181,47 +177,34 @@ function AppContent() {
 
   return (
     <>
-      <AnimatePresence mode="wait">
-        {(loading || localLoading) && (
-          <GlobalLoader key="global-app-loader" onFullyLoaded={() => setLocalLoading(false)} />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {routeTransitioning && (
-          <motion.div
-            key="route-loader-layer"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[999999] pointer-events-auto"
-          >
-            <OrbitalLoader size="fullscreen" text="Switching study sections..." />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30 ${(loading || localLoading) ? 'invisible h-0 overflow-hidden' : 'visible'}`}>
+      <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30 ${loading ? 'invisible h-0 overflow-hidden' : 'visible'}`}>
         <ScreenProtector />
         <ThemeProvider />
         <SeasonalOverlay />
         <Navbar />
         <PwaManager />
         <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/verify-otp" element={<VerifyOtp />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/select-standard" element={<SelectStandard />} />
-            <Route path="/learn" element={<Learn />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={
+            <div className="flex min-h-[60vh] items-center justify-center p-12">
+              <OrbitalLoader size="md" text="Loading study portal..." />
+            </div>
+          }>
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/verify-otp" element={<VerifyOtp />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/select-standard" element={<SelectStandard />} />
+              <Route path="/learn" element={<Learn />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </AnimatePresence>
         <LiquidGlassDock />
         <AIAssistantBot />

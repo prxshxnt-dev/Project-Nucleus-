@@ -22,68 +22,6 @@ export default function OrbitalLoader({
 
   const isFullscreen = size === 'fullscreen';
 
-  // Define dynamic orbital rotating ring keyframes that leverage root CSS variables
-  const styles = `
-    .orbit-perspective {
-      perspective: 800px;
-    }
-    .orbit-inner {
-      position: absolute;
-      box-sizing: border-box;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;  
-    }
-    .orbit-inner.one {
-      left: 0%;
-      top: 0%;
-      animation: orbit-rotate-one 1.2s linear infinite;
-      border-bottom: 3.5px solid var(--accent-primary, #4F46E5);
-      filter: drop-shadow(0 0 4px var(--accent-primary, #4F46E5));
-    }
-    .orbit-inner.two {
-      right: 0%;
-      top: 0%;
-      animation: orbit-rotate-two 1.2s linear infinite;
-      border-right: 3.5px solid var(--primary-custom, #4F46E5);
-      filter: drop-shadow(0 0 4px var(--primary-custom, #4F46E5));
-    }
-    .orbit-inner.three {
-      right: 0%;
-      bottom: 0%;
-      animation: orbit-rotate-three 1.2s linear infinite;
-      border-top: 3.5px solid var(--theme-accent-glow, #FBBF24);
-      filter: drop-shadow(0 0 4px var(--theme-accent-glow, #FBBF24));
-    }
-
-    @keyframes orbit-rotate-one {
-      0% {
-        transform: rotateX(35deg) rotateY(-45deg) rotateZ(0deg);
-      }
-      100% {
-        transform: rotateX(35deg) rotateY(-45deg) rotateZ(360deg);
-      }
-    }
-
-    @keyframes orbit-rotate-two {
-      0% {
-        transform: rotateX(50deg) rotateY(10deg) rotateZ(0deg);
-      }
-      100% {
-        transform: rotateX(50deg) rotateY(10deg) rotateZ(360deg);
-      }
-    }
-
-    @keyframes orbit-rotate-three {
-      0% {
-        transform: rotateX(35deg) rotateY(55deg) rotateZ(0deg);
-      }
-      100% {
-        transform: rotateX(35deg) rotateY(55deg) rotateZ(360deg);
-      }
-    }
-  `;
-
   if (isFullscreen) {
     return (
       <div className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center p-6 select-none bg-black/10 backdrop-blur-md transition-all duration-300 ${className}`}>

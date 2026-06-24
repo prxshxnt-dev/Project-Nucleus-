@@ -220,7 +220,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#FDF5E6]">
+    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#F8FAFC]">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -255,7 +255,7 @@ export default function ForgotPassword() {
                   <h3 className="font-bold text-xl text-green-700">Check Your Email</h3>
                   <p className="text-sm text-[#555555] leading-relaxed">
                     A Firebase password reset link has been dispatched to:
-                    <span className="block font-bold text-[#1F1F1F] mt-1 break-all bg-[#FDF5E6] p-2 rounded-xl border border-black/5">{email}</span>
+                    <span className="block font-bold text-[#1F1F1F] mt-1 break-all bg-[#F8FAFC] p-2 rounded-xl border border-black/5">{email}</span>
                   </p>
                   <p className="text-xs text-[#7A7A7A] leading-relaxed">
                     Please click the secure link in the email to define your new password. Check your spam/junk folder if the reset link does not show up within 2 minutes.
@@ -347,7 +347,7 @@ export default function ForgotPassword() {
                           onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
                           placeholder="••••••"
                           required
-                          className="w-full text-center text-2xl font-black tracking-[0.5em] py-3 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+                          className="w-full text-center text-2xl font-black tracking-[0.5em] py-3 bg-[#F8FAFC] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                         />
                       </div>
 
@@ -409,7 +409,7 @@ export default function ForgotPassword() {
                     transition={{ duration: 0.3 }}
                   >
                     {/* Dual Toggle Tabs */}
-                    <div className="flex gap-2 mb-6 bg-[#FDF5E6] p-1 rounded-2xl border border-black/10">
+                    <div className="flex gap-2 mb-6 bg-[#F8FAFC] p-1 rounded-2xl border border-black/10">
                       <button
                         type="button"
                         onClick={() => setForgotMethod('firebase')}
@@ -449,7 +449,7 @@ export default function ForgotPassword() {
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="student@nucleus.cc"
                             required
-                            className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+                            className="w-full pl-12 pr-4 py-3.5 bg-[#F8FAFC] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                           />
                         </div>
                       </div>
@@ -461,7 +461,7 @@ export default function ForgotPassword() {
                             id="alreadyHaveOtp"
                             checked={alreadyHaveOtp}
                             onChange={(e) => setAlreadyHaveOtp(e.target.checked)}
-                            className="w-4 h-4 text-primary border-black/15 bg-[#FDF5E6] rounded focus:ring-primary focus:ring-offset-0 cursor-pointer accent-primary"
+                            className="w-4 h-4 text-primary border-black/15 bg-[#F8FAFC] rounded focus:ring-primary focus:ring-offset-0 cursor-pointer accent-primary"
                           />
                           <label htmlFor="alreadyHaveOtp" className="text-xs font-bold text-[#1F1F1F] uppercase tracking-wider cursor-pointer select-none">
                             I already have an OTP code
@@ -485,7 +485,7 @@ export default function ForgotPassword() {
                               onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
                               placeholder="000000"
                               required
-                              className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-center text-xl font-bold tracking-[0.25em] text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+                              className="w-full pl-12 pr-4 py-3.5 bg-[#F8FAFC] border border-black/10 rounded-2xl text-center text-xl font-bold tracking-[0.25em] text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                             />
                           </div>
                         </div>
@@ -556,7 +556,7 @@ export default function ForgotPassword() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Minimum 6 characters"
                     required
-                    className="w-full pl-12 pr-12 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
+                    className="w-full pl-12 pr-12 py-3.5 bg-[#F8FAFC] border border-black/10 rounded-2xl text-[#1F1F1F] placeholder-[#7A7A7A] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200"
                   />
                   <button 
                     type="button" 

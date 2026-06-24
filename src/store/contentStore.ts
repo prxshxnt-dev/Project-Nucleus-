@@ -53,6 +53,8 @@ export interface MaterialItem {
   downloadCount: number;
   bookmarks: string[];
   createdAt?: any;
+  isCloudSynced?: boolean;
+  cloudUrl?: string;
 }
 
 interface ContentState {

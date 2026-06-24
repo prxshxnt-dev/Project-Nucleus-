@@ -36,6 +36,7 @@ import {
 import { SyllabusRenderer, getDefaultSyllabus } from "../components/SyllabusRenderer";
 import { ContentManagement } from "../components/ContentManagement";
 import { parseYouTubeVideoId } from "../components/CustomVideoPlayer";
+import LegalMarkdownEditor from "../components/LegalMarkdownEditor";
 
 const PRESET_INFO: Record<
   string,
@@ -44,12 +45,12 @@ const PRESET_INFO: Record<
   default: {
     name: "1. Default Luxury Gold",
     desc: "Slate-dark baseline aesthetic framing key learning workflows. Refined typography alongside luxurious bronze and pale gold accents.",
-    colors: ["#070709", "var(--primary-custom, #F15A29)", "#b59f6d"],
+    colors: ["#070709", "var(--primary-custom, #4F46E5)", "#b59f6d"],
   },
   theme2: {
-    name: "2. Cyber Oracle Flame",
-    desc: "SaaS-powered design with rich futuristic orange-red glowing gradients, dark dashboard borders and sharp cyberpunk corners.",
-    colors: ["#030303", "#f97316", "#ef4444"],
+    name: "2. Emerald Mint Academy",
+    desc: "SaaS-powered design with rich futuristic emerald mint glowing gradients, dark dashboard borders and sleek modern corners.",
+    colors: ["#022C22", "#10B981", "#34D399"],
   },
   theme3: {
     name: "3. Creator Cosmic Blue",
@@ -61,10 +62,10 @@ const PRESET_INFO: Record<
     desc: "Vibrant modern neon glassmorphic purple layouts, glowing cards, translucent panels, cosmic sparkles, and Dribbble-level tech flow.",
     colors: ["#090514", "#a855f7", "#3b82f6"],
   },
-  orange_academy: {
-    name: "7. Orange Modern Academy",
-    desc: "An energetic SaaS learning hub featuring bright orange primary accents, smooth transitions, and high contrast typography.",
-    colors: ["#0b0908", "#ea580c", "#fbbf24"],
+  royal_academy: {
+    name: "7. Royal Indigo Academy",
+    desc: "An energetic SaaS learning hub featuring royal indigo primary accents, smooth transitions, and high contrast typography.",
+    colors: ["#0b0914", "#6366F1", "#3B82F6"],
   },
   space_galaxy: {
     name: "8. Space Deep Galaxy",
@@ -141,7 +142,7 @@ export default function AdminDashboard() {
     }
   }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<
-    "materials" | "users" | "mentors" | "settings" | "appearance" | "security" | "syllabus" | "support_chats" | "content_management"
+    "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management"
   >("content_management");
 
   // Content Management Sub-tab States
@@ -388,6 +389,8 @@ export default function AdminDashboard() {
   const [footerLegal2Url, setFooterLegal2Url] = useState("#");
 
   const [reviewFormUrl, setReviewFormUrl] = useState("");
+  const [termsContent, setTermsContent] = useState(() => useSettingsStore.getState().settings.termsContent || "");
+  const [privacyContent, setPrivacyContent] = useState(() => useSettingsStore.getState().settings.privacyContent || "");
 
   // --- Security & DRM Panel Settings ---
   const [secVideoDownloads, setSecVideoDownloads] = useState(false);
@@ -567,7 +570,7 @@ export default function AdminDashboard() {
   const [aboutRatingDesc, setAboutRatingDesc] = useState("Highly recommended study app");
   const [aboutCornerImageUrl, setAboutCornerImageUrl] = useState("https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&q=80&w=400");
   const [aboutCornerImgShape, setAboutCornerImgShape] = useState<"circle" | "card">("circle");
-  const [aboutCornerBackground, setAboutCornerBackground] = useState<"orange_burst" | "water_spread" | "none">("water_spread");
+  const [aboutCornerBackground, setAboutCornerBackground] = useState<"indigo_burst" | "water_spread" | "none">("water_spread");
   const [aboutTeacherPhotoUrl, setAboutTeacherPhotoUrl] = useState("");
   const [aboutTeacherName, setAboutTeacherName] = useState("Dr. Anand Kumar");
   const [aboutTeacherRole, setAboutTeacherRole] = useState("Senior Physics Specialist (Ex-IIT)");
@@ -586,8 +589,7 @@ export default function AdminDashboard() {
   const [socialYoutubeShow, setSocialYoutubeShow] = useState(true);
   const [socialTelegramUrl, setSocialTelegramUrl] = useState("https://t.me/nucleus");
   const [socialTelegramShow, setSocialTelegramShow] = useState(true);
-  const [socialDiscordUrl, setSocialDiscordUrl] = useState("https://discord.gg/nucleus");
-  const [socialDiscordShow, setSocialDiscordShow] = useState(true);
+
   const [socialTwitterUrl, setSocialTwitterUrl] = useState("https://x.com/nucleus");
   const [socialTwitterShow, setSocialTwitterShow] = useState(false);
   const [socialLinkedinUrl, setSocialLinkedinUrl] = useState("");
@@ -710,11 +712,11 @@ export default function AdminDashboard() {
 
   // Real-Time UI Theme Switching & Builder States
   const [appearanceTheme, setAppearanceTheme] = useState<string>("default");
-  const [primaryColor, setPrimaryColor] = useState("var(--primary-custom, #F15A29)");
+  const [primaryColor, setPrimaryColor] = useState("var(--primary-custom, #4F46E5)");
   const [secondaryColor, setSecondaryColor] = useState("#b59f6d");
-  const [accentGlowColor, setAccentGlowColor] = useState("var(--primary-custom, #F15A29)");
+  const [accentGlowColor, setAccentGlowColor] = useState("var(--primary-custom, #4F46E5)");
   const [backgroundColor, setBackgroundColor] = useState("#070709");
-  const [gradientStart, setGradientStart] = useState("var(--primary-custom, #F15A29)");
+  const [gradientStart, setGradientStart] = useState("var(--primary-custom, #4F46E5)");
   const [gradientEnd, setGradientEnd] = useState("#070709");
   const [buttonStyle, setButtonStyle] = useState<"pill" | "rounded" | "square">(
     "pill",
@@ -854,6 +856,8 @@ export default function AdminDashboard() {
         if (d.footerLegal2Url !== undefined)
           setFooterLegal2Url(d.footerLegal2Url);
         if (d.reviewFormUrl !== undefined) setReviewFormUrl(d.reviewFormUrl);
+        if (d.termsContent !== undefined) setTermsContent(d.termsContent);
+        if (d.privacyContent !== undefined) setPrivacyContent(d.privacyContent);
 
           setAboutShowMockCard(d.aboutShowMockCard !== undefined ? d.aboutShowMockCard : true);
           setAboutMockCardTitle(d.aboutMockCardTitle || "Physics Expert");
@@ -891,8 +895,7 @@ export default function AdminDashboard() {
           setSocialYoutubeShow(d.socialYoutubeShow !== undefined ? d.socialYoutubeShow : true);
           setSocialTelegramUrl(d.socialTelegramUrl !== undefined ? d.socialTelegramUrl : "https://t.me/nucleus");
           setSocialTelegramShow(d.socialTelegramShow !== undefined ? d.socialTelegramShow : true);
-          setSocialDiscordUrl(d.socialDiscordUrl !== undefined ? d.socialDiscordUrl : "https://discord.gg/nucleus");
-          setSocialDiscordShow(d.socialDiscordShow !== undefined ? d.socialDiscordShow : true);
+
           setSocialTwitterUrl(d.socialTwitterUrl !== undefined ? d.socialTwitterUrl : "https://x.com/nucleus");
           setSocialTwitterShow(d.socialTwitterShow !== undefined ? d.socialTwitterShow : false);
           setSocialLinkedinUrl(d.socialLinkedinUrl !== undefined ? d.socialLinkedinUrl : "");
@@ -1720,6 +1723,8 @@ export default function AdminDashboard() {
           footerLegal2Text,
           footerLegal2Url,
           reviewFormUrl,
+          termsContent,
+          privacyContent,
           aboutShowMockCard,
           aboutMockCardTitle,
           aboutMockCardSubtitle,
@@ -1755,8 +1760,7 @@ export default function AdminDashboard() {
           socialYoutubeShow,
           socialTelegramUrl,
           socialTelegramShow,
-          socialDiscordUrl,
-          socialDiscordShow,
+
           socialTwitterUrl,
           socialTwitterShow,
           socialLinkedinUrl,
@@ -2214,7 +2218,7 @@ export default function AdminDashboard() {
           background-color: #000000 !important;
         }
         #admin-panel-container {
-          --primary-custom: #F15A29;
+          --primary-custom: #4F46E5;
           background-color: #000000 !important;
         }
         #admin-panel-container h1,
@@ -2234,7 +2238,7 @@ export default function AdminDashboard() {
         #admin-panel-container li,
         #admin-panel-container a,
         #admin-panel-container :not(.bg-primary):not([class*="bg-primary"]) > svg {
-          color: var(--color-primary, #F15A29) !important;
+          color: var(--color-primary, #4F46E5) !important;
         }
 
         /* Black text for solid primary-colored surfaces */
@@ -2259,7 +2263,7 @@ export default function AdminDashboard() {
         #admin-panel-container .bg-black\\/40,
         #admin-panel-container .bg-black\\/50 {
           background-color: #000000 !important;
-          border-color: rgba(241, 90, 41, 0.25) !important;
+          border-color: rgba(79, 70, 229, 0.25) !important;
         }
 
         /* Input controls and buttons */
@@ -2267,30 +2271,30 @@ export default function AdminDashboard() {
         #admin-panel-container textarea,
         #admin-panel-container select {
           background-color: #000000 !important;
-          color: var(--color-primary, #F15A29) !important;
-          border-color: rgba(241, 90, 41, 0.4) !important;
+          color: var(--color-primary, #4F46E5) !important;
+          border-color: rgba(79, 70, 229, 0.4) !important;
         }
         #admin-panel-container input::placeholder,
         #admin-panel-container textarea::placeholder {
-          color: rgba(241, 90, 41, 0.45) !important;
+          color: rgba(79, 70, 229, 0.45) !important;
         }
         #admin-panel-container input:focus,
         #admin-panel-container textarea:focus,
         #admin-panel-container select:focus {
-          border-color: var(--color-primary, #F15A29) !important;
-          box-shadow: 0 0 0 2px rgba(241, 90, 41, 0.15) !important;
+          border-color: var(--color-primary, #4F46E5) !important;
+          box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15) !important;
         }
 
-        /* Adjust all border utilities to use fine-grained theme orange */
+        /* Adjust all border utilities to use fine-grained theme indigo */
         #admin-panel-container .border,
         #admin-panel-container [class*="border-white/"],
         #admin-panel-container [class*="border-dashed"] {
-          border-color: rgba(241, 90, 41, 0.2) !important;
+          border-color: rgba(79, 70, 229, 0.2) !important;
         }
         
         #admin-translucent-tab-bar {
           background-color: #000000 !important;
-          border-color: rgba(241, 90, 41, 0.3) !important;
+          border-color: rgba(79, 70, 229, 0.3) !important;
         }
       `}</style>
       <button
@@ -2355,19 +2359,7 @@ export default function AdminDashboard() {
         >
           Faculty / Mentors
         </button>
-        {(user?.role === "superadmin" || user?.role === "admin") && (
-          <button
-            id="tab-btn-appearance"
-            onClick={() => setActiveTab("appearance")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === "appearance"
-                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
-                : "text-white/60 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            🎨 Appearance
-          </button>
-        )}
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             id="tab-btn-settings"
@@ -2425,7 +2417,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      {activeTab === "appearance" && (user?.role === "superadmin" || user?.role === "admin") && (
+      {false && (
         <div className="space-y-8 max-w-6xl animate-fade-in">
           {/* Real-time preview system header */}
           <div className="border border-primary/20 bg-primary/5 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -3361,7 +3353,7 @@ export default function AdminDashboard() {
                       >
                         <option value="default">Default Luxury Gold</option>
                         <option value="theme2">
-                          Theme 2: Cyber SaaS Orange
+                          Theme 2: Cyber SaaS Indigo
                         </option>
                         <option value="theme3">
                           Theme 3: Creator Cosmic Pink
@@ -3461,7 +3453,7 @@ export default function AdminDashboard() {
             {/* Prices Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] uppercase tracking-wide">
+                <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] uppercase tracking-wide">
                   Pricing Configuration (Default)
                 </h4>
               </div>
@@ -3474,7 +3466,7 @@ export default function AdminDashboard() {
                     type="number"
                     value={priceNotes}
                     onChange={(e) => setPriceNotes(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3485,7 +3477,7 @@ export default function AdminDashboard() {
                     type="number"
                     value={priceLectures}
                     onChange={(e) => setPriceLectures(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3496,7 +3488,7 @@ export default function AdminDashboard() {
                     type="number"
                     value={pricePremium}
                     onChange={(e) => setPricePremium(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3509,7 +3501,7 @@ export default function AdminDashboard() {
                       placeholder="e.g. john@upi"
                       value={upiId}
                       onChange={(e) => setUpiId(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                     />
                   </div>
                   <div>
@@ -3521,16 +3513,16 @@ export default function AdminDashboard() {
                       placeholder="e.g. https://domain.com/my-qr.jpg (leave blank to auto-generate from UPI ID)"
                       value={upiQrCode}
                       onChange={(e) => setUpiQrCode(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Pricing Cards Content Customizer */}
-              <div className="mb-8 p-5 rounded-2xl border border-[var(--primary-custom, #F15A29)]/20 bg-[var(--primary-custom, #F15A29)]/5 space-y-6">
+              <div className="mb-8 p-5 rounded-2xl border border-[var(--primary-custom, #4F46E5)]/20 bg-[var(--primary-custom, #4F46E5)]/5 space-y-6">
                 <div>
-                  <h4 className="text-sm font-bold text-[var(--primary-custom, #F15A29)] uppercase tracking-wide">
+                  <h4 className="text-sm font-bold text-[var(--primary-custom, #4F46E5)] uppercase tracking-wide">
                     Customize Pricing Cards Content & Texts
                   </h4>
                   <p className="text-xs text-white/50 mt-1">
@@ -3550,7 +3542,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard1Badge}
                         onChange={(e) => setPricingCard1Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -3559,7 +3551,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard1Title}
                         onChange={(e) => setPricingCard1Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   </div>
@@ -3569,7 +3561,7 @@ export default function AdminDashboard() {
                       value={pricingCard1Desc}
                       onChange={(e) => setPricingCard1Desc(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
+                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
                     />
                   </div>
                   <div>
@@ -3578,7 +3570,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={pricingCard1Features}
                       onChange={(e) => setPricingCard1Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       placeholder="Feature 1, Feature 2, Feature 3"
                     />
                   </div>
@@ -3596,7 +3588,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard2Badge}
                         onChange={(e) => setPricingCard2Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -3605,7 +3597,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard2Title}
                         onChange={(e) => setPricingCard2Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   </div>
@@ -3615,7 +3607,7 @@ export default function AdminDashboard() {
                       value={pricingCard2Desc}
                       onChange={(e) => setPricingCard2Desc(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
+                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
                     />
                   </div>
                   <div>
@@ -3624,7 +3616,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={pricingCard2Features}
                       onChange={(e) => setPricingCard2Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       placeholder="Feature 1, Feature 2, Feature 3"
                     />
                   </div>
@@ -3642,7 +3634,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard3Badge}
                         onChange={(e) => setPricingCard3Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -3651,7 +3643,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={pricingCard3Title}
                         onChange={(e) => setPricingCard3Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   </div>
@@ -3661,7 +3653,7 @@ export default function AdminDashboard() {
                       value={pricingCard3Desc}
                       onChange={(e) => setPricingCard3Desc(e.target.value)}
                       rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
+                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
                     />
                   </div>
                   <div>
@@ -3670,7 +3662,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={pricingCard3Features}
                       onChange={(e) => setPricingCard3Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       placeholder="Feature 1, Feature 2, Feature 3"
                     />
                   </div>
@@ -3705,7 +3697,7 @@ export default function AdminDashboard() {
                             },
                           }))
                         }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -3727,7 +3719,7 @@ export default function AdminDashboard() {
                             },
                           }))
                         }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -3749,7 +3741,7 @@ export default function AdminDashboard() {
                             },
                           }))
                         }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   </div>
@@ -3759,7 +3751,7 @@ export default function AdminDashboard() {
 
             {/* Branding Section */}
             <div>
-              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Brand & Identity
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3771,7 +3763,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={websiteName}
                     onChange={(e) => setWebsiteName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3782,7 +3774,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={documentTitle}
                     onChange={(e) => setDocumentTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3793,7 +3785,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={logoText}
                     onChange={(e) => setLogoText(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3804,7 +3796,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={logoImage}
                     onChange={(e) => setLogoImage(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -3815,7 +3807,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={faviconUrl}
                     onChange={(e) => setFaviconUrl(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
               </div>
@@ -3823,7 +3815,7 @@ export default function AdminDashboard() {
 
             {/* Hero Section settings */}
             <div>
-              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Hero Section (Home)
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3835,13 +3827,13 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroTitle}
                     onChange={(e) => setHeroTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
 
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 border border-white/5 bg-white/5 p-4 rounded-xl mt-2 mb-2">
                   <div className="md:col-span-3">
-                    <span className="text-xs font-bold text-[var(--primary-custom,#F15A29)] tracking-wider uppercase">Doodle Title Configuration (Editable Layout)</span>
+                    <span className="text-xs font-bold text-[var(--primary-custom,#4F46E5)] tracking-wider uppercase">Doodle Title Configuration (Editable Layout)</span>
                     <p className="text-xs text-white/50 mt-1">Controls the text structure EXACTLY like the playful handdrawn layout in the landing page (e.g., sparkles and curved double underlines).</p>
                   </div>
                   <div>
@@ -3851,7 +3843,7 @@ export default function AdminDashboard() {
                       value={heroTitleLine1}
                       onChange={(e) => setHeroTitleLine1(e.target.value)}
                       placeholder="Learning That's"
-                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                     />
                   </div>
                   <div>
@@ -3861,7 +3853,7 @@ export default function AdminDashboard() {
                       value={heroTitleLine2}
                       onChange={(e) => setHeroTitleLine2(e.target.value)}
                       placeholder="Smart, Simple &"
-                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                     />
                   </div>
                   <div>
@@ -3871,7 +3863,7 @@ export default function AdminDashboard() {
                       value={heroTitleHighlight}
                       onChange={(e) => setHeroTitleHighlight(e.target.value)}
                       placeholder="Super Fun!"
-                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                     />
                   </div>
                 </div>
@@ -3882,7 +3874,7 @@ export default function AdminDashboard() {
                   <textarea
                     value={heroSubtitle}
                     onChange={(e) => setHeroSubtitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-20 resize-none"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] h-20 resize-none"
                   />
                 </div>
                 <div>
@@ -3893,7 +3885,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroBadgeText}
                     onChange={(e) => setHeroBadgeText(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3904,7 +3896,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroCta1Text}
                     onChange={(e) => setHeroCta1Text(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3916,7 +3908,7 @@ export default function AdminDashboard() {
                     placeholder="/dashboard or https://..."
                     value={heroCta1Link}
                     onChange={(e) => setHeroCta1Link(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3927,7 +3919,7 @@ export default function AdminDashboard() {
                     type="text"
                     value={heroCta2Text}
                     onChange={(e) => setHeroCta2Text(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div>
@@ -3939,7 +3931,7 @@ export default function AdminDashboard() {
                     placeholder="https://youtube.com/..."
                     value={heroCta2Link}
                     onChange={(e) => setHeroCta2Link(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
               </div>
@@ -3947,7 +3939,7 @@ export default function AdminDashboard() {
 
             {/* Interactive Loading Screen Customizer Section */}
             <div>
-              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Interactive Loading Screen Customizer
               </h4>
               <div className="grid grid-cols-1 gap-4 mb-4">
@@ -3959,7 +3951,7 @@ export default function AdminDashboard() {
                     value={loaderSteps}
                     onChange={(e) => setLoaderSteps(e.target.value)}
                     placeholder="Formulating learning equations...&#10;Learn to become smart&#10;Learn to become simple&#10;Learn to become super fun!&#10;Ready to play & learn!"
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-32 font-mono scrollbar-thin"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] h-32 font-mono scrollbar-thin"
                   />
                   <p className="text-xs text-white/45 mt-1">
                     Provide the phrases to show sequentially (one per line) as the application fully boots.
@@ -3970,7 +3962,7 @@ export default function AdminDashboard() {
 
             {/* Footer Section */}
             <div>
-              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Footer Configuration
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -3981,7 +3973,39 @@ export default function AdminDashboard() {
                   <textarea
                     value={footerDescription}
                     onChange={(e) => setFooterDescription(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-20 resize-none"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] h-20 resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Legal Documents Markdown Configuration */}
+            <div className="border-t border-white/10 pt-6 mt-6">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide font-display">
+                Legal Documents Configuration (Markdown supported)
+              </h4>
+              <p className="text-xs text-white/50 mb-4">
+                Update the official Terms & Conditions and Privacy Policy agreements. These documents are dynamically rendered in the platform's high-definition legal subpages.
+              </p>
+
+              <div className="grid grid-cols-1 gap-8">
+                <div>
+                  <LegalMarkdownEditor 
+                    label="Terms & Conditions Agreement"
+                    value={termsContent}
+                    onChange={setTermsContent}
+                    placeholder="Enter Terms and Conditions in markdown format..."
+                    height="h-80"
+                  />
+                </div>
+
+                <div>
+                  <LegalMarkdownEditor 
+                    label="Privacy Policy Document"
+                    value={privacyContent}
+                    onChange={setPrivacyContent}
+                    placeholder="Enter Privacy Policy in markdown format..."
+                    height="h-80"
                   />
                 </div>
               </div>
@@ -3989,7 +4013,7 @@ export default function AdminDashboard() {
 
             {/* Review & Contact Form Section */}
             <div className="mb-6">
-              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Contact / Review Form Config
               </h4>
               <div className="grid grid-cols-1 gap-4">
@@ -4002,7 +4026,7 @@ export default function AdminDashboard() {
                     placeholder="https://formspree.io/f/..."
                     value={reviewFormUrl}
                     onChange={(e) => setReviewFormUrl(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                   <p className="text-xs text-white/40 mt-2">
                     If provided, a contact form will be displayed at the bottom
@@ -4014,7 +4038,7 @@ export default function AdminDashboard() {
 
             {/* About Section Interactive Graphics Config */}
             <div className="mb-6 border-t border-white/10 pt-6">
-              <h4 className="text-sm font-medium text-[var(--primary-custom, #F15A29)] mb-4 uppercase tracking-wide font-display">
+              <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide font-display">
                 About Section Graphics & Badges Config
               </h4>
               <p className="text-xs text-white/50 mb-4">
@@ -4045,7 +4069,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutMockCardTitle}
                           onChange={(e) => setAboutMockCardTitle(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                         />
                       </div>
                       <div>
@@ -4054,7 +4078,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutMockCardSubtitle}
                           onChange={(e) => setAboutMockCardSubtitle(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                         />
                       </div>
                       <div>
@@ -4063,7 +4087,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutMockCardValue}
                           onChange={(e) => setAboutMockCardValue(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                         />
                       </div>
                     </div>
@@ -4092,7 +4116,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={aboutIitianBadgeText}
                         onChange={(e) => setAboutIitianBadgeText(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   )}
@@ -4120,7 +4144,7 @@ export default function AdminDashboard() {
                         type="text"
                         value={aboutLiveDoubtsText}
                         onChange={(e) => setAboutLiveDoubtsText(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   )}
@@ -4150,7 +4174,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusTitle}
                             onChange={(e) => setAboutCalculusTitle(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                         <div>
@@ -4159,7 +4183,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusBadge}
                             onChange={(e) => setAboutCalculusBadge(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                       </div>
@@ -4172,7 +4196,7 @@ export default function AdminDashboard() {
                             max="100"
                             value={aboutCalculusProgress}
                             onChange={(e) => setAboutCalculusProgress(Number(e.target.value))}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                         <div>
@@ -4181,7 +4205,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusLectureText}
                             onChange={(e) => setAboutCalculusLectureText(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                         <div>
@@ -4190,7 +4214,7 @@ export default function AdminDashboard() {
                             type="text"
                             value={aboutCalculusPercentText}
                             onChange={(e) => setAboutCalculusPercentText(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                       </div>
@@ -4221,7 +4245,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutRatingTitle}
                           onChange={(e) => setAboutRatingTitle(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                         />
                       </div>
                       <div>
@@ -4230,14 +4254,14 @@ export default function AdminDashboard() {
                           type="text"
                           value={aboutRatingDesc}
                           onChange={(e) => setAboutRatingDesc(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                          className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                         />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* 5b. Corner Profile Image & Orange Spill Splash Widget */}
+                {/* 5b. Corner Profile Image & Indigo Spill Splash Widget */}
                 <div id="corner-image-control-card" className="p-4 rounded-xl border border-white/10 bg-white/5">
                   <div className="mb-4 flex flex-col justify-between">
                     <span className="text-sm font-semibold text-white flex items-center gap-2">
@@ -4245,7 +4269,7 @@ export default function AdminDashboard() {
                       Landing Page Top-Right Corner Image
                     </span>
                     <p className="text-xs text-white/50 mt-1">
-                      Configure custom profile photo URLs, shapes, and gorgeous orange uneven splash backgrounds.
+                      Configure custom profile photo URLs, shapes, and gorgeous indigo uneven splash backgrounds.
                     </p>
                   </div>
 
@@ -4257,7 +4281,7 @@ export default function AdminDashboard() {
                         placeholder="https://images.unsplash.com/..."
                         value={aboutCornerImageUrl}
                         onChange={(e) => setAboutCornerImageUrl(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -4265,21 +4289,21 @@ export default function AdminDashboard() {
                       <select
                         value={aboutCornerImgShape}
                         onChange={(e) => setAboutCornerImgShape(e.target.value as "circle" | "card")}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-[var(--primary-custom, #F15A29)] focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-[var(--primary-custom, #4F46E5)] focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       >
                         <option value="circle">Circular / Round Shape</option>
                         <option value="card">Rounded Corner Card Shape</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-white/60 mb-1.5">Orange Splash Background Effect</label>
+                      <label className="block text-xs text-white/60 mb-1.5">Indigo Splash Background Effect</label>
                       <select
                         value={aboutCornerBackground}
-                        onChange={(e) => setAboutCornerBackground(e.target.value as "orange_burst" | "water_spread" | "none")}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-[#ff7a00]/30 text-[#ff7a00] focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        onChange={(e) => setAboutCornerBackground(e.target.value as "indigo_burst" | "water_spread" | "none")}
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-[#ff7a00]/30 text-[#ff7a00] focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       >
-                        <option value="water_spread">Liquid Water Spread Spill Pattern (Orange)</option>
-                        <option value="orange_burst">Balloon Burst Splatter Burst (Orange)</option>
+                        <option value="water_spread">Liquid Water Spread Spill Pattern (Indigo)</option>
+                        <option value="indigo_burst">Balloon Burst Splatter Burst (Indigo)</option>
                         <option value="none">Neutral Clean Background (No pop splash)</option>
                       </select>
                     </div>
@@ -4290,7 +4314,7 @@ export default function AdminDashboard() {
                 <div className="p-4 rounded-xl border border-white/10 bg-white/5 space-y-4">
                   <div>
                     <span className="text-sm font-semibold text-white flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary-custom, #F15A29)]" /> 
+                      <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary-custom, #4F46E5)]" /> 
                       Interactive Teacher Showcase Card (Streak Widget Click)
                     </span>
                     <p className="text-xs text-white/50 mt-1">
@@ -4306,7 +4330,7 @@ export default function AdminDashboard() {
                         placeholder="https://images.unsplash.com/..."
                         value={aboutTeacherPhotoUrl}
                         onChange={(e) => setAboutTeacherPhotoUrl(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -4316,7 +4340,7 @@ export default function AdminDashboard() {
                         placeholder="Dr. Anand Kumar"
                         value={aboutTeacherName}
                         onChange={(e) => setAboutTeacherName(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -4326,7 +4350,7 @@ export default function AdminDashboard() {
                         placeholder="Senior Physics Specialist (Ex-IIT)"
                         value={aboutTeacherRole}
                         onChange={(e) => setAboutTeacherRole(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                   </div>
@@ -4337,7 +4361,7 @@ export default function AdminDashboard() {
                       placeholder="Visualizing complex equations. Crafting interactive modules for deep analytical development."
                       value={aboutTeacherTagline}
                       onChange={(e) => setAboutTeacherTagline(e.target.value)}
-                      className="w-full h-16 px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-none"
+                      className="w-full h-16 px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
                     />
                   </div>
                 </div>
@@ -4362,7 +4386,7 @@ export default function AdminDashboard() {
                         placeholder="Install App"
                         value={pwaBtnText}
                         onChange={(e) => setPwaBtnText(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                     </div>
                     <div>
@@ -4372,7 +4396,7 @@ export default function AdminDashboard() {
                         placeholder="https://play.google.com/store/apps/details?id=..."
                         value={pwaBtnLink}
                         onChange={(e) => setPwaBtnLink(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                        className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                       />
                       <span className="text-[10px] text-white/40 mt-1 block">
                         Leave blank to activate the default seamless PWA installation flow.
@@ -4414,7 +4438,7 @@ export default function AdminDashboard() {
                             placeholder="Connect via Socials"
                             value={socialSectionTitle}
                             onChange={(e) => setSocialSectionTitle(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                         <div>
@@ -4424,13 +4448,13 @@ export default function AdminDashboard() {
                             placeholder="Stay in the loop with live streams..."
                             value={socialSectionSubtitle}
                             onChange={(e) => setSocialSectionSubtitle(e.target.value)}
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                           />
                         </div>
                       </div>
 
                       <div className="h-px bg-white/10 my-4" />
-                      <span className="text-xs font-bold text-[var(--primary-custom, #F15A29)] block mb-2 uppercase tracking-wider">Configure Channels Profiles (Link + Toggle)</span>
+                      <span className="text-xs font-bold text-[var(--primary-custom, #4F46E5)] block mb-2 uppercase tracking-wider">Configure Channels Profiles (Link + Toggle)</span>
 
                       <div className="space-y-3">
                         {/* Instagram Platform */}
@@ -4448,7 +4472,7 @@ export default function AdminDashboard() {
                               placeholder="https://instagram.com/your-username"
                               value={socialInstagramUrl}
                               onChange={(e) => setSocialInstagramUrl(e.target.value)}
-                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                             />
                             <button
                               type="button"
@@ -4477,7 +4501,7 @@ export default function AdminDashboard() {
                               placeholder="https://youtube.com/@channel"
                               value={socialYoutubeUrl}
                               onChange={(e) => setSocialYoutubeUrl(e.target.value)}
-                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                             />
                             <button
                               type="button"
@@ -4506,7 +4530,7 @@ export default function AdminDashboard() {
                               placeholder="https://t.me/yourchannel"
                               value={socialTelegramUrl}
                               onChange={(e) => setSocialTelegramUrl(e.target.value)}
-                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                             />
                             <button
                               type="button"
@@ -4516,35 +4540,6 @@ export default function AdminDashboard() {
                               }`}
                             >
                               {socialTelegramShow ? "Visible" : "Hidden"}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Discord Platform */}
-                        <div className="p-3 bg-black/20 border border-white/5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded bg-[#5865F2]/10 text-[#5865F2] flex items-center justify-center font-bold text-xs">DC</div>
-                            <div>
-                              <span className="text-xs font-bold text-white block">Discord Invite Link</span>
-                              <span className="text-[10px] text-white/40">Student voice study room channels</span>
-                            </div>
-                          </div>
-                          <div className="flex flex-1 items-center gap-3">
-                            <input
-                              type="text"
-                              placeholder="https://discord.gg/invite"
-                              value={socialDiscordUrl}
-                              onChange={(e) => setSocialDiscordUrl(e.target.value)}
-                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setSocialDiscordShow(!socialDiscordShow)}
-                              className={`px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors whitespace-nowrap ${
-                                socialDiscordShow ? "bg-emerald-500/20 text-emerald-400" : "bg-white/10 text-white/50"
-                              }`}
-                            >
-                              {socialDiscordShow ? "Visible" : "Hidden"}
                             </button>
                           </div>
                         </div>
@@ -4564,7 +4559,7 @@ export default function AdminDashboard() {
                               placeholder="https://x.com/username"
                               value={socialTwitterUrl}
                               onChange={(e) => setSocialTwitterUrl(e.target.value)}
-                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                              className="flex-1 px-3 py-1.5 text-xs rounded bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                             />
                             <button
                               type="button"
@@ -4950,7 +4945,7 @@ export default function AdminDashboard() {
             {/* SMTP Dynamic Mail Credentials Form */}
             <div className="pt-8 mt-8 border-t border-white/10 space-y-6">
               <div>
-                <h4 className="text-base font-medium text-[var(--primary-custom, #F15A29)] flex items-center gap-2">
+                <h4 className="text-base font-medium text-[var(--primary-custom, #4F46E5)] flex items-center gap-2">
                   <span>✉️ Dynamic SMTP Mail Server Config</span>
                 </h4>
                 <p className="text-xs text-white/40 mt-1">
@@ -5118,7 +5113,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="p-5 rounded-2xl border border-white/5 bg-black/30 flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-emerald-500/10 text-[var(--primary-custom, #F15A29)]">
+              <div className="p-3 rounded-xl bg-emerald-500/10 text-[var(--primary-custom, #4F46E5)]">
                 <Sliders className="w-6 h-6 text-emerald-400" />
               </div>
               <div>
@@ -5135,7 +5130,7 @@ export default function AdminDashboard() {
               
               {/* OTT Video Stream Security Card */}
               <div className="border border-white/5 rounded-2xl bg-white/5 p-6 space-y-6">
-                <h4 className="text-sm font-bold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider flex items-center gap-2">
+                <h4 className="text-sm font-bold text-[var(--primary-custom, #4F46E5)] uppercase tracking-wider flex items-center gap-2">
                   <Video className="w-4 h-4 text-accent-primary" />
                   <span>Interactive Premium Video Player Security</span>
                 </h4>
@@ -5144,7 +5139,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Video Downloadability</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #4F46E5)] focus:outline-none"
                       value={secVideoDownloads ? "true" : "false"}
                       onChange={(e) => setSecVideoDownloads(e.target.value === "true")}
                     >
@@ -5156,7 +5151,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Defocus / Tab-Switch Action</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #4F46E5)] focus:outline-none"
                       value={secPauseSuspicious ? "true" : "false"}
                       onChange={(e) => setSecPauseSuspicious(e.target.value === "true")}
                     >
@@ -5168,7 +5163,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Screen Capture Prevention Mode</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #4F46E5)] focus:outline-none"
                       value={secVideoScreenshot ? "true" : "false"}
                       onChange={(e) => setSecVideoScreenshot(e.target.value === "true")}
                     >
@@ -5180,7 +5175,7 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <label className="text-xs text-white/50 block">Seeking Operations (Disallow skipping forwards)</label>
                     <select
-                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #F15A29)] focus:outline-none"
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white focus:border-[var(--primary-custom, #4F46E5)] focus:outline-none"
                       value={secDisableSeeking ? "true" : "false"}
                       onChange={(e) => setSecDisableSeeking(e.target.value === "true")}
                     >
@@ -5200,7 +5195,7 @@ export default function AdminDashboard() {
                       type="checkbox"
                       checked={secVideoWatermark}
                       onChange={(e) => setSecVideoWatermark(e.target.checked)}
-                      className="w-4 h-4 accent-[var(--primary-custom, #F15A29)]"
+                      className="w-4 h-4 accent-[var(--primary-custom, #4F46E5)]"
                     />
                   </div>
 
@@ -5256,7 +5251,7 @@ export default function AdminDashboard() {
                                   if (active) setSecWatermarkFields(secWatermarkFields.filter(x => x !== f));
                                   else setSecWatermarkFields([...secWatermarkFields, f]);
                                 }}
-                                className={`px-2.5 py-1 rounded-md text-[9px] font-mono tracking-wider uppercase border font-bold transition-all ${active ? 'bg-[var(--primary-custom, #F15A29)]/10 text-[var(--primary-custom, #F15A29)] border-[var(--primary-custom, #F15A29)]/30' : 'bg-transparent text-zinc-500 border-white/10'}`}
+                                className={`px-2.5 py-1 rounded-md text-[9px] font-mono tracking-wider uppercase border font-bold transition-all ${active ? 'bg-[var(--primary-custom, #4F46E5)]/10 text-[var(--primary-custom, #4F46E5)] border-[var(--primary-custom, #4F46E5)]/30' : 'bg-transparent text-zinc-500 border-white/10'}`}
                               >
                                 {f}
                               </button>
@@ -5436,7 +5431,7 @@ export default function AdminDashboard() {
                       
                       <button
                         onClick={() => handleAdminResetDevices(v.userId)}
-                        className="w-full mt-1.5 pt-1.5 pb-1 border-t border-dashed border-white/5 text-[9px] uppercase font-mono tracking-widest text-[var(--primary-custom, #F15A29)] hover:text-white transition-colors text-center font-bold cursor-pointer"
+                        className="w-full mt-1.5 pt-1.5 pb-1 border-t border-dashed border-white/5 text-[9px] uppercase font-mono tracking-widest text-[var(--primary-custom, #4F46E5)] hover:text-white transition-colors text-center font-bold cursor-pointer"
                       >
                         Force drop all sessions!
                       </button>
@@ -5503,9 +5498,9 @@ export default function AdminDashboard() {
       {activeTab === "syllabus" && (
         <div className="space-y-8 max-w-5xl animate-fade-in text-left">
           {/* Section Header */}
-          <div className="border border-[var(--primary-custom, #F15A29)]/20 bg-[var(--primary-custom, #F15A29)]/5 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="border border-[var(--primary-custom, #4F46E5)]/20 bg-[var(--primary-custom, #4F46E5)]/5 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-              <h3 className="text-xl font-display font-medium text-[var(--primary-custom, #F15A29)] flex items-center gap-2">
+              <h3 className="text-xl font-display font-medium text-[var(--primary-custom, #4F46E5)] flex items-center gap-2">
                 <span>📚 Custom Syllabus & Section Planner</span>
               </h3>
               <p className="text-xs text-white/50 mt-1 max-w-2xl">
@@ -5516,7 +5511,7 @@ export default function AdminDashboard() {
             <button
               onClick={handleSaveSyllabusSettings}
               disabled={isSavingSyllabus}
-              className="px-6 py-2.5 rounded-xl text-xs font-black uppercase bg-[var(--primary-custom, #F15A29)] text-zinc-950 hover:scale-[1.03] active:scale-[0.98] transition-all shadow-lg cursor-pointer flex items-center gap-2 shrink-0 disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl text-xs font-black uppercase bg-[var(--primary-custom, #4F46E5)] text-zinc-950 hover:scale-[1.03] active:scale-[0.98] transition-all shadow-lg cursor-pointer flex items-center gap-2 shrink-0 disabled:opacity-50"
             >
               {isSavingSyllabus ? "Saving updates..." : "Publish Syllabus Updates"}
             </button>
@@ -5526,7 +5521,7 @@ export default function AdminDashboard() {
             {/* Left Hand: Dashboard Label Customizer & Class select */}
             <div className="lg:col-span-4 space-y-6">
               <div className="border border-white/10 p-6 rounded-2xl bg-white/5 space-y-4">
-                <h4 className="text-sm font-semibold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider border-b border-white/5 pb-2 font-mono">
+                <h4 className="text-sm font-semibold text-[var(--primary-custom, #4F46E5)] uppercase tracking-wider border-b border-white/5 pb-2 font-mono">
                   Portal Layout Labels
                 </h4>
                 <div>
@@ -5538,7 +5533,7 @@ export default function AdminDashboard() {
                     value={syllabusSectionName}
                     onChange={(e) => setSyllabusSectionName(e.target.value)}
                     placeholder="e.g. Syllabus, Course Plan"
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)] text-xs font-semibold"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] text-xs font-semibold"
                   />
                   <p className="text-[10px] text-white/40 mt-1.5 leading-relaxed">
                     Changes the rendering text on the student navbar link, persistent dock, mobile drawer menu, and class card headings. Default is "Syllabus".
@@ -5548,7 +5543,7 @@ export default function AdminDashboard() {
 
               {/* Class Selection List */}
               <div className="border border-white/10 p-6 rounded-2xl bg-white/5 space-y-4">
-                <h4 className="text-sm font-semibold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider border-b border-white/5 pb-2 font-mono">
+                <h4 className="text-sm font-semibold text-[var(--primary-custom, #4F46E5)] uppercase tracking-wider border-b border-white/5 pb-2 font-mono">
                   Select Grade to Edit
                 </h4>
                 <div className="flex flex-col gap-1.5">
@@ -5559,12 +5554,12 @@ export default function AdminDashboard() {
                       onClick={() => setSyllabusEditClass(cls)}
                       className={`w-full px-4 py-3 rounded-xl text-left text-xs font-bold uppercase tracking-wide transition-all flex items-center justify-between cursor-pointer ${
                         syllabusEditClass === cls
-                          ? 'bg-[var(--primary-custom, #F15A29)]/15 text-[var(--primary-custom, #F15A29)] border border-[var(--primary-custom, #F15A29)]/30 shadow-md scale-[1.02]'
+                          ? 'bg-[var(--primary-custom, #4F46E5)]/15 text-[var(--primary-custom, #4F46E5)] border border-[var(--primary-custom, #4F46E5)]/30 shadow-md scale-[1.02]'
                           : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
                       }`}
                     >
                       <span>Class {cls === 'dropper' ? 'Dropper' : cls}</span>
-                      <span className="text-[9px] text-[var(--primary-custom, #F15A29)]/60 bg-[var(--primary-custom, #F15A29)]/10 px-2 py-0.5 rounded-full font-mono font-normal">
+                      <span className="text-[9px] text-[var(--primary-custom, #4F46E5)]/60 bg-[var(--primary-custom, #4F46E5)]/10 px-2 py-0.5 rounded-full font-mono font-normal">
                         {classSyllabuses[cls] ? 'Customized' : 'Template'}
                       </span>
                     </button>
@@ -5578,7 +5573,7 @@ export default function AdminDashboard() {
               <div className="border border-white/10 p-6 rounded-2xl bg-white/5 flex-grow flex flex-col space-y-4">
                 <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-3">
                   <div>
-                    <h4 className="text-sm font-semibold text-[var(--primary-custom, #F15A29)] uppercase tracking-wider font-mono">
+                    <h4 className="text-sm font-semibold text-[var(--primary-custom, #4F46E5)] uppercase tracking-wider font-mono">
                       Syllabus Details: Class {syllabusEditClass === 'dropper' ? 'Dropper' : syllabusEditClass}
                     </h4>
                     <p className="text-[11px] text-white/50 mt-0.5">
@@ -5593,7 +5588,7 @@ export default function AdminDashboard() {
                         setClassSyllabuses(prev => ({ ...prev, [syllabusEditClass]: defaultText }));
                       }
                     }}
-                    className="text-[10px] text-[var(--primary-custom, #F15A29)] hover:underline font-bold cursor-pointer"
+                    className="text-[10px] text-[var(--primary-custom, #4F46E5)] hover:underline font-bold cursor-pointer"
                   >
                     Restore Class Template
                   </button>
@@ -5612,13 +5607,13 @@ export default function AdminDashboard() {
                       setClassSyllabuses(prev => ({ ...prev, [syllabusEditClass]: updated }));
                     }}
                     placeholder="Describe syllabus units and curriculum layout detail..."
-                    className="w-full flex-grow p-4 rounded-xl bg-black/50 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-[var(--primary-custom, #F15A29)] resize-y min-h-[300px] leading-relaxed"
+                    className="w-full flex-grow p-4 rounded-xl bg-black/50 border border-white/10 text-white font-mono text-xs focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-y min-h-[300px] leading-relaxed"
                   />
                 </div>
 
                 {/* Live Preview block mimicking Student View */}
                 <div className="space-y-2 border-t border-white/5 pt-4">
-                  <div className="text-[10px] text-[var(--primary-custom, #F15A29)] uppercase tracking-widest font-mono mb-2">Live Student View Preview</div>
+                  <div className="text-[10px] text-[var(--primary-custom, #4F46E5)] uppercase tracking-widest font-mono mb-2">Live Student View Preview</div>
                   <div className="p-4 rounded-xl bg-black/30 border border-white/5 max-h-[180px] overflow-y-auto custom-scrollbar">
                     <SyllabusRenderer text={classSyllabuses[syllabusEditClass] ?? getDefaultSyllabus(syllabusEditClass)} />
                   </div>
@@ -6215,7 +6210,7 @@ export default function AdminDashboard() {
                               )}
                             </h4>
                             <p className="text-[10px] text-white/40 line-clamp-1 mt-0.5">{mat.description || "No summary notes."}</p>
-                            <p className="text-[9px] text-[#F15A29] font-mono uppercase tracking-wider mt-1 select-none">
+                            <p className="text-[9px] text-[#4F46E5] font-mono uppercase tracking-wider mt-1 select-none">
                               标准路径: {cStandard?.className || mat.classGroup || "Default"} standard / {sStandard?.subjectName || "General"} / {cChapter?.chapterName || "Folder ROOT"}
                             </p>
                           </div>
@@ -6507,20 +6502,20 @@ export default function AdminDashboard() {
                 placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               <textarea
                 required
                 placeholder="Description"
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-24 resize-none"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] h-24 resize-none"
               />
               <div className="flex flex-col sm:flex-row gap-4">
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                 >
                   <option value="note">Notes / PDF</option>
                   <option value="lecture">Lecture / Video</option>
@@ -6528,7 +6523,7 @@ export default function AdminDashboard() {
                 <select
                   value={classGroup}
                   onChange={(e) => setClassGroup(e.target.value)}
-                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                  className="w-full sm:w-1/2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                 >
                   <option value="all">Any Class</option>
                   <option value="6">Class 6</option>
@@ -6545,14 +6540,14 @@ export default function AdminDashboard() {
                 placeholder="Optional Thumbnail URL (Image link)"
                 value={thumbnailUrl}
                 onChange={(e) => setThumbnailUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               <input
                 required
                 placeholder="Content URL, YouTube/PDF link, or VdoCipher Script/Video ID"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               
               {type === "lecture" && url.trim() && (
@@ -6599,7 +6594,7 @@ export default function AdminDashboard() {
                     placeholder="Section Name (e.g. Trigonometry)"
                     value={section}
                     onChange={(e) => setSection(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
                   />
                 </div>
                 <div className="w-full sm:w-1/2 flex items-center justify-between px-4 py-2.5 rounded-xl bg-black/40 border border-white/10">
@@ -6608,14 +6603,14 @@ export default function AdminDashboard() {
                     type="checkbox"
                     checked={isHidden}
                     onChange={(e) => setIsHidden(e.target.checked)}
-                    className="w-5 h-5 accent-[var(--primary-custom, #F15A29)] rounded cursor-pointer"
+                    className="w-5 h-5 accent-[var(--primary-custom, #4F46E5)] rounded cursor-pointer"
                   />
                 </div>
               </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-[var(--primary-custom, #F15A29)] text-[#070709] font-medium hover:bg-[var(--primary-custom, #F15A29)] transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-[var(--primary-custom, #4F46E5)] text-[#070709] font-medium hover:bg-[var(--primary-custom, #4F46E5)] transition-colors"
                 >
                   {editingMaterialId ? "Update Content" : "Publish Content"}
                 </button>
@@ -6696,7 +6691,7 @@ export default function AdminDashboard() {
                   <td className="p-4">{u.displayName}</td>
                   <td className="p-4 text-white/60">{u.email}</td>
                   <td className="p-4">
-                    <div className="flex items-center gap-1.5 text-orange-400">
+                    <div className="flex items-center gap-1.5 text-amber-500">
                       <Flame className="w-4 h-4" />
                       <span className="font-medium text-sm">
                         {u.streak || 0}
@@ -6770,38 +6765,38 @@ export default function AdminDashboard() {
                 placeholder="Name (e.g. Dr. Aryan Sharma)"
                 value={mentorName}
                 onChange={(e) => setMentorName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               <input
                 required
                 placeholder="Role (e.g. AIIMS Topper)"
                 value={mentorRole}
                 onChange={(e) => setMentorRole(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               <input
                 placeholder="Experience (e.g. 10+ Years Exp, Ex-IITian) [Optional]"
                 value={mentorExperience}
                 onChange={(e) => setMentorExperience(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               <textarea
                 placeholder="Bio/Description [Optional]"
                 value={mentorDescription}
                 onChange={(e) => setMentorDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)] h-20 resize-none"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] h-20 resize-none"
               />
               <input
                 required
                 placeholder="Image URL (Unsplash link)"
                 value={mentorImage}
                 onChange={(e) => setMentorImage(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #F15A29)]"
+                className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
               />
               <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-[var(--primary-custom, #F15A29)] text-[#070709] font-medium hover:bg-[var(--primary-custom, #F15A29)] transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-[var(--primary-custom, #4F46E5)] text-[#070709] font-medium hover:bg-[var(--primary-custom, #4F46E5)] transition-colors"
                 >
                   {editingMentorId ? "Save Changes" : "Publish Faculty"}
                 </button>
@@ -7147,7 +7142,7 @@ export default function AdminDashboard() {
                           managingUser.unlockedMaterials,
                         )
                       }
-                      className={`p-2 rounded-lg transition-colors ${unlocked ? "bg-[var(--primary-custom, #F15A29)] text-[#070709]" : "bg-black/50 text-white/40 hover:text-white/80"}`}
+                      className={`p-2 rounded-lg transition-colors ${unlocked ? "bg-[var(--primary-custom, #4F46E5)] text-[#070709]" : "bg-black/50 text-white/40 hover:text-white/80"}`}
                     >
                       {unlocked ? (
                         <Check className="w-5 h-5" />
@@ -7228,7 +7223,7 @@ function DrmSimulatorDashboard() {
       <div className="flex items-center justify-between border-b border-white/5 pb-2">
         <div className="flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          <span className="text-xs font-mono font-bold tracking-wider uppercase text-[var(--primary-custom, #F15A29)] flex items-center gap-1">
+          <span className="text-xs font-mono font-bold tracking-wider uppercase text-[var(--primary-custom, #4F46E5)] flex items-center gap-1">
             <ShieldAlert className="w-4 h-4 text-[#ff7a00]" /> Secure DRM Simulator
           </span>
         </div>
@@ -7282,7 +7277,7 @@ function DrmSimulatorDashboard() {
       <button
         type="button"
         onClick={triggerMockShutter}
-        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-[var(--primary-custom, #F15A29)] to-[#f4e2ba] hover:brightness-110 text-zinc-950 font-bold text-[10px] uppercase tracking-widest cursor-pointer transition-transform active:scale-[0.98]"
+        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-[var(--primary-custom, #4F46E5)] to-[#f4e2ba] hover:brightness-110 text-zinc-950 font-bold text-[10px] uppercase tracking-widest cursor-pointer transition-transform active:scale-[0.98]"
       >
         <Camera className="w-3.5 h-3.5" /> Trigger Shot Block Simulation
       </button>
@@ -7315,7 +7310,7 @@ function DrmSimulatorDashboard() {
                   <span 
                     className={`text-[7.5px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${
                       isTargetBlack 
-                        ? 'bg-[var(--primary-custom, #F15A29)] text-black border-none font-extrabold' 
+                        ? 'bg-[var(--primary-custom, #4F46E5)] text-black border-none font-extrabold' 
                         : 'bg-red-400/10 text-red-400 border-red-400/20'
                     }`}
                   >
@@ -7654,7 +7649,7 @@ function YoutubeDiagnosticConsole() {
                 type="button"
                 onClick={executeRepair}
                 disabled={repairing}
-                className="w-full text-center py-2.5 bg-[var(--primary-custom,#F15A29)] hover:brightness-110 text-white rounded-xl text-xs font-bold cursor-pointer transition-all uppercase tracking-widest shadow-md"
+                className="w-full text-center py-2.5 bg-[var(--primary-custom,#4F46E5)] hover:brightness-110 text-white rounded-xl text-xs font-bold cursor-pointer transition-all uppercase tracking-widest shadow-md"
               >
                 {repairing ? "Executing repair routine..." : "Instant Safe Repair Ecosystem"}
               </button>

@@ -164,7 +164,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#FDF5E6]">
+    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#F8FAFC]">
       <Toaster richColors position="bottom-right" />
       
       <motion.div 
@@ -184,13 +184,13 @@ export default function Login() {
         </div>
 
         {/* First Create Account CTA */}
-        <div className="mb-6 p-4 bg-[#F15A29]/5 border border-[#F15A29]/15 rounded-2xl text-center space-y-2">
+        <div className="mb-6 p-4 bg-[#4F46E5]/5 border border-[#4F46E5]/15 rounded-2xl text-center space-y-2">
           <p className="text-xs text-[#7A7A7A] font-medium leading-[1.4]">
             Don't have a student account yet? Get instant access to online live modules.
           </p>
           <Link
             to="/signup"
-            className="inline-flex items-center justify-center gap-2 w-full py-2.5 bg-[#F15A29]/10 hover:bg-[#F15A29]/20 text-[#F15A29] font-extrabold text-[11px] uppercase tracking-wider rounded-xl border border-[#F15A29]/20 transition-all"
+            className="inline-flex items-center justify-center gap-2 w-full py-2.5 bg-[#4F46E5]/10 hover:bg-[#4F46E5]/20 text-[#4F46E5] font-extrabold text-[11px] uppercase tracking-wider rounded-xl border border-[#4F46E5]/20 transition-all"
           >
             <span>First Create Account</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -198,7 +198,7 @@ export default function Login() {
         </div>
 
         {/* Login Method Toggle Tabs */}
-        <div className="flex gap-2 mb-6 bg-[#FDF5E6] p-1 rounded-2xl border border-black/10">
+        <div className="flex gap-2 mb-6 bg-[#F8FAFC] p-1 rounded-2xl border border-black/10">
           <button
             type="button"
             onClick={() => setLoginMethod('password')}
@@ -268,7 +268,7 @@ export default function Login() {
                 disabled={isSubmitting}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                className={`w-full py-4 bg-primary text-[#FDF5E6] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                 id="login-submit-btn"
               >
                 {isSubmitting ? (
@@ -306,7 +306,7 @@ export default function Login() {
                 disabled={isSubmitting}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
-                className={`w-full py-4 bg-primary text-[#FDF5E6] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                 id="login-otp-request-btn"
               >
                 {isSubmitting ? (

@@ -158,7 +158,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#FDF5E6]">
+    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#F8FAFC]">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -253,7 +253,7 @@ export default function Signup() {
               <select 
                 value={classGroup}
                 onChange={(e) => setClassGroup(e.target.value)}
-                className="w-full pl-12 pr-4 py-3.5 bg-[#FDF5E6] border border-black/10 rounded-2xl text-[#1F1F1F] appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium cursor-pointer"
+                className="w-full pl-12 pr-4 py-3.5 bg-[#F8FAFC] border border-black/10 rounded-2xl text-[#1F1F1F] appearance-none focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium cursor-pointer"
               >
                 <option value="6">Class 6th Foundation</option>
                 <option value="7">Class 7th Foundation</option>
@@ -279,7 +279,7 @@ export default function Signup() {
             disabled={isSubmitting}
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
-            className={`w-full py-4 bg-primary text-[#FDF5E6] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#D4471B] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
             {isSubmitting ? (
               <>

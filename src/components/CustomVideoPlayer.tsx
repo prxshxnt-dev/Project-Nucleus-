@@ -435,7 +435,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
     return (
       <div 
         ref={playerContainerRef} 
-        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(99, 102, 241,0.05)]"
         onContextMenu={(e) => { e.preventDefault(); }}
       >
         {/* Dynamic Moving Security Watermark */}
@@ -491,7 +491,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
     return (
       <div 
         ref={playerContainerRef} 
-        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(99, 102, 241,0.05)]"
         onContextMenu={(e) => { e.preventDefault(); }}
       >
         {/* Dynamic Moving Security Watermark */}
@@ -547,7 +547,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
     return (
       <div 
         ref={playerContainerRef} 
-        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+        className="relative w-full aspect-video bg-black flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(99, 102, 241,0.05)]"
         onContextMenu={(e) => { e.preventDefault(); }}
       >
         {/* Dynamic Moving Security Watermark */}
@@ -601,7 +601,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
   return (
     <div 
       ref={playerContainerRef} 
-      className="relative w-full h-full bg-black group flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(229,210,165,0.05)]"
+      className="relative w-full h-full bg-black group flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(99, 102, 241,0.05)]"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={() => setShowControls(true)}
@@ -688,7 +688,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={(e) => { e.stopPropagation(); handlePlayPause(); }}
-                className="pointer-events-auto p-5 rounded-full bg-[#E5D2A5]/90 text-black backdrop-blur-md shadow-[0_0_40px_rgba(229,210,165,0.4)] hover:scale-110 transition-transform"
+                className="pointer-events-auto p-5 rounded-full bg-[#E5D2A5]/90 text-black backdrop-blur-md shadow-[0_0_40px_rgba(99, 102, 241,0.4)] hover:scale-110 transition-transform"
               >
                   <Play className="w-10 h-10 ml-1 fill-current" />
               </motion.button>
@@ -728,7 +728,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
                 <div className="absolute left-0 h-full bg-white/20 rounded-full w-full pointer-events-none" />
                 <div className="absolute left-0 h-full bg-white/40 rounded-full pointer-events-none" style={{ width: `${loaded * 100}%` }} />
                 <div className="absolute left-0 h-full bg-[#E5D2A5] rounded-full group-hover/progress:h-2.5 transition-all pointer-events-none" style={{ width: `${played * 100}%` }}>
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-[#E5D2A5] rounded-full scale-0 group-hover/progress:scale-100 transition-transform shadow-[0_0_10px_rgba(229,210,165,0.8)]" />
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-[#E5D2A5] rounded-full scale-0 group-hover/progress:scale-100 transition-transform shadow-[0_0_10px_rgba(99, 102, 241,0.8)]" />
                 </div>
             </div>
 

@@ -110,7 +110,7 @@ export default function LiquidGlassDock() {
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.8, type: 'spring', stiffness: 100, damping: 15 }}
-        className={`flex items-end gap-3 px-5 py-3.5 border rounded-[24px] pointer-events-auto shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] hover:shadow-[0_25px_80px_rgba(229,210,165,0.15)] transition-all duration-500 relative ${dockBgClass}`}
+        className={`flex items-end gap-3 px-5 py-3.5 border rounded-[24px] pointer-events-auto shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] hover:shadow-[0_25px_80px_rgba(99, 102, 241,0.15)] transition-all duration-500 relative ${dockBgClass}`}
       >
         {/* Sleek top highlighting border for metallic look */}
         <div className="absolute top-0 inset-x-5 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -148,7 +148,7 @@ export default function LiquidGlassDock() {
                 (app.to === '/library' && location.pathname === '/library') ||
                 (app.to === '/dashboard' && location.pathname === '/dashboard') ||
                 (app.to === '/admin' && location.pathname === '/admin')) && (
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-accent-primary rounded-full shadow-[0_0_8px_rgba(229,210,165,0.8)]" />
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-accent-primary rounded-full shadow-[0_0_8px_rgba(99, 102, 241,0.8)]" />
               )}
             </motion.div>
           );

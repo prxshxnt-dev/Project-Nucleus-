@@ -29,12 +29,12 @@ export interface ThemeConfig {
 export const THEME_PRESETS: Record<string, ThemeConfig> = {
   default: {
     activeTheme: 'default',
-    primaryColor: '#F15A29',
+    primaryColor: '#4F46E5',
     secondaryColor: '#1F1F1F',
-    accentGlowColor: '#F15A29',
-    backgroundColor: '#FDF5E6',
-    gradientStart: '#F15A29',
-    gradientEnd: '#FDF5E6',
+    accentGlowColor: '#4F46E5',
+    backgroundColor: '#F8FAFC',
+    gradientStart: '#4F46E5',
+    gradientEnd: '#F8FAFC',
     buttonStyle: 'rounded',
     borderRadius: 20,
     fontFamily: 'Inter',
@@ -54,12 +54,12 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
   },
   theme2: {
     activeTheme: 'theme2',
-    primaryColor: '#f97316',
-    secondaryColor: '#ef4444',
-    accentGlowColor: '#f97316',
-    backgroundColor: '#030303',
-    gradientStart: '#f97316',
-    gradientEnd: '#ef4444',
+    primaryColor: '#10B981',
+    secondaryColor: '#059669',
+    accentGlowColor: '#10B981',
+    backgroundColor: '#022C22',
+    gradientStart: '#10B981',
+    gradientEnd: '#34D399',
     buttonStyle: 'rounded',
     borderRadius: 12,
     fontFamily: 'Space Grotesk',
@@ -112,14 +112,14 @@ export const THEME_PRESETS: Record<string, ThemeConfig> = {
     dashboardStyle: 'bento',
     mobileUiStyle: 'ios_bottom_tab'
   },
-  orange_academy: {
-    activeTheme: 'orange_academy',
-    primaryColor: '#ea580c',
-    secondaryColor: '#fbbf24',
-    accentGlowColor: '#ea580c',
-    backgroundColor: '#0b0908',
-    gradientStart: '#ea580c',
-    gradientEnd: '#fbbf24',
+  royal_academy: {
+    activeTheme: 'royal_academy',
+    primaryColor: '#6366F1',
+    secondaryColor: '#3b82f6',
+    accentGlowColor: '#6366F1',
+    backgroundColor: '#0b0914',
+    gradientStart: '#6366F1',
+    gradientEnd: '#3B82F6',
     buttonStyle: 'rounded',
     borderRadius: 12,
     fontFamily: 'Space Grotesk',
@@ -278,7 +278,7 @@ interface SiteSettings {
   aboutRatingDesc?: string;
   aboutCornerImageUrl?: string;
   aboutCornerImgShape?: 'circle' | 'card';
-  aboutCornerBackground?: 'orange_burst' | 'water_spread' | 'none';
+  aboutCornerBackground?: 'indigo_burst' | 'water_spread' | 'none';
 
   chatbotEnabled?: boolean;
   chatbotIconUrl?: string;
@@ -413,8 +413,7 @@ interface SiteSettings {
   socialYoutubeShow?: boolean;
   socialTelegramUrl?: string;
   socialTelegramShow?: boolean;
-  socialDiscordUrl?: string;
-  socialDiscordShow?: boolean;
+
   socialTwitterUrl?: string;
   socialTwitterShow?: boolean;
   socialLinkedinUrl?: string;
@@ -424,6 +423,8 @@ interface SiteSettings {
   syllabusSectionName?: string;
   classSyllabuses?: { [classGroup: string]: string };
   loaderSteps?: string;
+  termsContent?: string;
+  privacyContent?: string;
 }
 
 interface SettingsState {
@@ -463,6 +464,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     footerLegal2Text: 'Terms of Service',
     footerLegal2Url: '#',
     reviewFormUrl: '',
+
+    termsContent: `# Terms and Conditions for Nucleus.cc\nEffective Date: June 9, 2026\n\nWelcome to Nucleus.cc! These terms define the rules and regulations for using our educational platform.\n\n### 1. General Acceptance\nBy accessing this website, we assume you accept these terms and conditions. Do not continue to use Nucleus.cc if you do not agree to all terms stated on this page.\n\n### 2. Intellectual Property Rights\nUnless otherwise stated, Nucleus.cc and/or its licensors own the intellectual property rights for all study materials, courses, and content on Nucleus.cc. All intellectual property rights are reserved.\n\n### 3. User Accounts and Verification\nWhen registering or logging in, you agree to:\n- Provide accurate and complete registration info.\n- Verify transactions, login sequences, and operations using secure dynamic OTP mechanisms.\n- Maintain the confidentiality of your account credentials.\n\n### 4. Code of Conduct\nUsers are strictly prohibited from:\n- Attempting to bypass dynamic DRM and anti-piracy protection.\n- Republishing, selling, or rent-leasing any class syllabus, slides, or study materials.\n- Engaging in systematic scraping or automated queries.\n\n### 5. Disclaimer of Warranties\nOur courses are provided "as is" and "as available" without any warranty of any kind, whether express or implied. Under no circumstance shall Nucleus.cc be liable for any special, direct, indirect, consequential, or incidental damages.`,
+
+    privacyContent: `# Privacy Policy for Nucleus.cc\nEffective Date: June 9, 2026\n\nAt Nucleus.cc, accessible from our application platform, one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by Nucleus.cc and how we use it.\n\n### 1. Information We Collect\nWe collect several types of operational and personal data to support your seamless educational journey:\n- **Personal and Profile Data**: Information such as your full name, email address, standard/class, and profile data.\n- **Verification Logs**: Temporal dynamic OTP logs for securely authorizing operations without static password vulnerabilities.\n- **Educational Activity**: Syllabus progress, lecture completions, and chatbot assist query logs.\n\n### 2. How We Use Your Information\nWe use the collected information to:\n- Provision, operate, and maintain internal interactive courses and library systems.\n- Enhance personalized AI-assisted tutoring and doubt solving.\n- Safely route security notifications and study milestones.\n- Strictly enforce DRM rules to protect against unauthorized redistribution of educational video content.\n\n### 3. Cookies and Persistent States\nNucleus.cc uses local browser storage and cookie segments strictly to retain secure theme options, system preferences, and user authorization sessions.\n\n### 4. Data Protection & Deletion\nWe implement rigorous security measures to protect your metadata and prevent unauthorized leakage. You may request data inspection or account deletion at any time by contacting our support team or designated administrators.`,
 
     aboutShowMockCard: true,
     aboutMockCardTitle: 'Physics Expert',
@@ -620,8 +625,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     socialYoutubeShow: true,
     socialTelegramUrl: 'https://t.me/nucleus',
     socialTelegramShow: true,
-    socialDiscordUrl: 'https://discord.gg/nucleus',
-    socialDiscordShow: true,
+
     socialTwitterUrl: 'https://x.com/nucleus',
     socialTwitterShow: false,
     socialLinkedinUrl: '',

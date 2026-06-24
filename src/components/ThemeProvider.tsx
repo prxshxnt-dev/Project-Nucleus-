@@ -76,12 +76,12 @@ export default function ThemeProvider() {
   // Resolve base config from preset or customizations
   let config: ThemeConfig = {
     ...THEME_PRESETS.default,
-    backgroundColor: '#FDF5E6',
-    primaryColor: '#F15A29',
+    backgroundColor: '#F8FAFC',
+    primaryColor: '#4F46E5',
     secondaryColor: '#1F1F1F',
-    accentGlowColor: '#F15A29',
-    gradientStart: '#F15A29',
-    gradientEnd: '#FDF5E6',
+    accentGlowColor: '#4F46E5',
+    gradientStart: '#4F46E5',
+    gradientEnd: '#F8FAFC',
     isDarkMode: false,
     shadowIntensity: 'soft',
     glassmorphism: false,
@@ -92,8 +92,8 @@ export default function ThemeProvider() {
     const root = document.documentElement;
 
     // --- SMART CONTRAST ENGINE ANALYSIS ---
-    const bgHsl = parseToHsl(config.backgroundColor || '#FDF5E6');
-    const primaryHsl = parseToHsl(config.primaryColor || '#F15A29');
+    const bgHsl = parseToHsl(config.backgroundColor || '#F8FAFC');
+    const primaryHsl = parseToHsl(config.primaryColor || '#4F46E5');
     
     // Background light check: is background dark or light?
     const isBgDark = false;

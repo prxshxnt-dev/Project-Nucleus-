@@ -22,7 +22,7 @@ export default function FloatingLabelInput({ label, icon, value, onChange, type 
         onChange={onChange}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        className={`w-full ${icon ? 'pl-11' : 'pl-4'} pr-4 pt-5 pb-2 bg-[#FDF5E6] border-2 rounded-2xl text-[#1F1F1F] text-sm font-semibold placeholder-transparent focus:outline-none focus:bg-[#FFFDF9] transition-all duration-300 ${
+        className={`w-full ${icon ? 'pl-11' : 'pl-4'} pr-4 pt-5 pb-2 bg-[#F8FAFC] border-2 rounded-2xl text-[#1F1F1F] text-sm font-semibold placeholder-transparent focus:outline-none focus:bg-[#FFFDF9] transition-all duration-300 ${
           isFocused ? 'border-primary ring-4 ring-primary/10 shadow-lg' : 'border-black/5 hover:border-black/10'
         }`}
         {...props}

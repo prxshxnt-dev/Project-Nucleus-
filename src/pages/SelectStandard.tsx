@@ -114,7 +114,7 @@ const standardData: StandardItem[] = [
     code: 'dropper', 
     enrollment: 3100, 
     avgStudy: 9.0, 
-    color: '#F15A29',
+    color: '#4F46E5',
     description: 'Dedicated focus on pure competitive output with customized micro-routines.',
     focus: 'Exclusively JEE Advanced & NEET Topper Prep',
     highlights: ['High-torque daily test chains', 'Instant personalized IITian mentorship']
@@ -198,13 +198,13 @@ export default function SelectStandard() {
   };
 
   return (
-    <div className="min-h-screen pt-28 pb-20 px-4 md:px-8 bg-[#FDF5E6] select-none text-[#1F1F1F]">
+    <div className="min-h-screen pt-28 pb-20 px-4 md:px-8 bg-[#F8FAFC] select-none text-[#1F1F1F]">
       <Toaster richColors position="bottom-right" />
       
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Academic Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#F15A29]/10 rounded-full text-[#F15A29] text-xs font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#4F46E5]/10 rounded-full text-[#4F46E5] text-xs font-bold uppercase tracking-wider">
             <GraduationCap className="w-4 h-4" />
             <span>Academic Milestone Setup</span>
           </div>
@@ -222,15 +222,15 @@ export default function SelectStandard() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-6">
               <div>
                 <h3 className="text-lg font-bold flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-[#F15A29]" />
+                  <Compass className="w-5 h-5 text-[#4F46E5]" />
                   Interactive Curricula Chart
                 </h3>
                 <p className="text-xs text-[#7A7A7A]">
                   Y-Axis: Recommended daily hours. Tap any bar inside the chart to select standard.
                 </p>
               </div>
-              <div className="flex items-center gap-2 bg-[#FDF5E6] px-3 py-1.5 rounded-xl border border-black/5 text-xs text-[#7A7A7A] font-mono">
-                <Clock className="w-3.5 h-3.5 text-[#F15A29]" />
+              <div className="flex items-center gap-2 bg-[#F8FAFC] px-3 py-1.5 rounded-xl border border-black/5 text-xs text-[#7A7A7A] font-mono">
+                <Clock className="w-3.5 h-3.5 text-[#4F46E5]" />
                 <span>Peak load: 9.0 Hours</span>
               </div>
             </div>
@@ -261,16 +261,16 @@ export default function SelectStandard() {
                     domain={[0, 10]}
                   />
                   <Tooltip
-                    cursor={{ fill: 'rgba(241, 90, 41, 0.04)' }}
+                    cursor={{ fill: 'rgba(79, 70, 229, 0.04)' }}
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload as StandardItem;
                         return (
-                          <div className="bg-[#FFFDF9] border border-[#F15A29]/20 p-3 rounded-2xl shadow-xl space-y-1">
+                          <div className="bg-[#FFFDF9] border border-[#4F46E5]/20 p-3 rounded-2xl shadow-xl space-y-1">
                             <p className="font-extrabold text-xs text-text-primary">{data.name}</p>
                             <p className="text-[10px] text-[#7A7A7A] flex items-center gap-1">
                               <span>Recommended study:</span>
-                              <span className="font-bold text-[#F15A29]">{data.avgStudy} hrs/day</span>
+                              <span className="font-bold text-[#4F46E5]">{data.avgStudy} hrs/day</span>
                             </p>
                             <p className="text-[10px] text-[#7A7A7A]">
                               Active Peers: <span className="font-semibold text-black">{data.enrollment} Enrolled</span>
@@ -289,8 +289,8 @@ export default function SelectStandard() {
                     {standardData.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={selectedIdx === index ? '#F15A29' : 'rgba(241, 90, 41, 0.25)'}
-                        stroke={selectedIdx === index ? '#F15A29' : 'rgba(241, 90, 41, 0.1)'}
+                        fill={selectedIdx === index ? '#4F46E5' : 'rgba(79, 70, 229, 0.25)'}
+                        stroke={selectedIdx === index ? '#4F46E5' : 'rgba(79, 70, 229, 0.1)'}
                         strokeWidth={selectedIdx === index ? 2 : 1}
                         className="transition-colors duration-200 cursor-pointer"
                         style={{ cursor: 'pointer' }}
@@ -314,11 +314,11 @@ export default function SelectStandard() {
                       type="button"
                       className={`py-3.5 px-3 rounded-2xl border text-center transition-all duration-200 cursor-pointer ${
                         isSelected 
-                          ? 'bg-[#F15A29] border-[#F15A29] text-white shadow-md' 
-                          : 'bg-[#FDF5E6]/40 hover:bg-[#FDF5E6]/80 border-black/10 text-text-primary'
+                          ? 'bg-[#4F46E5] border-[#4F46E5] text-white shadow-md' 
+                          : 'bg-[#F8FAFC]/40 hover:bg-[#F8FAFC]/80 border-black/10 text-text-primary'
                       }`}
                     >
-                      <GraduationCap className={`w-5 h-5 mx-auto mb-1 ${isSelected ? 'text-white' : 'text-[#F15A29]'}`} />
+                      <GraduationCap className={`w-5 h-5 mx-auto mb-1 ${isSelected ? 'text-white' : 'text-[#4F46E5]'}`} />
                       <span className="text-xs font-bold block truncate">{item.name}</span>
                     </button>
                   );
@@ -340,14 +340,14 @@ export default function SelectStandard() {
               >
                 {/* Visual Icon Badge */}
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-[#F15A29]/10 border border-[#F15A29]/20 flex items-center justify-center text-[#F15A29] shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-[#4F46E5]/10 border border-[#4F46E5]/20 flex items-center justify-center text-[#4F46E5] shrink-0">
                     <Award className="w-7 h-7" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-black font-display tracking-tight text-[#1F1F1F]">
                       {selectedStandard.name}
                     </h2>
-                    <p className="text-[#F15A29] text-xs font-mono uppercase tracking-widest font-black">
+                    <p className="text-[#4F46E5] text-xs font-mono uppercase tracking-widest font-black">
                       Segment: {selectedStandard.focus}
                     </p>
                   </div>
@@ -372,7 +372,7 @@ export default function SelectStandard() {
                   </div>
 
                   {/* Platform Analytics Widget */}
-                  <div className="grid grid-cols-2 gap-3 bg-[#FDF5E6] p-4 rounded-2xl border border-black/5 mt-4">
+                  <div className="grid grid-cols-2 gap-3 bg-[#F8FAFC] p-4 rounded-2xl border border-black/5 mt-4">
                     <div className="space-y-0.5">
                       <span className="text-[10px] font-mono text-[#7A7A7A] uppercase tracking-wider block">Avg study required</span>
                       <strong className="text-base font-extrabold font-display">{selectedStandard.avgStudy} Hours/Day</strong>
@@ -396,7 +396,7 @@ export default function SelectStandard() {
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   type="button"
-                  className={`w-full py-4 bg-[#F15A29] hover:bg-primary-dark text-white rounded-2xl font-bold font-sans flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`w-full py-4 bg-[#4F46E5] hover:bg-primary-dark text-white rounded-2xl font-bold font-sans flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer ${isSaving ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
                   <span>{isSaving ? 'Configuring Access...' : `Enroll in ${selectedStandard.name}`}</span>
                   {!isSaving && <ChevronRight className="w-5 h-5" />}
