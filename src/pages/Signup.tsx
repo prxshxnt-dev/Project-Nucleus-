@@ -15,13 +15,13 @@ import {
   Chrome,
   RefreshCw
 } from 'lucide-react';
-import { signInWithGoogle } from '../lib/firebase';
+import { signInWithGoogle, signInWithGoogleToken } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import FloatingLabelInput from '../components/FloatingLabelInput';
 
 export default function Signup() {
-  const { user, loading } = useAuthStore();
+  const { user, loading, setLoading } = useAuthStore();
   const navigate = useNavigate();
 
   // Form State
@@ -32,6 +32,78 @@ export default function Signup() {
   const [classGroup, setClassGroup] = useState('11');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Google Identity Services (GIS) Callback
+  const handleCredentialResponse = async (response: any) => {
+    if (!response || !response.credential) {
+      toast.error('Google portal credentials not received.');
+      return;
+    }
+    try {
+      if (setLoading) setLoading(true);
+      const authenticatedUser = await signInWithGoogleToken(response.credential);
+      toast.success(`Welcome back, ${authenticatedUser.displayName || 'Student'}!`);
+    } catch (err: any) {
+      console.error('GIS authentication error:', err);
+      toast.error(err.message || 'Google portal authentication failed.');
+    } finally {
+      if (setLoading) setLoading(false);
+    }
+  };
+
+  // Google Identity Services (GIS) Initialization
+  useEffect(() => {
+    let checkInterval: NodeJS.Timeout;
+    const initGis = () => {
+      const google = (window as any).google;
+      if (!google || !google.accounts || !google.accounts.id) return;
+
+      const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '575632888280-9g0v0v8v796n03h061vfe8k9b5j6d78u.apps.googleusercontent.com';
+
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+
+      // Show One Tap
+      google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed()) {
+          console.debug('One tap not displayed:', notification.getNotDisplayedReason());
+        }
+      });
+
+      // Render hidden native sign-in button over custom design
+      const btnEl = document.getElementById("google-signup-gsi-button");
+      if (btnEl) {
+        google.accounts.id.renderButton(
+          btnEl,
+          { 
+            theme: "outline", 
+            size: "large", 
+            type: "standard", 
+            width: btnEl.clientWidth || 382 
+          }
+        );
+      }
+    };
+
+    if ((window as any).google?.accounts?.id) {
+      initGis();
+    } else {
+      checkInterval = setInterval(() => {
+        if ((window as any).google?.accounts?.id) {
+          clearInterval(checkInterval);
+          initGis();
+        }
+      }, 500);
+    }
+
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+    };
+  }, []);
 
   // Auto-redirect if already logged in
   useEffect(() => {
@@ -307,10 +379,14 @@ export default function Signup() {
           onClick={handleGoogleRegister}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          className="w-full py-3 px-4 bg-transparent hover:bg-black/5 border border-black/10 rounded-2xl text-[#1F1F1F] font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer"
+          className="relative w-full py-3 px-4 bg-transparent hover:bg-black/5 border border-black/10 rounded-2xl text-[#1F1F1F] font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer overflow-hidden"
         >
           <Chrome className="w-5 h-5 text-red-500 fill-current" />
           <span>Register with Google Portal</span>
+          <div 
+            id="google-signup-gsi-button" 
+            className="absolute inset-0 opacity-0 cursor-pointer z-10 [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:!absolute [&_iframe]:!top-0 [&_iframe]:!left-0"
+          />
         </motion.button>
 
         {/* Back navigation */}

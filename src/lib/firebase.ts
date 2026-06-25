@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithCredential } from 'firebase/auth';
 import { 
   initializeFirestore, 
   doc, 
@@ -24,46 +24,55 @@ export const db = initializeFirestore(app, {
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
+export const syncUserWithFirestore = async (user: any) => {
+  // Check if user exists in Firestore
+  const userRef = doc(db, 'users', user.uid);
+  const userSnap = await getDoc(userRef);
+  
+  if (!userSnap.exists()) {
+    // Create new user profile
+    const adminEmails = ['meinkxun@gmail.com', 'nucleuscc2026@gmail.com'];
+    const isSuperadmin = user.email ? adminEmails.includes(user.email.toLowerCase().trim()) : false;
+    const role = isSuperadmin ? 'superadmin' : 'guest';
+    const planId = isSuperadmin ? 'premium' : 'free';
+    await setDoc(userRef, {
+      email: user.email,
+      displayName: user.displayName || 'Student',
+      role: role,
+      planId: planId,
+      classGroup: 'all',
+      unlockedMaterials: [],
+      photoURL: user.photoURL || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    // If user exists and is a superadmin email, but doesn't have the role, upgrade them
+    const adminEmails = ['meinkxun@gmail.com', 'nucleuscc2026@gmail.com'];
+    const isSuperadmin = user.email ? adminEmails.includes(user.email.toLowerCase().trim()) : false;
+    if (isSuperadmin && userSnap.data().role !== 'superadmin') {
+      await updateDoc(userRef, {
+        role: 'superadmin',
+        planId: 'premium',
+        classGroup: 'all',
+        unlockedMaterials: [],
+        updatedAt: serverTimestamp(),
+      });
+    }
+  }
+};
+
+export const signInWithGoogleToken = async (idToken: string) => {
+  const credential = GoogleAuthProvider.credential(idToken);
+  const result = await signInWithCredential(auth, credential);
+  await syncUserWithFirestore(result.user);
+  return result.user;
+};
+
 export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    
-    // Check if user exists in Firestore
-    const userRef = doc(db, 'users', user.uid);
-    const userSnap = await getDoc(userRef);
-    
-    if (!userSnap.exists()) {
-      // Create new user profile
-      const adminEmails = ['meinkxun@gmail.com', 'nucleuscc2026@gmail.com'];
-      const isSuperadmin = user.email ? adminEmails.includes(user.email.toLowerCase().trim()) : false;
-      const role = isSuperadmin ? 'superadmin' : 'guest';
-      const planId = isSuperadmin ? 'premium' : 'free';
-      await setDoc(userRef, {
-        email: user.email,
-        displayName: user.displayName || 'Student',
-        role: role,
-        planId: planId,
-        classGroup: 'all',
-        unlockedMaterials: [],
-        photoURL: user.photoURL || null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      // If user exists and is a superadmin email, but doesn't have the role, upgrade them
-      const adminEmails = ['meinkxun@gmail.com', 'nucleuscc2026@gmail.com'];
-      const isSuperadmin = user.email ? adminEmails.includes(user.email.toLowerCase().trim()) : false;
-      if (isSuperadmin && userSnap.data().role !== 'superadmin') {
-        await updateDoc(userRef, {
-          role: 'superadmin',
-          planId: 'premium',
-          classGroup: 'all',
-          unlockedMaterials: [],
-          updatedAt: serverTimestamp(),
-        });
-      }
-    }
+    await syncUserWithFirestore(result.user);
   } catch (error: any) {
     console.error('Error signing in with Google', error);
     if (error.code === 'auth/cancelled-popup-request') {
