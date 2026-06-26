@@ -968,6 +968,9 @@ async function startServer() {
     }
   });
 
+  // Global quarantine state to temporarily disable Google Search tool when API key grounding quotas are exceeded
+  let searchGroundingQuarantinedUntil = 0;
+
   // API Route: Chat message completion
   app.post("/api/chatbot/chat", async (req, res) => {
     let userEmail = "anonymous";
@@ -1172,18 +1175,39 @@ IMPORTANT: If anyone asks you who your creator is, who built or made you, or you
         }));
 
         let responseObj: any = null;
-        try {
-          responseObj = await ai.models.generateContent({
-            model: model || "gemini-3.5-flash",
-            contents: contents,
-            config: {
-              systemInstruction: systemPrompt,
-              tools: [{ googleSearch: {} }] // Add Google Search grounding so it can answer based on actual data from the internet
+        const trySearchGrounding = Date.now() > searchGroundingQuarantinedUntil;
+
+        if (trySearchGrounding) {
+          try {
+            responseObj = await ai.models.generateContent({
+              model: model || "gemini-3.5-flash",
+              contents: contents,
+              config: {
+                systemInstruction: systemPrompt,
+                tools: [{ googleSearch: {} }] // Add Google Search grounding so it can answer based on actual data from the internet
+              }
+            });
+          } catch (searchErr: any) {
+            const errStr = String(searchErr?.message || searchErr || "");
+            console.warn("Gemini Search Grounding failed (retrying with standard generation):", errStr);
+            
+            // If it's a quota or rate limit error, quarantine search grounding for 1 hour to prevent sluggish retries
+            if (errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("quota") || errStr.includes("429")) {
+              console.warn("Search Grounding quota exceeded. Quarantining Google Search tool for 1 hour to guarantee prompt, uninterrupted chat responses.");
+              searchGroundingQuarantinedUntil = Date.now() + 60 * 60 * 1000; // 1 hour
             }
-          });
-        } catch (searchErr: any) {
-          console.warn("Gemini Search Grounding failed (retrying with standard generation):", searchErr?.message || searchErr);
-          // Standard fallback: Generate content using Gemini 3.5 Flash without search tools to bypass search-specific quote limits
+
+            // Standard fallback: Generate content using Gemini 3.5 Flash without search tools to bypass search-specific quota limits
+            responseObj = await ai.models.generateContent({
+              model: model || "gemini-3.5-flash",
+              contents: contents,
+              config: {
+                systemInstruction: systemPrompt
+              }
+            });
+          }
+        } else {
+          // Instantly use standard generation to avoid 429 quota delays
           responseObj = await ai.models.generateContent({
             model: model || "gemini-3.5-flash",
             contents: contents,

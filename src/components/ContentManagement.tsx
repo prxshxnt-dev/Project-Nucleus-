@@ -10,6 +10,7 @@ export function ContentManagement() {
     subjects,
     chapters,
     materials,
+    mcqTests,
     loading,
     initSync,
     addClass,
@@ -24,9 +25,12 @@ export function ContentManagement() {
     addMaterial,
     updateMaterial,
     deleteMaterial,
+    addMcqTest,
+    updateMcqTest,
+    deleteMcqTest,
   } = useContentStore();
 
-  const [activeSubTab, setActiveSubTab] = useState<"classes" | "subjects" | "chapters" | "materials" | "upload" | "cloud">("classes");
+  const [activeSubTab, setActiveSubTab] = useState<"classes" | "subjects" | "chapters" | "materials" | "upload" | "cloud" | "tests">("classes");
   const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
 
   const showToast = (message: string, isError = false) => {
@@ -44,6 +48,27 @@ export function ContentManagement() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Form states for MCQ Tests
+  const [testId, setTestId] = useState<string | null>(null);
+  const [testTitle, setTestTitle] = useState("");
+  const [testDesc, setTestDesc] = useState("");
+  const [testClassId, setTestClassId] = useState("");
+  const [testSubId, setTestSubId] = useState("");
+  const [testChapId, setTestChapId] = useState("");
+  const [testQuestions, setTestQuestions] = useState<any[]>([]);
+  const [isEditingTest, setIsEditingTest] = useState(false);
+  const [uploadMode, setUploadMode] = useState<"manual" | "upload">("manual");
+
+  // Single Question builder states
+  const [qText, setQText] = useState("");
+  const [qOpt1, setQOpt1] = useState("");
+  const [qOpt2, setQOpt2] = useState("");
+  const [qOpt3, setQOpt3] = useState("");
+  const [qOpt4, setQOpt4] = useState("");
+  const [qCorrect, setQCorrect] = useState<number>(0);
+  const [qExplanation, setQExplanation] = useState("");
+  const [editingQIndex, setEditingQIndex] = useState<number | null>(null);
 
   // Form states for Classes
   const [classId, setClassId] = useState<string | null>(null);
@@ -519,6 +544,232 @@ export function ContentManagement() {
     }
   };
 
+  // MCQ Test Form Management & Question Editors
+  const handleResetTestForm = () => {
+    setTestId(null);
+    setTestTitle("");
+    setTestDesc("");
+    setTestClassId("");
+    setTestSubId("");
+    setTestChapId("");
+    setTestQuestions([]);
+    setUploadMode("manual");
+    
+    // Clear question builder too
+    setQText("");
+    setQOpt1("");
+    setQOpt2("");
+    setQOpt3("");
+    setQOpt4("");
+    setQCorrect(0);
+    setQExplanation("");
+    setEditingQIndex(null);
+  };
+
+  const handleAddQuestion = () => {
+    if (!qText.trim()) {
+      showToast("Question text cannot be empty!", true);
+      return;
+    }
+    if (!qOpt1.trim() || !qOpt2.trim() || !qOpt3.trim() || !qOpt4.trim()) {
+      showToast("All four option fields must be filled!", true);
+      return;
+    }
+
+    const newQuestion = {
+      questionText: qText.trim(),
+      options: [qOpt1.trim(), qOpt2.trim(), qOpt3.trim(), qOpt4.trim()],
+      correctOptionIndex: qCorrect,
+      explanation: qExplanation.trim(),
+    };
+
+    if (editingQIndex !== null) {
+      const updated = [...testQuestions];
+      updated[editingQIndex] = newQuestion;
+      setTestQuestions(updated);
+      setEditingQIndex(null);
+      showToast("Question updated successfully!");
+    } else {
+      setTestQuestions([...testQuestions, newQuestion]);
+      showToast("Question added to test drafting.");
+    }
+
+    // Reset question builder fields
+    setQText("");
+    setQOpt1("");
+    setQOpt2("");
+    setQOpt3("");
+    setQOpt4("");
+    setQCorrect(0);
+    setQExplanation("");
+  };
+
+  const handleEditQuestion = (index: number) => {
+    const q = testQuestions[index];
+    setQText(q.questionText);
+    setQOpt1(q.options[0] || "");
+    setQOpt2(q.options[1] || "");
+    setQOpt3(q.options[2] || "");
+    setQOpt4(q.options[3] || "");
+    setQCorrect(q.correctOptionIndex);
+    setQExplanation(q.explanation || "");
+    setEditingQIndex(index);
+    setUploadMode("manual");
+  };
+
+  const handleDeleteQuestion = (index: number) => {
+    const updated = testQuestions.filter((_, i) => i !== index);
+    setTestQuestions(updated);
+    if (editingQIndex === index) {
+      setEditingQIndex(null);
+      setQText("");
+      setQOpt1("");
+      setQOpt2("");
+      setQOpt3("");
+      setQOpt4("");
+      setQCorrect(0);
+      setQExplanation("");
+    } else if (editingQIndex !== null && editingQIndex > index) {
+      setEditingQIndex(editingQIndex - 1);
+    }
+    showToast("Question removed from drafting.");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (file.name.endsWith(".json")) {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            const sanitized = parsed.map((item: any, idx: number) => {
+              if (!item.questionText || !Array.isArray(item.options) || item.options.length < 4) {
+                throw new Error(`Item ${idx + 1} is missing required fields (questionText, options array with 4 items)`);
+              }
+              return {
+                questionText: String(item.questionText),
+                options: item.options.slice(0, 4).map(String),
+                correctOptionIndex: typeof item.correctOptionIndex === 'number' ? item.correctOptionIndex : 0,
+                explanation: item.explanation ? String(item.explanation) : "",
+              };
+            });
+            setTestQuestions([...testQuestions, ...sanitized]);
+            showToast(`Successfully imported ${sanitized.length} questions from JSON!`);
+          } else {
+            showToast("Invalid JSON structure: Must be an array of questions", true);
+          }
+        } else if (file.name.endsWith(".csv")) {
+          const lines = text.split(/\r?\n/);
+          if (lines.length < 2) {
+            showToast("Empty CSV file!", true);
+            return;
+          }
+
+          const parsedQuestions: any[] = [];
+          
+          const splitCSVLine = (line: string) => {
+            const result = [];
+            let current = "";
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = "";
+              } else {
+                current += char;
+              }
+            }
+            result.push(current.trim());
+            return result;
+          };
+
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            const parts = splitCSVLine(line);
+            if (parts.length >= 6) {
+              const questionText = parts[0].replace(/^"|"$/g, "");
+              const options = [
+                parts[1].replace(/^"|"$/g, ""),
+                parts[2].replace(/^"|"$/g, ""),
+                parts[3].replace(/^"|"$/g, ""),
+                parts[4].replace(/^"|"$/g, "")
+              ];
+              const correctIdxRaw = parseInt(parts[5], 10);
+              const correctOptionIndex = isNaN(correctIdxRaw) ? 0 : Math.max(0, Math.min(3, correctIdxRaw - 1));
+              const explanation = parts[6] ? parts[6].replace(/^"|"$/g, "") : "";
+
+              parsedQuestions.push({
+                questionText,
+                options,
+                correctOptionIndex,
+                explanation
+              });
+            }
+          }
+
+          if (parsedQuestions.length > 0) {
+            setTestQuestions([...testQuestions, ...parsedQuestions]);
+            showToast(`Successfully imported ${parsedQuestions.length} questions from CSV!`);
+          } else {
+            showToast("No valid question rows found in CSV.", true);
+          }
+        }
+      } catch (err: any) {
+        showToast(`Import error: ${err.message || "Failed to parse file"}`, true);
+      }
+    };
+
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleSaveTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testTitle.trim()) {
+      showToast("Test title is required!", true);
+      return;
+    }
+    if (!testClassId) {
+      showToast("Target Class standard is required!", true);
+      return;
+    }
+    if (testQuestions.length === 0) {
+      showToast("Please add at least one question to the MCQ test!", true);
+      return;
+    }
+
+    const testPayload = {
+      title: testTitle.trim(),
+      description: testDesc.trim(),
+      classId: testClassId,
+      subjectId: testSubId || undefined,
+      chapterId: testChapId || undefined,
+      questions: testQuestions,
+    };
+
+    try {
+      if (testId) {
+        await updateMcqTest(testId, testPayload);
+        showToast("MCQ Test updated successfully!");
+      } else {
+        await addMcqTest(testPayload);
+        showToast("MCQ Test published successfully!");
+      }
+      setIsEditingTest(false);
+      handleResetTestForm();
+    } catch (err: any) {
+      showToast(`Failed to save MCQ Test: ${err.message || "Internal error"}`, true);
+    }
+  };
+
   return (
     <div className="w-full bg-zinc-950/60 border border-white/10 p-4 md:p-8 rounded-3xl relative text-left min-h-[600px] flex flex-col lg:flex-row gap-8 font-sans">
       
@@ -544,6 +795,7 @@ export function ContentManagement() {
           { id: "subjects", label: "📚 Subject Folders", count: subjects.length },
           { id: "chapters", label: "📂 Chapter Folders", count: chapters.length },
           { id: "materials", label: "📄 Vault Database", count: materials.length },
+          { id: "tests", label: "✏️ MCQ Tests Manager", count: mcqTests.length },
           { id: "upload", label: "🚀 Live Upload Hub", count: undefined },
           { id: "cloud", label: "☁️ Cloud Server Sync", count: undefined },
         ].map((subb) => (
@@ -1477,6 +1729,616 @@ export function ContentManagement() {
                     </div>
                   </form>
                 </div>
+              </div>
+            )}
+
+            {/* MCQ TESTS SUB-TAB */}
+            {activeSubTab === "tests" && (
+              <div className="space-y-6 animate-fadeIn font-sans">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-white font-display uppercase tracking-tight">MCQ Tests Manager</h3>
+                    <p className="text-xs text-white/50 mt-0.5">Design, build, and publish interactive multiple-choice question exams for each class standard.</p>
+                  </div>
+                  {!isEditingTest && (
+                    <button
+                      onClick={() => {
+                        handleResetTestForm();
+                        setIsEditingTest(true);
+                      }}
+                      className="px-4 py-2 bg-emerald-500 text-zinc-950 font-black uppercase text-xs rounded-xl hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-2 animate-pulse"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Create New MCQ Test
+                    </button>
+                  )}
+                </div>
+
+                {isEditingTest ? (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Header Action Row */}
+                    <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10">
+                      <span className="text-xs font-black text-white/70 uppercase">
+                        {testId ? "Editing MCQ Test Module" : "New MCQ Test Creator Wizard"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingTest(false)}
+                        className="px-3.5 py-1.5 bg-white/10 text-white font-black uppercase text-[10px] rounded-lg hover:bg-white/20 transition-all cursor-pointer"
+                      >
+                        ← Back to List
+                      </button>
+                    </div>
+
+                    {/* Test Setup Form */}
+                    <form onSubmit={handleSaveTest} className="theme-card-themed bg-white/5 border border-white/10 p-6 rounded-3xl space-y-6 text-left">
+                      <h4 className="text-xs font-black uppercase text-white/40 tracking-wider">1. Test Details & Target Standard</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-white/40">Test Title <span className="text-red-400">*</span></label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Physics - Laws of Motion MCQ Exam"
+                            value={testTitle}
+                            onChange={(e) => setTestTitle(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-white/40">Target Class Standard <span className="text-red-400">*</span></label>
+                          <select
+                            value={testClassId}
+                            onChange={(e) => {
+                              setTestClassId(e.target.value);
+                              setTestSubId("");
+                              setTestChapId("");
+                            }}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer"
+                            required
+                          >
+                            <option value="">Select a Class...</option>
+                            {classes.map(c => <option key={c.id} value={c.id}>{c.className}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-white/40">Subject Folder (Optional)</label>
+                          <select
+                            value={testSubId}
+                            onChange={(e) => {
+                              setTestSubId(e.target.value);
+                              setTestChapId("");
+                            }}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={!testClassId}
+                          >
+                            <option value="">Select Subject...</option>
+                            {subjects
+                              .filter(s => s.classId === testClassId)
+                              .map(s => <option key={s.id} value={s.id}>{s.subjectName}</option>)}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-white/40">Chapter Folder (Optional)</label>
+                          <select
+                            value={testChapId}
+                            onChange={(e) => setTestChapId(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={!testSubId}
+                          >
+                            <option value="">Select Chapter...</option>
+                            {chapters
+                              .filter(c => c.subjectId === testSubId)
+                              .map(c => <option key={c.id} value={c.id}>{c.chapterName}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-white/40">Test Description</label>
+                        <textarea
+                          placeholder="Provide short instruction guidelines, time limit, and scoring pattern..."
+                          value={testDesc}
+                          onChange={(e) => setTestDesc(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20 h-20 resize-none"
+                        />
+                      </div>
+
+                      {/* Question Method Selector */}
+                      <div className="border-t border-white/5 pt-5 space-y-4">
+                        <h4 className="text-xs font-black uppercase text-white/40 tracking-wider">2. Populate Questions Panel</h4>
+                        
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setUploadMode("manual")}
+                            className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              uploadMode === "manual"
+                                ? "bg-emerald-500 text-zinc-950 border-transparent font-bold"
+                                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+                            }`}
+                          >
+                            ✍️ Manual Entry Editor
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setUploadMode("upload")}
+                            className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              uploadMode === "upload"
+                                ? "bg-emerald-500 text-zinc-950 border-transparent font-bold"
+                                : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+                            }`}
+                          >
+                            🚀 Import JSON / CSV File
+                          </button>
+                        </div>
+
+                        {uploadMode === "upload" ? (
+                          <div className="bg-black/30 border border-white/10 p-5 rounded-2xl space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-white/40">Upload file (.json or .csv)</label>
+                              <input
+                                type="file"
+                                accept=".json,.csv"
+                                onChange={handleFileUpload}
+                                className="w-full text-xs text-white/60 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-white/20 file:cursor-pointer cursor-pointer border border-white/10 p-3 rounded-xl bg-black/20"
+                              />
+                            </div>
+
+                            {/* Template Helpers */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/5 p-4 rounded-xl border border-white/5 text-left">
+                              <div className="space-y-2">
+                                <span className="text-[10px] font-black uppercase text-emerald-400 block">CSV File Format Standard</span>
+                                <p className="text-[10px] text-white/50 leading-relaxed">
+                                  Your CSV file must contain a header row. Columns required:<br/>
+                                  <code className="text-white bg-black/60 px-1 rounded block truncate">Question, Option A, Option B, Option C, Option D, Correct Index (1-4), Explanation</code>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const template = `Question,Option A,Option B,Option C,Option D,Correct Index,Explanation\n"What is the SI unit of force?",Newton,Joule,Pascal,Watt,1,"Newton is the SI unit of force (F = ma)."\n"Which planet is known as the Red Planet?",Earth,Mars,Jupiter,Venus,2,"Mars has a reddish appearance due to iron oxide on its surface."`;
+                                    navigator.clipboard.writeText(template);
+                                    showToast("CSV Template copied to clipboard!");
+                                  }}
+                                  className="text-[9px] font-black uppercase tracking-wider text-emerald-400 hover:underline bg-transparent border-0 cursor-pointer p-0"
+                                >
+                                  Copy Sample CSV Template
+                                </button>
+                              </div>
+
+                              <div className="space-y-2">
+                                <span className="text-[10px] font-black uppercase text-blue-400 block">JSON File Format Standard</span>
+                                <p className="text-[10px] text-white/50 leading-relaxed">
+                                  Must be an array of objects. Schema fields:<br/>
+                                  <code className="text-white bg-black/60 px-1 rounded block truncate">{"[ { \"questionText\": \"...\", \"options\": [\"...\"], \"correctOptionIndex\": 0, \"explanation\": \"...\" } ]"}</code>
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const template = JSON.stringify([
+                                      {
+                                        questionText: "What is the speed of light in vacuum?",
+                                        options: ["299,792 km/s", "150,000 km/s", "343 m/s", "1,000 km/s"],
+                                        correctOptionIndex: 0,
+                                        explanation: "Light travels at exactly 299,792,458 meters per second in a vacuum."
+                                      }
+                                    ], null, 2);
+                                    navigator.clipboard.writeText(template);
+                                    showToast("JSON Template copied to clipboard!");
+                                  }}
+                                  className="text-[9px] font-black uppercase tracking-wider text-blue-400 hover:underline bg-transparent border-0 cursor-pointer p-0"
+                                >
+                                  Copy Sample JSON Template
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-black/30 border border-white/10 p-5 rounded-2xl space-y-4">
+                            <span className="text-[10px] font-black uppercase text-white/40 block">
+                              {editingQIndex !== null ? `✍️ Editing Question #${editingQIndex + 1}` : "✍️ Create Question Item"}
+                            </span>
+                            
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-white/40">Question Text</label>
+                              <textarea
+                                placeholder="Write the question prompt here..."
+                                value={qText}
+                                onChange={(e) => setQText(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20 h-16 resize-none"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-white/40">Option A</label>
+                                <input
+                                  type="text"
+                                  placeholder="Option A"
+                                  value={qOpt1}
+                                  onChange={(e) => setQOpt1(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none placeholder-white/20"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-white/40">Option B</label>
+                                <input
+                                  type="text"
+                                  placeholder="Option B"
+                                  value={qOpt2}
+                                  onChange={(e) => setQOpt2(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none placeholder-white/20"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-white/40">Option C</label>
+                                <input
+                                  type="text"
+                                  placeholder="Option C"
+                                  value={qOpt3}
+                                  onChange={(e) => setQOpt3(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none placeholder-white/20"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-white/40">Option D</label>
+                                <input
+                                  type="text"
+                                  placeholder="Option D"
+                                  value={qOpt4}
+                                  onChange={(e) => setQOpt4(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none placeholder-white/20"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-white/40">Correct Answer Option</label>
+                                <div className="flex gap-1.5">
+                                  {[
+                                    { index: 0, label: "A" },
+                                    { index: 1, label: "B" },
+                                    { index: 2, label: "C" },
+                                    { index: 3, label: "D" },
+                                  ].map((opt) => (
+                                    <button
+                                      key={opt.index}
+                                      type="button"
+                                      onClick={() => setQCorrect(opt.index)}
+                                      className={`flex-1 py-1.5 text-xs font-black rounded-lg transition-all border cursor-pointer ${
+                                        qCorrect === opt.index
+                                          ? "bg-emerald-500 border-transparent text-zinc-950"
+                                          : "bg-white/5 border-white/5 text-white/50 hover:text-white"
+                                      }`}
+                                    >
+                                      Option {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-white/40">Explanation / Solutions hint</label>
+                                <input
+                                  type="text"
+                                  placeholder="Provide step-by-step reasoning details..."
+                                  value={qExplanation}
+                                  onChange={(e) => setQExplanation(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none placeholder-white/20"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                              {editingQIndex !== null && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingQIndex(null);
+                                    setQText("");
+                                    setQOpt1("");
+                                    setQOpt2("");
+                                    setQOpt3("");
+                                    setQOpt4("");
+                                    setQCorrect(0);
+                                    setQExplanation("");
+                                  }}
+                                  className="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black uppercase text-[10px] rounded-xl transition-all cursor-pointer"
+                                >
+                                  Cancel Edit
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={handleAddQuestion}
+                                className="px-5 py-2 bg-emerald-500 text-zinc-950 font-black uppercase text-[10px] rounded-xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                              >
+                                {editingQIndex !== null ? "Update Question Block" : "Add Question to Exam"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Live Questions Preview */}
+                      <div className="border-t border-white/5 pt-5 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase text-white/40 tracking-wider">
+                            3. Live Questions Feed ({testQuestions.length} Items)
+                          </h4>
+                          {testQuestions.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTestQuestions([]);
+                                showToast("Cleared all questions from the test drafting.");
+                              }}
+                              className="text-[10px] font-black uppercase text-red-400 hover:underline bg-transparent border-0 cursor-pointer"
+                            >
+                              Clear All
+                            </button>
+                          )}
+                        </div>
+
+                        {testQuestions.length === 0 ? (
+                          <div className="border border-dashed border-white/10 rounded-2xl py-10 text-center">
+                            <p className="text-xs text-white/30 italic">No questions added yet. Fill manually or upload.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-[400px] overflow-y-auto scrollbar-thin pr-1 text-left">
+                            {testQuestions.map((q, idx) => (
+                              <div key={idx} className="bg-black/20 border border-white/5 p-4 rounded-xl text-left space-y-2 relative group">
+                                <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  {/* Reordering */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (idx === 0) return;
+                                      const updated = [...testQuestions];
+                                      const temp = updated[idx];
+                                      updated[idx] = updated[idx - 1];
+                                      updated[idx - 1] = temp;
+                                      setTestQuestions(updated);
+                                    }}
+                                    disabled={idx === 0}
+                                    className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white disabled:opacity-20 cursor-pointer"
+                                    title="Move Up"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (idx === testQuestions.length - 1) return;
+                                      const updated = [...testQuestions];
+                                      const temp = updated[idx];
+                                      updated[idx] = updated[idx + 1];
+                                      updated[idx + 1] = temp;
+                                      setTestQuestions(updated);
+                                    }}
+                                    disabled={idx === testQuestions.length - 1}
+                                    className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white disabled:opacity-20 cursor-pointer"
+                                    title="Move Down"
+                                  >
+                                    ▼
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditQuestion(idx)}
+                                    className="p-1 hover:bg-blue-500/10 rounded text-blue-400 hover:text-blue-300 cursor-pointer"
+                                    title="Edit Question"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteQuestion(idx)}
+                                    className="p-1 hover:bg-red-500/10 rounded text-red-400 hover:text-red-300 cursor-pointer"
+                                    title="Delete Question"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <div className="flex gap-2">
+                                  <span className="text-xs font-black text-emerald-400 font-mono">Q{idx + 1}.</span>
+                                  <p className="text-xs text-white font-bold pr-20">{q.questionText}</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-6 pt-1">
+                                  {q.options.map((opt: string, optIdx: number) => {
+                                    const isCorrect = q.correctOptionIndex === optIdx;
+                                    return (
+                                      <div
+                                        key={optIdx}
+                                        className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 border ${
+                                          isCorrect
+                                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold"
+                                            : "bg-white/5 border-transparent text-white/60"
+                                        }`}
+                                      >
+                                        <span className="font-black uppercase text-[10px] opacity-60">
+                                          {String.fromCharCode(65 + optIdx)}.
+                                        </span>
+                                        <span>{opt}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {q.explanation && (
+                                  <div className="pl-6 pt-1">
+                                    <p className="text-[10px] text-white/40 italic">
+                                      <strong className="text-emerald-400/80 not-italic font-black">Explanation:</strong> {q.explanation}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Final Submit Block */}
+                      <div className="border-t border-white/5 pt-5 flex justify-end gap-3.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingTest(false)}
+                          className="px-5 py-3 bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs rounded-xl transition-all cursor-pointer"
+                        >
+                          Discard
+                        </button>
+                        <button
+                          type="submit"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleSaveTest(e);
+                          }}
+                          className="px-7 py-3 bg-emerald-500 text-zinc-950 font-black uppercase text-xs rounded-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                        >
+                          {testId ? "💾 Save Published Changes" : "🚀 Publish MCQ Test"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Search / Filter Dashboard */}
+                    <div className="bg-white/5 p-5 border border-white/10 rounded-2xl grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-white/40">Search by Test Title</label>
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-white/30 absolute left-3 top-3" />
+                          <input
+                            type="text"
+                            placeholder="e.g. Physics"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 col-span-2">
+                        <label className="text-[10px] font-black uppercase text-white/40">Filter by Target Class</label>
+                        <select
+                          value={filterClass}
+                          onChange={(e) => setFilterClass(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="">All Classes</option>
+                          {classes.map(c => <option key={c.id} value={c.id}>{c.className}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Active Tests List Grid */}
+                    <div className="theme-card-themed bg-white/5 border border-white/10 p-6 rounded-3xl text-left space-y-4">
+                      <h4 className="text-xs font-black uppercase text-white/40">Published MCQ Tests Ledger</h4>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-white/10 text-[9px] uppercase font-black tracking-wider text-white/40">
+                              <th className="pb-3">Test Title Details</th>
+                              <th className="pb-3">Target Standard</th>
+                              <th className="pb-3">Questions Count</th>
+                              <th className="pb-3">Last Modified</th>
+                              <th className="pb-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5 text-xs">
+                            {mcqTests
+                              .filter(t => {
+                                const titleSafe = t.title || "";
+                                const matchesSearch = titleSafe.toLowerCase().includes(searchQuery.toLowerCase());
+                                const matchesClass = !filterClass || t.classId === filterClass;
+                                return matchesSearch && matchesClass;
+                              })
+                              .map((test) => {
+                                const targetClass = classes.find(c => c.id === test.classId)?.className || "All Classes";
+                                const formattedDate = test.updatedAt ? new Date(test.updatedAt.seconds * 1000).toLocaleDateString() : "Just Now";
+                                
+                                return (
+                                  <tr key={test.id} className="hover:bg-white/5 transition-colors duration-150">
+                                    <td className="py-4">
+                                      <div className="font-bold text-white leading-snug">{test.title}</div>
+                                      {test.description && (
+                                        <div className="text-[10px] text-white/40 max-w-sm truncate mt-0.5" title={test.description}>
+                                          {test.description}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="py-4 font-black uppercase text-[10px] text-emerald-400">{targetClass}</td>
+                                    <td className="py-4 font-mono text-emerald-400 font-bold">{test.questions?.length || 0} Questions</td>
+                                    <td className="py-4 text-white/50 text-[10px]">{formattedDate}</td>
+                                    <td className="py-4 text-right">
+                                      <div className="inline-flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setTestId(test.id);
+                                            setTestTitle(test.title);
+                                            setTestDesc(test.description || "");
+                                            setTestClassId(test.classId);
+                                            setTestSubId(test.subjectId || "");
+                                            setTestChapId(test.chapterId || "");
+                                            setTestQuestions(test.questions || []);
+                                            setUploadMode("manual");
+                                            setIsEditingTest(true);
+                                          }}
+                                          className="p-1.5 bg-white/5 border border-white/10 hover:border-white/20 text-white rounded-lg transition-all cursor-pointer"
+                                          title="Edit MCQ Test"
+                                        >
+                                          <Edit2 className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            if (confirm(`Are you sure you want to delete the test "${test.title}"?`)) {
+                                              try {
+                                                await deleteMcqTest(test.id);
+                                                showToast("Published test removed successfully.");
+                                              } catch (e) {
+                                                showToast("Failed to delete test.", true);
+                                              }
+                                            }
+                                          }}
+                                          className="p-1.5 bg-red-500/10 border border-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-all cursor-pointer"
+                                          title="Delete MCQ Test"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            {mcqTests.filter(t => {
+                              const titleSafe = t.title || "";
+                              const matchesSearch = titleSafe.toLowerCase().includes(searchQuery.toLowerCase());
+                              const matchesClass = !filterClass || t.classId === filterClass;
+                              return matchesSearch && matchesClass;
+                            }).length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="text-center py-8 text-white/30 italic text-xs">
+                                  No interactive MCQ tests match the filter or search patterns.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

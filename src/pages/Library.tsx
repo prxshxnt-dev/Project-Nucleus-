@@ -144,6 +144,54 @@ export default function Library() {
   // UI display settings
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // MCQ Test States
+  const [mcqTests, setMcqTests] = useState<any[]>([]);
+  const [activeMcqTest, setActiveMcqTest] = useState<any | null>(null);
+  const [mcqAnswers, setMcqAnswers] = useState<Record<number, number>>({});
+  const [mcqShowResult, setMcqShowResult] = useState(false);
+  const [mcqCurrentIndex, setMcqCurrentIndex] = useState(0);
+  const [mcqScore, setMcqScore] = useState(0);
+  const [mcqSelectedAnswer, setMcqSelectedAnswer] = useState<number | null>(null);
+  const [mcqSubmittedQuestion, setMcqSubmittedQuestion] = useState(false);
+
+  const handleStartMcqTest = (test: any) => {
+    setActiveMcqTest(test);
+    setMcqAnswers({});
+    setMcqShowResult(false);
+    setMcqCurrentIndex(0);
+    setMcqScore(0);
+    setMcqSelectedAnswer(null);
+    setMcqSubmittedQuestion(false);
+  };
+
+  const handleSelectMcqOption = (optIdx: number) => {
+    if (mcqSubmittedQuestion) return;
+    setMcqSelectedAnswer(optIdx);
+  };
+
+  const handleConfirmMcqAnswer = () => {
+    if (mcqSelectedAnswer === null || mcqSubmittedQuestion) return;
+    
+    const isCorrect = mcqSelectedAnswer === activeMcqTest.questions[mcqCurrentIndex].correctOptionIndex;
+    if (isCorrect) {
+      setMcqScore(prev => prev + 1);
+    }
+    
+    // Save answer
+    setMcqAnswers(prev => ({ ...prev, [mcqCurrentIndex]: mcqSelectedAnswer }));
+    setMcqSubmittedQuestion(true);
+  };
+
+  const handleNextMcqQuestion = () => {
+    setMcqSelectedAnswer(null);
+    setMcqSubmittedQuestion(false);
+    if (mcqCurrentIndex + 1 < activeMcqTest.questions.length) {
+      setMcqCurrentIndex(prev => prev + 1);
+    } else {
+      setMcqShowResult(true);
+    }
+  };
+
   // Previewer modals
   const [previewMaterial, setPreviewMaterial] = useState<MaterialItem | null>(null);
   const [secureFileUrl, setSecureFileUrl] = useState<string>('');
@@ -254,11 +302,19 @@ export default function Library() {
       setLoading(false);
     });
 
+    const unsubMcqTests = onSnapshot(collection(db, 'mcq_tests'), (snap) => {
+      const testsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMcqTests(testsList);
+    }, (error) => {
+      console.error("Error syncing mcq_tests:", error);
+    });
+
     return () => {
       unsubClasses();
       unsubSubjects();
       unsubChapters();
       unsubMaterials();
+      unsubMcqTests();
     };
   }, [user?.uid, seeding]);
 
@@ -1297,8 +1353,357 @@ export default function Library() {
               </div>
             )}
 
+            {/* INTERACTIVE MCQ TESTS RUNNER AND CATALOG */}
+            {activeTab === 'tests' && (
+              <div className="space-y-6">
+                {activeMcqTest ? (
+                  /* 1. ACTIVE MCQ TEST RUNNER INTERFACE */
+                  <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm animate-fadeIn text-left space-y-6">
+                    {/* Header bar */}
+                    <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
+                      <div>
+                        <span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-[10px] uppercase font-black tracking-wide text-indigo-600">
+                          Active Interactive Exam
+                        </span>
+                        <h3 className="text-sm font-black text-zinc-900 uppercase tracking-tight mt-1">
+                          {activeMcqTest.title}
+                        </h3>
+                        {activeMcqTest.description && (
+                          <p className="text-[11px] text-zinc-500 mt-0.5">{activeMcqTest.description}</p>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => {
+                          if (confirm("Are you sure you want to exit this test? Your active progress will be discarded.")) {
+                            setActiveMcqTest(null);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[10px] font-black uppercase rounded-xl transition cursor-pointer"
+                      >
+                        ✕ Exit Test
+                      </button>
+                    </div>
+
+                    {!mcqShowResult ? (
+                      /* ACTIVE QUESTION PANEL */
+                      <div className="space-y-6">
+                        {/* Progress Tracker */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px] font-black uppercase text-zinc-400">
+                            <span>Question {mcqCurrentIndex + 1} of {activeMcqTest.questions.length}</span>
+                            <span>Score: {mcqScore} / {mcqCurrentIndex + (mcqSubmittedQuestion ? 1 : 0)}</span>
+                          </div>
+                          <div className="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-indigo-600 h-full transition-all duration-300"
+                              style={{ width: `${((mcqCurrentIndex + 1) / activeMcqTest.questions.length) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Question Text Box */}
+                        <div className="bg-zinc-50 border border-zinc-150 p-6 rounded-2xl">
+                          <span className="text-xs font-black text-indigo-500 font-mono block mb-2">QUESTION #{mcqCurrentIndex + 1}</span>
+                          <h4 className="text-sm font-bold text-zinc-900 leading-relaxed">
+                            {activeMcqTest.questions[mcqCurrentIndex].questionText}
+                          </h4>
+                        </div>
+
+                        {/* 4 Option Buttons */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {activeMcqTest.questions[mcqCurrentIndex].options.map((opt: string, optIdx: number) => {
+                            const isSelected = mcqSelectedAnswer === optIdx;
+                            const isCorrectAnswer = activeMcqTest.questions[mcqCurrentIndex].correctOptionIndex === optIdx;
+                            
+                            // Style calculation based on state
+                            let optionClass = "bg-white border-zinc-200 text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50/50";
+                            
+                            if (mcqSubmittedQuestion) {
+                              if (isCorrectAnswer) {
+                                optionClass = "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold shadow-sm shadow-emerald-100";
+                              } else if (isSelected) {
+                                optionClass = "bg-red-50 border-red-300 text-red-800 font-bold shadow-sm shadow-red-100";
+                              } else {
+                                optionClass = "bg-white border-zinc-150 text-zinc-400 opacity-60";
+                              }
+                            } else if (isSelected) {
+                              optionClass = "bg-indigo-50/60 border-indigo-500 text-indigo-800 font-bold ring-1 ring-indigo-500/20";
+                            }
+
+                            return (
+                              <button
+                                key={optIdx}
+                                onClick={() => handleSelectMcqOption(optIdx)}
+                                disabled={mcqSubmittedQuestion}
+                                className={`w-full p-4 rounded-xl border text-left text-xs transition duration-150 cursor-pointer flex items-start gap-3 ${optionClass}`}
+                              >
+                                <span className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black flex-shrink-0 ${
+                                  mcqSubmittedQuestion && isCorrectAnswer
+                                    ? "bg-emerald-500 text-white"
+                                    : mcqSubmittedQuestion && isSelected
+                                    ? "bg-red-500 text-white"
+                                    : isSelected
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-zinc-100 text-zinc-500"
+                                }`}>
+                                  {String.fromCharCode(65 + optIdx)}
+                                </span>
+                                <span className="pt-0.5">{opt}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Explanation Box - displayed after answer submission */}
+                        {mcqSubmittedQuestion && (
+                          <div className="bg-emerald-50/40 border border-emerald-500/20 p-5 rounded-2xl animate-fadeIn space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                              <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">
+                                Solution & Explanation
+                              </span>
+                            </div>
+                            <p className="text-xs text-zinc-700 leading-relaxed pl-3.5">
+                              {activeMcqTest.questions[mcqCurrentIndex].explanation || 
+                                "No detailed explanation was provided for this question by the administrator."}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Actions bar */}
+                        <div className="flex justify-end pt-4 border-t border-zinc-100">
+                          {!mcqSubmittedQuestion ? (
+                            <button
+                              onClick={handleConfirmMcqAnswer}
+                              disabled={mcqSelectedAnswer === null}
+                              className="px-6 py-3 bg-indigo-600 text-white font-black uppercase text-xs rounded-xl hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-100"
+                            >
+                              Check Answer
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleNextMcqQuestion}
+                              className="px-6 py-3 bg-emerald-500 text-zinc-950 font-black uppercase text-xs rounded-xl hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md shadow-emerald-100 flex items-center gap-1"
+                            >
+                              {mcqCurrentIndex + 1 < activeMcqTest.questions.length ? "Next Question →" : "Finish & View Results 🏆"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      /* 2. RESULTS VIEW */
+                      <div className="space-y-6 text-center py-4">
+                        <div className="max-w-md mx-auto space-y-4">
+                          <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-4xl mx-auto animate-bounce">
+                            🏆
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <h4 className="text-lg font-black text-zinc-900 uppercase tracking-tight">Exam Session Complete!</h4>
+                            <p className="text-xs text-zinc-500">You've successfully solved all questions in this interactive module.</p>
+                          </div>
+
+                          <div className="bg-zinc-50 border border-zinc-150 p-6 rounded-3xl space-y-3">
+                            <div className="text-[10px] font-black uppercase text-zinc-400">Your Score Card</div>
+                            <div className="text-3xl font-black text-indigo-600 font-display">
+                              {mcqScore} / {activeMcqTest.questions.length}
+                            </div>
+                            <div className="text-xs font-bold text-zinc-600">
+                              Accuracy Rate: {Math.round((mcqScore / activeMcqTest.questions.length) * 100)}%
+                            </div>
+                            
+                            {/* Performance evaluation */}
+                            <p className="text-[11px] text-zinc-500 italic pt-1 border-t border-zinc-150">
+                              {mcqScore === activeMcqTest.questions.length 
+                                ? "Outstanding! Flawless perfect score! 🌟" 
+                                : mcqScore >= activeMcqTest.questions.length * 0.7 
+                                ? "Great job! Strong command over the subject! 👍" 
+                                : "Good effort! Review the detailed solutions below to improve. 📖"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Detailed Solutions Review Ledger */}
+                        <div className="border-t border-zinc-100 pt-6 space-y-4 text-left">
+                          <h4 className="text-xs font-black uppercase text-zinc-400 tracking-wider">Detailed Exam Review Ledger</h4>
+                          
+                          <div className="space-y-4">
+                            {activeMcqTest.questions.map((q: any, idx: number) => {
+                              const userAnswer = mcqAnswers[idx];
+                              const isCorrect = userAnswer === q.correctOptionIndex;
+                              
+                              return (
+                                <div key={idx} className="bg-zinc-50 border border-zinc-200/60 p-5 rounded-2xl space-y-3 text-left">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-black text-indigo-500 font-mono">QUESTION {idx + 1}</span>
+                                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wide ${
+                                      isCorrect ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                                    }`}>
+                                      {isCorrect ? "✓ Correct" : "✕ Incorrect"}
+                                    </span>
+                                  </div>
+
+                                  <p className="text-xs font-bold text-zinc-900 leading-relaxed">{q.questionText}</p>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-4">
+                                    {q.options.map((opt: string, optIdx: number) => {
+                                      const isCorrectOpt = q.correctOptionIndex === optIdx;
+                                      const isUserChoice = userAnswer === optIdx;
+                                      
+                                      let optStyle = "bg-white border-zinc-200 text-zinc-500";
+                                      if (isCorrectOpt) {
+                                        optStyle = "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold";
+                                      } else if (isUserChoice) {
+                                        optStyle = "bg-red-50 border-red-300 text-red-800 font-bold";
+                                      }
+
+                                      return (
+                                        <div key={optIdx} className={`px-3 py-2 border rounded-xl text-xs flex items-center gap-2 ${optStyle}`}>
+                                          <span className="font-black text-[10px] opacity-60">
+                                            {String.fromCharCode(65 + optIdx)}.
+                                          </span>
+                                          <span>{opt}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="pl-4 pt-1 bg-white/50 border border-zinc-150 p-3.5 rounded-xl">
+                                    <span className="text-[10px] font-black uppercase text-emerald-600 block mb-1">Detailed Explanation</span>
+                                    <p className="text-[11px] text-zinc-600 leading-relaxed">
+                                      {q.explanation || "No explanation provided for this question block."}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Final footer review actions */}
+                        <div className="border-t border-zinc-100 pt-5 flex justify-end gap-3.5">
+                          <button
+                            onClick={() => handleStartMcqTest(activeMcqTest)}
+                            className="px-5 py-2.5 bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 text-xs font-black uppercase rounded-xl transition cursor-pointer"
+                          >
+                            🔄 Retake Exam
+                          </button>
+                          <button
+                            onClick={() => setActiveMcqTest(null)}
+                            className="px-6 py-2.5 bg-indigo-600 text-white text-xs font-black uppercase rounded-xl hover:bg-indigo-700 transition cursor-pointer shadow-md shadow-indigo-100"
+                          >
+                            📚 Back to tests catalog
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* INTERACTIVE TESTS CATALOG */
+                  <div className="space-y-6">
+                    {/* Catalog Header */}
+                    <div className="bg-gradient-to-r from-red-500 to-amber-600 rounded-3xl p-6 text-white text-left relative overflow-hidden shadow-md shadow-red-100">
+                      <div className="absolute right-6 top-6 text-7xl opacity-10 font-black">
+                        🏆
+                      </div>
+                      <div className="relative z-10 space-y-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-white/80">Interactive Practice Exams</span>
+                        <h3 className="text-lg font-black uppercase tracking-tight">Interactive MCQ Tests Vault</h3>
+                        <p className="text-xs text-white/80 max-w-xl">
+                          Select an interactive subject test to challenge your analytical skills. Real-time feedback and explanation provided instantly.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Filter and grid of tests */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black uppercase text-zinc-400 tracking-wider">Available Practice Exams</h4>
+                        <span className="text-xs font-bold text-zinc-500">
+                          {mcqTests.filter(t => !selectedClassId || t.classId === selectedClassId).length} Interactive Exams Published
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {mcqTests
+                          .filter(t => !selectedClassId || t.classId === selectedClassId)
+                          .map((test) => {
+                            const clsName = classes.find(c => c.id === test.classId)?.className || "All Standards";
+                            const subName = subjects.find(s => s.id === test.subjectId)?.subjectName;
+                            const chapName = chapters.find(c => c.id === test.chapterId)?.chapterName;
+                            
+                            return (
+                              <div
+                                key={test.id}
+                                className="bg-white border border-zinc-200 hover:border-red-400/50 hover:shadow-md rounded-2xl p-5 transition duration-200 flex flex-col justify-between text-left relative group cursor-pointer"
+                                onClick={() => handleStartMcqTest(test)}
+                              >
+                                <div>
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <span className="px-2 py-0.5 rounded-lg bg-red-50 text-[9px] uppercase font-black tracking-wide text-red-600">
+                                      {clsName}
+                                    </span>
+                                    {subName && (
+                                      <span className="px-2 py-0.5 rounded-lg bg-zinc-100 text-[9px] uppercase font-bold text-zinc-500">
+                                        {subName}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <h4 className="text-sm font-bold text-zinc-900 group-hover:text-red-600 transition leading-snug">
+                                    {test.title}
+                                  </h4>
+                                  {test.description && (
+                                    <p className="text-[11px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
+                                      {test.description}
+                                    </p>
+                                  )}
+
+                                  {chapName && (
+                                    <p className="text-[10px] text-zinc-400 mt-1 truncate">
+                                      📁 Chapter: {chapName}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="mt-5 pt-3.5 border-t border-zinc-100 flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-zinc-500">
+                                    📝 {test.questions?.length || 0} Questions
+                                  </span>
+                                  <span className="text-xs font-black text-red-500 group-hover:translate-x-1 transition-transform flex items-center gap-0.5">
+                                    Start Test →
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {mcqTests.filter(t => !selectedClassId || t.classId === selectedClassId).length === 0 && (
+                          <div className="col-span-2 border border-dashed border-zinc-200 rounded-3xl py-12 text-center text-zinc-400">
+                            <Award className="w-8 h-8 mx-auto text-zinc-300 mb-2 animate-bounce" />
+                            <p className="text-xs italic">No interactive MCQ tests published yet for this class standard.</p>
+                            <p className="text-[10px] text-zinc-400 mt-1">Please browse using standard Class Folders or check back soon!</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Subtitle dividing line */}
+                {!activeMcqTest && filteredMaterials.length > 0 && (
+                  <div className="border-t border-zinc-200/60 pt-6 space-y-4">
+                    <h4 className="text-xs font-black uppercase text-zinc-400 tracking-wider text-left">
+                      Reference PDFs & Solution Keys
+                    </h4>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* General Filtered Materials Feed View */}
-            {(activeTab !== 'home' && (!selectedClassId || selectedCategory || activeTab !== 'classes')) && (
+            {(activeTab !== 'home' && (!selectedClassId || selectedCategory || activeTab !== 'classes') && !activeMcqTest) && (
               <div>
                 {viewMode === 'grid' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

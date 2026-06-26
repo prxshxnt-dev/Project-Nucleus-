@@ -242,9 +242,45 @@
         "version": { "type": "string" }
       },
       "required": ["userId", "email", "termsAccepted", "privacyAccepted", "acceptedAt"]
+    },
+    "McqTest": {
+      "title": "McqTest",
+      "description": "An online interactive MCQ test set created by admins for specific classes.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "classId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "chapterId": { "type": "string" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "questionText": { "type": "string" },
+              "options": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "correctOptionIndex": { "type": "number" },
+              "explanation": { "type": "string" }
+            },
+            "required": ["questionText", "options", "correctOptionIndex"]
+          }
+        },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "authorId": { "type": "string" }
+      },
+      "required": ["title", "classId", "questions", "createdAt", "updatedAt", "authorId"]
     }
   },
   "firestore": {
+    "mcq_tests/{testId}": {
+      "schema": { "$ref": "#/entities/McqTest" },
+      "description": "Stores MCQ test modules with questions and options."
+    },
     "agreement_history/{historyId}": {
       "schema": { "$ref": "#/entities/AgreementHistory" },
       "description": "Log of users accepting terms & privacy policies."

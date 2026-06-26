@@ -205,6 +205,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /mcq_tests/{testId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /classes/{classId} {
       allow read: if true;
       allow write: if isAdmin();

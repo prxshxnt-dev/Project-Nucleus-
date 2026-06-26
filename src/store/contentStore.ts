@@ -11,7 +11,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "../lib/firebase";
+import { db, auth, handleFirestoreError, OperationType } from "../lib/firebase";
 
 export interface ClassItem {
   id: string;
@@ -57,17 +57,39 @@ export interface MaterialItem {
   cloudUrl?: string;
 }
 
+export interface McqQuestion {
+  questionText: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation?: string;
+}
+
+export interface McqTestItem {
+  id: string;
+  title: string;
+  description?: string;
+  classId: string;
+  subjectId?: string;
+  chapterId?: string;
+  questions: McqQuestion[];
+  createdAt?: any;
+  updatedAt?: any;
+  authorId: string;
+}
+
 interface ContentState {
   classes: ClassItem[];
   subjects: SubjectItem[];
   chapters: ChapterItem[];
   materials: MaterialItem[];
+  mcqTests: McqTestItem[];
   loading: boolean;
   
   setClasses: (classes: ClassItem[]) => void;
   setSubjects: (subjects: SubjectItem[]) => void;
   setChapters: (chapters: ChapterItem[]) => void;
   setMaterials: (materials: MaterialItem[]) => void;
+  setMcqTests: (mcqTests: McqTestItem[]) => void;
   setLoading: (loading: boolean) => void;
 
   // Real-time synchronization
@@ -89,6 +111,10 @@ interface ContentState {
   addMaterial: (material: Omit<MaterialItem, "id" | "downloadCount" | "bookmarks">) => Promise<void>;
   updateMaterial: (id: string, material: Partial<MaterialItem>) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
+
+  addMcqTest: (test: Omit<McqTestItem, "id" | "createdAt" | "updatedAt" | "authorId">) => Promise<void>;
+  updateMcqTest: (id: string, test: Partial<McqTestItem>) => Promise<void>;
+  deleteMcqTest: (id: string) => Promise<void>;
 }
 
 export const useContentStore = create<ContentState>((set, get) => ({
@@ -96,12 +122,14 @@ export const useContentStore = create<ContentState>((set, get) => ({
   subjects: [],
   chapters: [],
   materials: [],
+  mcqTests: [],
   loading: true,
 
   setClasses: (classes) => set({ classes }),
   setSubjects: (subjects) => set({ subjects }),
   setChapters: (chapters) => set({ chapters }),
   setMaterials: (materials) => set({ materials }),
+  setMcqTests: (mcqTests) => set({ mcqTests }),
   setLoading: (loading) => set({ loading }),
 
   initSync: () => {
@@ -171,11 +199,29 @@ export const useContentStore = create<ContentState>((set, get) => ({
       }
     );
 
+    const unsubMcqTests = onSnapshot(
+      collection(db, "mcq_tests"),
+      (snap) => {
+        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as McqTestItem);
+        // Sort newest first
+        list.sort((a, b) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+        set({ mcqTests: list });
+      },
+      (err) => {
+        console.error("Error syncing mcq_tests:", err);
+      }
+    );
+
     return () => {
       unsubClasses();
       unsubSubjects();
       unsubChapters();
       unsubMaterials();
+      unsubMcqTests();
     };
   },
 
@@ -332,6 +378,42 @@ export const useContentStore = create<ContentState>((set, get) => ({
     try {
       await deleteDoc(doc(db, "materials", id));
       await deleteDoc(doc(db, "materials_secure", id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, path);
+    }
+  },
+
+  addMcqTest: async (test) => {
+    const path = "mcq_tests";
+    try {
+      const authorId = auth.currentUser?.uid || "system";
+      await addDoc(collection(db, path), {
+        ...test,
+        authorId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, path);
+    }
+  },
+
+  updateMcqTest: async (id, test) => {
+    const path = `mcq_tests/${id}`;
+    try {
+      await updateDoc(doc(db, "mcq_tests", id), {
+        ...test,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    }
+  },
+
+  deleteMcqTest: async (id) => {
+    const path = `mcq_tests/${id}`;
+    try {
+      await deleteDoc(doc(db, "mcq_tests", id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, path);
     }
