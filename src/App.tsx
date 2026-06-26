@@ -31,10 +31,12 @@ import { AIAssistantBot } from './components/AIAssistantBot';
 import PwaManager from './components/PwaManager';
 import LiquidGlassDock from './components/LiquidGlassDock';
 import OrbitalLoader from './components/OrbitalLoader';
+import LoadingScreen from './components/LoadingScreen';
+import OnboardingWizard from './components/OnboardingWizard';
 
 function AppContent() {
   const { setUser, setLoading, user, loading } = useAuthStore();
-  const { setSettings } = useSettingsStore();
+  const { settings, setSettings } = useSettingsStore();
   const location = useLocation();
 
   useEffect(() => {
@@ -118,6 +120,10 @@ function AppContent() {
               todayStudyMinutes: userData.todayStudyMinutes,
               lastStreakDate: userData.lastStreakDate,
               photoURL: userData.photoURL || firebaseUser.photoURL || null,
+              onboardingCompleted: userData.onboardingCompleted || false,
+              privacyAccepted: userData.privacyAccepted || false,
+              termsAccepted: userData.termsAccepted || false,
+              acceptedAt: userData.acceptedAt || null,
             });
           }
           setLoading(false);
@@ -150,6 +156,10 @@ function AppContent() {
                     todayStudyMinutes: userData.todayStudyMinutes,
                     lastStreakDate: userData.lastStreakDate,
                     photoURL: userData.photoURL || null,
+                    onboardingCompleted: userData.onboardingCompleted || false,
+                    privacyAccepted: userData.privacyAccepted || false,
+                    termsAccepted: userData.termsAccepted || false,
+                    acceptedAt: userData.acceptedAt || null,
                   });
                 }
               });
@@ -177,12 +187,18 @@ function AppContent() {
 
   return (
     <>
+      <AnimatePresence mode="wait">
+        {loading && <LoadingScreen key="global-auth-loading" />}
+      </AnimatePresence>
       <div className={`min-h-screen bg-background text-foreground font-sans transition-colors duration-300 selection:bg-primary/30 ${loading ? 'invisible h-0 overflow-hidden' : 'visible'}`}>
         <ScreenProtector />
         <ThemeProvider />
         <SeasonalOverlay />
         <Navbar />
         <PwaManager />
+        {user && (!user.onboardingCompleted || (settings?.requiredTermsTimestamp && (!user.acceptedAt || new Date(user.acceptedAt) < new Date(settings.requiredTermsTimestamp)))) && (
+          <OnboardingWizard onComplete={() => console.log('Onboarding Wizard Completed Successfully')} />
+        )}
         <AnimatePresence mode="wait">
           <Suspense fallback={
             <div className="flex min-h-[60vh] items-center justify-center p-12">

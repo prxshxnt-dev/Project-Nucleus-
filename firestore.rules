@@ -28,6 +28,10 @@ service cloud.firestore {
         && (!data.keys().hasAny(['classGroup']) || data.classGroup is string)
         && (!data.keys().hasAny(['unlockedMaterials']) || data.unlockedMaterials is list)
         && (!data.keys().hasAny(['mobile']) || data.mobile is string)
+        && (!data.keys().hasAny(['onboardingCompleted']) || data.onboardingCompleted is bool)
+        && (!data.keys().hasAny(['privacyAccepted']) || data.privacyAccepted is bool)
+        && (!data.keys().hasAny(['termsAccepted']) || data.termsAccepted is bool)
+        && (!data.keys().hasAny(['acceptedAt']) || data.acceptedAt is string)
         && data.createdAt == request.time
         && data.updatedAt == request.time;
     }
@@ -41,6 +45,10 @@ service cloud.firestore {
         && (!data.keys().hasAny(['classGroup']) || data.classGroup is string)
         && (!data.keys().hasAny(['unlockedMaterials']) || data.unlockedMaterials is list)
         && (!data.keys().hasAny(['mobile']) || data.mobile is string)
+        && (!data.keys().hasAny(['onboardingCompleted']) || data.onboardingCompleted is bool)
+        && (!data.keys().hasAny(['privacyAccepted']) || data.privacyAccepted is bool)
+        && (!data.keys().hasAny(['termsAccepted']) || data.termsAccepted is bool)
+        && (!data.keys().hasAny(['acceptedAt']) || data.acceptedAt is string)
         && data.createdAt == existing().createdAt
         && data.updatedAt == request.time;
     }
@@ -165,8 +173,8 @@ service cloud.firestore {
           && isValidId(userId) 
           && isValidUserUpdate(incoming()) 
           && (
-            (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'classGroup']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
-            (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'classGroup', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
+            (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'classGroup', 'onboardingCompleted', 'privacyAccepted', 'termsAccepted', 'acceptedAt']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
+            (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'classGroup', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'onboardingCompleted', 'privacyAccepted', 'termsAccepted', 'acceptedAt']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
             (request.auth.token.email == 'meinkxun@gmail.com' && request.auth.uid == userId)
           )
         ) || (
@@ -223,6 +231,13 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read: if docId != 'secure_bot' || isSuperAdmin();
       allow write: if isSuperAdmin();
+    }
+
+    match /agreement_history/{historyId} {
+      allow create: if isSignedIn() 
+        && isValidId(historyId) 
+        && incoming().userId == request.auth.uid;
+      allow read: if isAdmin();
     }
 
     match /mentors/{mentorId} {

@@ -18,7 +18,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { motion } from "motion/react";
-import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare } from "lucide-react";
+import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare, Upload, FileUp } from "lucide-react";
 import Markdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
 import {
@@ -142,8 +142,14 @@ export default function AdminDashboard() {
     }
   }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<
-    "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management"
+    "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management" | "onboarding"
   >("content_management");
+
+  const { settings } = useSettingsStore();
+
+  const [agreementLogs, setAgreementLogs] = useState<any[]>([]);
+  const [agreementLogsLoading, setAgreementLogsLoading] = useState(false);
+  const [onboardingSearch, setOnboardingSearch] = useState("");
 
   // Content Management Sub-tab States
   const [contentSubTab, setContentSubTab] = useState<
@@ -186,6 +192,8 @@ export default function AdminDashboard() {
   const [mChapterId, setMChapterId] = useState("");
   const [mThumbnailUrl, setMThumbnailUrl] = useState("");
   const [mIsHidden, setMIsHidden] = useState(false);
+  const [isUploadingLocal, setIsUploadingLocal] = useState(false);
+  const [localUploadProgress, setLocalUploadProgress] = useState(0);
 
   const [users, setUsers] = useState<any[]>([]);
   const [materials, setMaterials] = useState<any[]>([]);
@@ -492,6 +500,29 @@ export default function AdminDashboard() {
     runFetch();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== "onboarding") return;
+    
+    const runFetch = async () => {
+      setAgreementLogsLoading(true);
+      try {
+        const q = query(collection(db, "agreement_history"), orderBy("acceptedAt", "desc"));
+        const snap = await getDocs(q);
+        if (!isMountedRef.current) return;
+        const list = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() }));
+        setAgreementLogs(list);
+      } catch (err) {
+        console.error("Error loading agreement logs:", err);
+      } finally {
+        if (isMountedRef.current) {
+          setAgreementLogsLoading(false);
+        }
+      }
+    };
+
+    runFetch();
+  }, [activeTab]);
+
   const handleSaveSecuritySettings = async () => {
     try {
       const docRef = doc(db, "settings", "global");
@@ -528,6 +559,50 @@ export default function AdminDashboard() {
     } catch (e) {
       console.error(e);
       alert("Failed to save and sync security fields.");
+    }
+  };
+
+  const handleResetOnboarding = async (targetUserId: string) => {
+    if (!window.confirm("Are you sure you want to reset the onboarding state for this user? They will be forced to re-complete onboarding on their next visit.")) return;
+    try {
+      const userRef = doc(db, 'users', targetUserId);
+      await updateDoc(userRef, {
+        onboardingCompleted: false,
+        privacyAccepted: false,
+        termsAccepted: false,
+        acceptedAt: null,
+        updatedAt: new Date().toISOString()
+      });
+      setUsers((prev: any[]) => prev.map(u => u.id === targetUserId ? {
+        ...u,
+        onboardingCompleted: false,
+        privacyAccepted: false,
+        termsAccepted: false,
+        acceptedAt: null
+      } : u));
+      alert("✨ Successfully reset onboarding status for user!");
+    } catch (e: any) {
+      console.error("Failed to reset onboarding", e);
+      alert("❌ Failed to reset onboarding: " + e.message);
+    }
+  };
+
+  const handleForceReacceptance = async (clear = false) => {
+    if (!window.confirm(clear ? "Revoke the global mandatory policy re-acceptance state?" : "Are you sure you want to force ALL active users to re-accept the Privacy Policy and Terms & Conditions? This will instantly prompt them on next refresh.")) return;
+    try {
+      const docRef = doc(db, "settings", "global");
+      const timestamp = clear ? null : new Date().toISOString();
+      const version = clear ? "1.0" : (Number(settings?.requiredTermsVersion || "1.0") + 0.1).toFixed(1);
+      
+      await updateDoc(docRef, {
+        requiredTermsTimestamp: timestamp,
+        requiredTermsVersion: version
+      });
+      
+      alert(clear ? "✨ Global force re-acceptance status revoked." : `✨ Successfully forced global policy re-acceptance! Version ${version} is now mandatory.`);
+    } catch (err: any) {
+      console.error("Failed to update terms timestamp:", err);
+      alert("❌ Error updating settings: " + err.message);
     }
   };
 
@@ -1221,6 +1296,80 @@ export default function AdminDashboard() {
       showToast("Chapter database reference deleted.");
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Direct file uploader for local PDFs and video lectures
+  const handleLocalFileUpload = async (file: File) => {
+    if (!file) return;
+    
+    // Check file size limit (50MB is 52428800 bytes)
+    const MAX_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      showToast("File size exceeds 50MB. Please upload a smaller file or use an external URL link.", true);
+      return;
+    }
+
+    setIsUploadingLocal(true);
+    setLocalUploadProgress(10);
+    
+    try {
+      const reader = new FileReader();
+      
+      // Promise-wrapped reader to load file
+      const fileDataPromise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+      });
+      
+      setLocalUploadProgress(30);
+      const base64Data = await fileDataPromise;
+      setLocalUploadProgress(50);
+      
+      const response = await fetch("/api/library/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileData: base64Data,
+          userEmail: user?.email,
+        }),
+      });
+      
+      setLocalUploadProgress(80);
+      
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to upload file to the server.");
+      }
+      
+      const result = await response.json();
+      setLocalUploadProgress(100);
+      
+      if (result.success && result.fileUrl) {
+        setMUrl(result.fileUrl);
+        // Pre-populate title if empty
+        if (!mTitle.trim()) {
+          const lastDotIdx = file.name.lastIndexOf('.');
+          const cleanName = lastDotIdx !== -1 
+            ? file.name.substring(0, lastDotIdx) 
+            : file.name;
+          setMTitle(cleanName.replace(/[^a-zA-Z0-9_\-\s]/g, ' ').trim());
+        }
+        showToast("File uploaded and linked successfully!");
+      } else {
+        throw new Error("Invalid response structure from server.");
+      }
+    } catch (err: any) {
+      console.error("Local upload error:", err);
+      showToast(err.message || "An error occurred during file upload.", true);
+    } finally {
+      setIsUploadingLocal(false);
+      setLocalUploadProgress(0);
     }
   };
 
@@ -2373,19 +2522,7 @@ export default function AdminDashboard() {
             Settings
           </button>
         )}
-        {(user?.role === "superadmin" || user?.role === "admin") && (
-          <button
-            id="tab-btn-syllabus"
-            onClick={() => setActiveTab("syllabus")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === "syllabus"
-                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
-                : "text-white/60 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            📚 Syllabus Planner
-          </button>
-        )}
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             id="tab-btn-support-chats"
@@ -2413,6 +2550,19 @@ export default function AdminDashboard() {
             }`}
           >
             🛡️ Security Center
+          </button>
+        )}
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-onboarding"
+            onClick={() => setActiveTab("onboarding")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "onboarding"
+                ? "bg-indigo-500 text-white shadow-md font-bold scale-[1.02]"
+                : "text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+            }`}
+          >
+            👋 Onboarding & Consent
           </button>
         )}
       </div>
@@ -6374,6 +6524,73 @@ export default function AdminDashboard() {
                       />
                     </div>
 
+                    {/* Direct File Upload Area */}
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                          <FileUp className="w-4 h-4 text-primary" /> Direct File Uploader
+                        </span>
+                        <span className="text-[10px] text-white/40 font-mono">MAX FILE SIZE: 50MB</span>
+                      </div>
+                      
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          if (isUploadingLocal) return;
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) {
+                            await handleLocalFileUpload(file);
+                          }
+                        }}
+                        className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                          isUploadingLocal 
+                            ? 'border-primary/40 bg-primary/5 cursor-wait' 
+                            : 'border-white/10 hover:border-primary/40 hover:bg-white/[0.02] cursor-pointer'
+                        }`}
+                        onClick={() => {
+                          if (isUploadingLocal) return;
+                          document.getElementById('direct-file-input')?.click();
+                        }}
+                      >
+                        <input
+                          id="direct-file-input"
+                          type="file"
+                          accept=".pdf,video/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              await handleLocalFileUpload(file);
+                            }
+                          }}
+                        />
+                        {isUploadingLocal ? (
+                          <div className="space-y-3">
+                            <RefreshCw className="w-8 h-8 text-primary animate-spin mx-auto" />
+                            <div className="text-xs font-bold text-white">Uploading local file directly...</div>
+                            <div className="w-full max-w-[200px] mx-auto bg-white/10 h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-primary h-full rounded-full transition-all duration-300" 
+                                style={{ width: `${localUploadProgress}%` }}
+                              />
+                            </div>
+                            <div className="text-[10px] font-mono text-primary">{localUploadProgress}%</div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Upload className="w-8 h-8 text-white/40 mx-auto" />
+                            <p className="text-xs font-bold text-white">
+                              Drag & drop or <span className="text-primary underline">browse</span> your file
+                            </p>
+                            <p className="text-[10px] text-white/40">
+                              Supports Lecture Videos (.mp4, .mov, etc.) & Class PDFs (.pdf)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] uppercase font-bold text-white/50 mb-1.5">Security resource URL (link) *</label>
@@ -6668,6 +6885,266 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "onboarding" && (
+        <div className="space-y-6 max-w-6xl animate-fade-in text-white">
+          {/* Header Dashboard */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border border-indigo-500/20 bg-indigo-500/5 p-6 rounded-2xl">
+            <div>
+              <h3 className="text-xl font-display font-medium text-indigo-400 flex items-center gap-2">
+                <span>👋 Onboarding & Compliance Command Center</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  Global Policy Control
+                </span>
+              </h3>
+              <p className="text-sm text-white/60 mt-1">
+                Audit student agreements, reset first-time wizards, and force re-consent upon policy updates.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setAgreementLogsLoading(true);
+                try {
+                  const q = query(collection(db, "agreement_history"), orderBy("acceptedAt", "desc"));
+                  const snap = await getDocs(q);
+                  const list = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() }));
+                  setAgreementLogs(list);
+                  alert("✨ Consent auditing logs refreshed!");
+                } catch (e: any) {
+                  alert("❌ Failed to refresh: " + e.message);
+                } finally {
+                  setAgreementLogsLoading(false);
+                }
+              }}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${agreementLogsLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh Logs</span>
+            </button>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col justify-between">
+              <span className="text-xs text-white/50 font-mono uppercase tracking-wider">Total Registered Accounts</span>
+              <span className="text-3xl font-extrabold mt-1 font-mono">{users.length}</span>
+            </div>
+            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col justify-between">
+              <span className="text-xs text-white/50 font-mono uppercase tracking-wider font-semibold">Onboarding Completed</span>
+              <span className="text-3xl font-extrabold mt-1 font-mono text-emerald-400">
+                {users.filter(u => u.onboardingCompleted).length}
+              </span>
+            </div>
+            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col justify-between">
+              <span className="text-xs text-white/50 font-mono uppercase tracking-wider">Mandatory Policy Version</span>
+              <span className="text-3xl font-extrabold mt-1 font-mono text-indigo-400">
+                v{settings?.requiredTermsVersion || "1.0"}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Version & Force Control */}
+            <div className="lg:col-span-2 p-6 bg-white/5 border border-white/10 rounded-2xl space-y-6">
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4" />
+                  <span>Force Re-Acceptance Controls</span>
+                </h4>
+                <p className="text-xs text-white/60">
+                  Update published terms and compel all students to sign the newly agreed consent forms.
+                </p>
+              </div>
+
+              {/* Status Display */}
+              <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-white/50">Forced Version:</span>
+                  <span className="font-mono font-bold text-indigo-300">v{settings?.requiredTermsVersion || "1.0"}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-white/50">Activated Timestamp:</span>
+                  <span className="font-mono text-white/70 text-[11px]">
+                    {settings?.requiredTermsTimestamp ? new Date(settings.requiredTermsTimestamp).toLocaleString() : "Never Forced"}
+                  </span>
+                </div>
+                {settings?.requiredTermsTimestamp ? (
+                  <div className="flex items-center gap-1.5 text-[11px] text-amber-400">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>All users must sign consent to unlock content.</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+                    <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>No pending force re-acceptances are active.</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleForceReacceptance(false)}
+                  className="w-full py-3 px-4 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Force Global Re-Acceptance</span>
+                </button>
+
+                {settings?.requiredTermsTimestamp && (
+                  <button
+                    onClick={() => handleForceReacceptance(true)}
+                    className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 text-white/80 text-xs font-bold uppercase tracking-wider border border-white/10 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <XOctagon className="w-4 h-4" />
+                    <span>Clear Global Force Rule</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10 text-xs text-indigo-300/90 leading-relaxed space-y-2">
+                <span className="font-bold block">How this works:</span>
+                <p>
+                  Pressing "Force Global Re-Acceptance" generates a new policy timestamp. Anyone whose account agreement timestamp is older than this new value will be blocked by the full-screen setup wizard on their next load, ensuring 100% legal compliance.
+                </p>
+              </div>
+            </div>
+
+            {/* Student Onboarding Status & Reset */}
+            <div className="lg:col-span-3 p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 pb-2 border-b border-white/5">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-sm text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <User className="w-4 h-4" />
+                    <span>Student Onboarding Roster</span>
+                  </h4>
+                  <p className="text-xs text-white/60">Search student accounts and reset individual onboarding status.</p>
+                </div>
+              </div>
+
+              {/* Search bar */}
+              <input
+                type="text"
+                placeholder="Search by student name or email..."
+                value={onboardingSearch}
+                onChange={(e) => setOnboardingSearch(e.target.value)}
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-indigo-500/50"
+              />
+
+              {/* Mini user list */}
+              <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-thin pr-1">
+                {users
+                  .filter((u) => {
+                    const term = onboardingSearch.toLowerCase();
+                    return (
+                      u.displayName?.toLowerCase().includes(term) ||
+                      u.email?.toLowerCase().includes(term)
+                    );
+                  })
+                  .slice(0, 50)
+                  .map((u) => {
+                    const isCompleted = u.onboardingCompleted;
+                    return (
+                      <div
+                        key={u.id}
+                        className="p-3 rounded-xl bg-black/20 border border-white/5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-white block">{u.displayName}</span>
+                          <span className="text-[10px] text-white/50 block font-mono">{u.email}</span>
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <span
+                              className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                                isCompleted
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}
+                            >
+                              {isCompleted ? 'Onboarded' : 'Pending'}
+                            </span>
+                            {u.classGroup && (
+                              <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white/5 text-white/60">
+                                Class {u.classGroup}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleResetOnboarding(u.id)}
+                          className="px-2.5 py-1.5 rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/20 hover:border-red-500/40 text-[10px] font-bold uppercase tracking-wider text-red-400 transition-all cursor-pointer"
+                        >
+                          Reset Onboarding
+                        </button>
+                      </div>
+                    );
+                  })}
+                {users.length === 0 && (
+                  <p className="text-xs text-white/40 text-center py-4">No student records found in memory.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Trail Logs */}
+          <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+            <div className="space-y-1">
+              <h4 className="font-bold text-sm text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+                <History className="w-4 h-4" />
+                <span>Agreement History Log (Consent Auditing Ledger)</span>
+              </h4>
+              <p className="text-xs text-white/60">Immutable logs detailing student consent actions and accepted versions.</p>
+            </div>
+
+            <div className="overflow-x-auto border border-white/5 rounded-xl bg-black/20">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/5 text-[10px] font-mono text-white/50 uppercase tracking-widest">
+                    <th className="p-3">Student Name</th>
+                    <th className="p-3">Email Address</th>
+                    <th className="p-3 text-center">Version Signed</th>
+                    <th className="p-3">Accepted At (Timestamp)</th>
+                    <th className="p-3 text-right">Verification</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-xs">
+                  {agreementLogsLoading ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-white/40">
+                        <div className="flex items-center justify-center gap-2">
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Loading audit ledger...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : agreementLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                      <td className="p-3 font-bold text-white">{log.displayName}</td>
+                      <td className="p-3 text-white/60 font-mono text-[11px]">{log.email}</td>
+                      <td className="p-3 text-center font-mono font-bold text-indigo-300">v{log.version || "1.0"}</td>
+                      <td className="p-3 font-mono text-[11px] text-white/50">
+                        {log.acceptedAt ? new Date(log.acceptedAt).toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="p-3 text-right">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          <Check className="w-3 h-3" />
+                          <span>Audited & Verified</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {agreementLogs.length === 0 && !agreementLogsLoading && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-white/40 font-mono text-xs">
+                        No consent logs recorded in database. Log will populate when users sign onboarding agreements.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

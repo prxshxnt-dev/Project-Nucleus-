@@ -12,6 +12,7 @@ import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
 import SecurePdfViewer from '../components/SecurePdfViewer';
 import { FloatingStickers } from '../components/FloatingStickers';
 import OrbitalLoader from '../components/OrbitalLoader';
+import { Skeleton } from '../components/Skeleton';
 
 const planTiers = {
   free: 0,
@@ -743,55 +744,9 @@ export default function Dashboard() {
       </motion.div>
 
   {/* Home Dashboard Integration & Bento Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10 text-left">
-        {/* Widget 1: Quick Access Classes */}
-        <div className="md:col-span-2 bg-glass-bg border border-border-color p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="p-1.5 rounded-lg bg-accent-primary/10 text-accent-primary">
-                <Sparkles className="w-4 h-4 animate-pulse" />
-              </span>
-              <h3 className="font-display font-black text-sm uppercase tracking-wider text-text-primary">Quick Access Classes</h3>
-            </div>
-            <p className="text-xs text-text-secondary mb-4">Click any card to jump and browse folders instantly below.</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {[
-              { id: 'class_6', label: 'Class 6', glow: 'from-blue-500/10' },
-              { id: 'class_7', label: 'Class 7', glow: 'from-indigo-500/10' },
-              { id: 'class_8', label: 'Class 8', glow: 'from-purple-500/10' },
-              { id: 'class_9', label: 'Class 9', glow: 'from-pink-500/10' },
-              { id: 'class_10', label: 'Class 10', glow: 'from-rose-500/10' },
-              { id: 'class_11', label: 'Class 11', glow: 'from-amber-500/10' },
-              { id: 'class_12', label: 'Class 12', glow: 'from-violet-500/10' },
-              { id: 'class_jee', label: 'JEE Main/Adv', glow: 'from-emerald-500/10' },
-              { id: 'class_neet', label: 'NEET', glow: 'from-teal-500/10' },
-              { id: 'class_droppers', label: 'Droppers', glow: 'from-cyan-500/10' }
-            ].map((clsEx) => {
-              const matchingDbClass = classes.find(c => c.id === clsEx.id || c.className?.toLowerCase() === clsEx.label.toLowerCase());
-              const targetId = matchingDbClass?.id || clsEx.id;
-              return (
-                <button
-                  key={clsEx.id}
-                  onClick={() => {
-                    setActiveClassId(targetId);
-                    setActiveSubjectId(null);
-                    setActiveChapterId(null);
-                    const el = document.getElementById('my-classes-directory');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className={`p-2.5 rounded-xl border border-border-color bg-gradient-to-br ${clsEx.glow} to-transparent text-left hover:scale-[1.03] hover:border-accent-primary/40 active:scale-[0.98] transition-all text-[11px] font-bold text-text-primary cursor-pointer`}
-                >
-                  <Folder className="w-3.5 h-3.5 text-accent-primary/80 mb-1.5" />
-                  <div className="truncate leading-tight">{clsEx.label}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
+      <div className="mb-10 text-left">
         {/* Widget 2: Continue Learning */}
-        <div className="bg-glass-bg border border-border-color p-6 rounded-3xl flex flex-col justify-between">
+        <div className="bg-glass-bg border border-border-color p-6 rounded-3xl flex flex-col justify-between w-full">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
@@ -817,37 +772,6 @@ export default function Dashboard() {
             ))}
             {materials.filter(m => user && (recentlyViewed.includes(m.id) || m.bookmarks?.includes(user.uid))).length === 0 && (
               <p className="text-xs text-text-muted text-center py-4 italic">No recent pages. Search files below to continue!</p>
-            )}
-          </div>
-        </div>
-
-        {/* Widget 3: Recently Uploaded */}
-        <div className="bg-glass-bg border border-border-color p-6 rounded-3xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 animate-pulse">
-                <Sparkles className="w-4 h-4" />
-              </span>
-              <h3 className="font-display font-black text-sm uppercase tracking-wider text-text-primary">Recently Uploaded</h3>
-            </div>
-            <p className="text-xs text-text-secondary mb-2">Instantly synced curriculum files added by teachers.</p>
-          </div>
-          <div className="space-y-2 max-h-[140px] overflow-y-auto custom-scrollbar">
-            {[...materials].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 3).map((mat) => (
-              <div
-                key={mat.id}
-                onClick={() => setSelectedMaterial(mat)}
-                className="p-2 rounded-xl bg-bg-secondary/40 border border-border-color/60 flex items-center gap-2.5 text-xs hover:border-accent-primary/30 cursor-pointer"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-primary shrink-0 animate-ping" />
-                <div className="truncate text-left flex-1 min-w-0">
-                  <p className="font-bold text-text-primary truncate">{mat.title}</p>
-                  <p className="text-[10px] text-text-muted truncate">Class: {mat.classGroup || 'Any'}</p>
-                </div>
-              </div>
-            ))}
-            {materials.length === 0 && (
-              <p className="text-xs text-text-muted text-center py-4 italic">No uploads synced yet.</p>
             )}
           </div>
         </div>
@@ -926,7 +850,19 @@ export default function Dashboard() {
         </div>
 
         {/* Level 0: Display Class Folders */}
-        {activeClassId === null && (
+        {loading ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <Skeleton variant="folder" count={5} />
+            </div>
+            <div className="h-4 bg-border-color/30 rounded w-1/4 animate-pulse mt-8" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Skeleton variant="card" count={3} />
+            </div>
+          </div>
+        ) : (
+          <>
+            {activeClassId === null && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {(classes.length > 0 ? classes : [
               { id: 'class_6', className: 'Class 6' },
@@ -1223,6 +1159,8 @@ export default function Dashboard() {
               })()}
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 

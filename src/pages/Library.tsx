@@ -62,6 +62,7 @@ import { CustomVideoPlayer } from '../components/CustomVideoPlayer';
 import { FloatingStickers } from '../components/FloatingStickers';
 import OrbitalLoader from '../components/OrbitalLoader';
 import QuickNoteButton from '../components/QuickNoteButton';
+import { Skeleton } from '../components/Skeleton';
 
 // Define TS Types matches firebase-blueprint.json
 interface ClassItem {
@@ -955,7 +956,23 @@ export default function Library() {
             </div>
 
             {/* Library Home (Recommended & Spotlight) */}
-            {activeTab === 'home' && !selectedClassId && (
+            {loading ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Skeleton variant="card" count={2} />
+                </div>
+                <div className="h-4 bg-zinc-200/60 rounded w-1/4 animate-pulse mt-8" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                  <Skeleton variant="folder" count={5} />
+                </div>
+                <div className="h-4 bg-zinc-200/60 rounded w-1/4 animate-pulse mt-8" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Skeleton variant="file" count={2} />
+                </div>
+              </div>
+            ) : (
+              <>
+                {activeTab === 'home' && !selectedClassId && (
               <div className="space-y-8">
                 {/* Visual Banners and Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1437,6 +1454,8 @@ export default function Library() {
                   </div>
                 )}
               </div>
+            )}
+              </>
             )}
           </div>
         </div>

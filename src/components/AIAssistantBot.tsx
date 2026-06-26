@@ -506,7 +506,7 @@ Please type in your question, formula, or topic, and let's solve it step-by-step
               {/* Messages Body */}
               <div 
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto chatbot-scrollbar px-6 py-6 space-y-6 select-text scroll-smooth overscroll-contain"
+                className="flex-1 overflow-y-auto chatbot-scrollbar px-6 py-6 space-y-6 select-text scroll-smooth overscroll-contain bg-[#FAF8F5]"
                 style={{ WebkitOverflowScrolling: "touch" }}
               >
                 {messages.map((msg) => {

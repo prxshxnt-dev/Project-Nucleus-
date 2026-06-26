@@ -13,6 +13,10 @@ interface User {
   lastStreakDate?: string;
   classGroup?: string;
   photoURL?: string | null;
+  onboardingCompleted?: boolean;
+  privacyAccepted?: boolean;
+  termsAccepted?: boolean;
+  acceptedAt?: string | null;
 }
 
 interface AuthState {

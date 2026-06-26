@@ -425,6 +425,8 @@ interface SiteSettings {
   loaderSteps?: string;
   termsContent?: string;
   privacyContent?: string;
+  requiredTermsTimestamp?: string | null;
+  requiredTermsVersion?: string;
 }
 
 interface SettingsState {

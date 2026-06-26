@@ -37,6 +37,22 @@
           "items": { "type": "string" },
           "description": "The list of material IDs specifically unlocked for the user."
         },
+        "onboardingCompleted": {
+          "type": "boolean",
+          "description": "Indicates whether the user has completed the onboarding wizard."
+        },
+        "privacyAccepted": {
+          "type": "boolean",
+          "description": "Indicates if the user accepted the Privacy Policy."
+        },
+        "termsAccepted": {
+          "type": "boolean",
+          "description": "Indicates if the user accepted the Terms and Conditions."
+        },
+        "acceptedAt": {
+          "type": "string",
+          "description": "ISO timestamp when the user completed onboarding agreements."
+        },
         "createdAt": {
           "type": "string"
         },
@@ -211,9 +227,28 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["userId", "email", "materialId", "materialTitle", "text", "createdAt", "updatedAt"]
+    },
+    "AgreementHistory": {
+      "title": "AgreementHistory",
+      "description": "Log of user onboarding privacy and terms agreement acceptance.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "termsAccepted": { "type": "boolean" },
+        "privacyAccepted": { "type": "boolean" },
+        "acceptedAt": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "required": ["userId", "email", "termsAccepted", "privacyAccepted", "acceptedAt"]
     }
   },
   "firestore": {
+    "agreement_history/{historyId}": {
+      "schema": { "$ref": "#/entities/AgreementHistory" },
+      "description": "Log of users accepting terms & privacy policies."
+    },
     "notes/{noteId}": {
       "schema": { "$ref": "#/entities/Note" },
       "description": "Stores user text thoughts on materials."
