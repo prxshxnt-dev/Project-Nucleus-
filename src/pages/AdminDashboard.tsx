@@ -18,7 +18,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { motion } from "motion/react";
-import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare, Upload, FileUp } from "lucide-react";
+import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare, Upload, FileUp, X, Paperclip } from "lucide-react";
 import Markdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
 import {
@@ -342,6 +342,150 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.error("Failed to delete chat session:", err);
+    }
+  };
+
+  // Support Doubt Tickets States
+  const [supportSubTab, setSupportSubTab] = useState<"intercepts" | "tickets" | "analytics">("tickets");
+  const [allTickets, setAllTickets] = useState<any[]>([]);
+  const [selectedTeacherTicketId, setSelectedTeacherTicketId] = useState<string | null>(null);
+  const [teacherTicketReplyText, setTeacherTicketReplyText] = useState("");
+  const [teacherTicketImage, setTeacherTicketImage] = useState<string | null>(null);
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string>("all");
+  const [ticketSubjectFilter, setTicketSubjectFilter] = useState<string>("all");
+  const [ticketChapterFilter, setTicketChapterFilter] = useState<string>("all");
+  const [ticketSearchQuery, setTicketSearchQuery] = useState<string>("");
+  const teacherTicketFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync tickets real-time
+  useEffect(() => {
+    const isAuthorized = (user?.role as string) === "admin" || (user?.role as string) === "superadmin" || (user?.role as string) === "teacher" || (user?.email && ["meinkxun@gmail.com", "nucleuscc2026@gmail.com"].includes(user.email.toLowerCase().trim()));
+    if (!isAuthorized) return;
+
+    const q = query(collection(db, "support_tickets"), orderBy("updatedAt", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetched: any[] = [];
+      snapshot.forEach((doc) => {
+        fetched.push({ id: doc.id, ...doc.data() });
+      });
+      setAllTickets(fetched);
+    }, (err) => {
+      console.error("Error subscribing to support_tickets:", err);
+    });
+
+    return () => unsub();
+  }, [user]);
+
+  const handleTeacherTicketImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTeacherTicketImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClaimTicket = async (ticketId: string) => {
+    if (!user) return;
+    try {
+      const ticketRef = doc(db, "support_tickets", ticketId);
+      const systemMsg = {
+        id: "msg_sys_claimed_" + Date.now(),
+        senderId: "system",
+        senderName: "Nucleus Helpdesk",
+        senderRole: "system",
+        content: `👨‍🏫 Teacher **${user.displayName || "Expert Faculty"}** has joined the room and claimed this doubt.`,
+        timestamp: new Date().toISOString()
+      };
+      await updateDoc(ticketRef, {
+        assignedTeacherId: user.uid,
+        assignedTeacherName: user.displayName || "Expert Faculty",
+        status: "in_progress",
+        messages: arrayUnion(systemMsg),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to claim ticket.");
+    }
+  };
+
+  const handleSendTeacherReply = async () => {
+    if (!selectedTeacherTicketId || (!teacherTicketReplyText.trim() && !teacherTicketImage)) return;
+    try {
+      const currentText = teacherTicketReplyText.trim();
+      const currentImg = teacherTicketImage;
+      setTeacherTicketReplyText("");
+      setTeacherTicketImage(null);
+
+      const newMsg = {
+        id: "msg_tkt_" + Date.now(),
+        senderId: user?.uid || "teacher",
+        senderName: user?.displayName || "Faculty Member",
+        senderRole: "teacher",
+        content: currentText,
+        attachmentUrl: currentImg || undefined,
+        timestamp: new Date().toISOString()
+      };
+
+      const ticketRef = doc(db, "support_tickets", selectedTeacherTicketId);
+      await updateDoc(ticketRef, {
+        messages: arrayUnion(newMsg),
+        status: "in_progress",
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to send reply.");
+    }
+  };
+
+  const handleResolveTeacherTicket = async (ticketId: string) => {
+    if (!window.confirm("Are you sure you want to resolve this doubt ticket?")) return;
+    try {
+      const ticketRef = doc(db, "support_tickets", ticketId);
+      const systemMsg = {
+        id: "msg_sys_resolved_" + Date.now(),
+        senderId: "system",
+        senderName: "Nucleus Helpdesk",
+        senderRole: "system",
+        content: "✅ Teacher marked this doubt as **Resolved**.",
+        timestamp: new Date().toISOString()
+      };
+      await updateDoc(ticketRef, {
+        status: "resolved",
+        messages: arrayUnion(systemMsg),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCloseTeacherTicket = async (ticketId: string) => {
+    if (!window.confirm("Are you sure you want to close this doubt ticket?")) return;
+    try {
+      const ticketRef = doc(db, "support_tickets", ticketId);
+      const systemMsg = {
+        id: "msg_sys_closed_" + Date.now(),
+        senderId: "system",
+        senderName: "Nucleus Helpdesk",
+        senderRole: "system",
+        content: "🔒 This doubt ticket has been closed.",
+        timestamp: new Date().toISOString()
+      };
+      await updateDoc(ticketRef, {
+        status: "closed",
+        messages: arrayUnion(systemMsg),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -674,6 +818,7 @@ export default function AdminDashboard() {
 
   // AI Chatbot Assistant States
   const [chatbotEnabled, setChatbotEnabled] = useState(false);
+  const [teacherChatEnabled, setTeacherChatEnabled] = useState(true);
   const [chatbotIconUrl, setChatbotIconUrl] = useState("");
   const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "grok">("gemini");
   const [aiApiKey, setAiApiKey] = useState("");
@@ -1086,6 +1231,7 @@ export default function AdminDashboard() {
           if (sch.themeId) setScheduleThemeId(sch.themeId);
         }
         if (d.chatbotEnabled !== undefined) setChatbotEnabled(d.chatbotEnabled);
+        if (d.teacherChatEnabled !== undefined) setTeacherChatEnabled(d.teacherChatEnabled);
         if (d.chatbotIconUrl !== undefined) setChatbotIconUrl(d.chatbotIconUrl);
       }
 
@@ -1979,6 +2125,7 @@ export default function AdminDashboard() {
           syllabusSectionName,
           classSyllabuses,
           chatbotEnabled,
+          teacherChatEnabled,
           chatbotIconUrl,
           loaderSteps,
         },
@@ -2349,7 +2496,7 @@ export default function AdminDashboard() {
     setManagingUser((prev: any) => ({ ...prev, unlockedMaterials: newList }));
   };
 
-  if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+  if (!user || ((user.role as string) !== "admin" && (user.role as string) !== "superadmin" && (user.role as string) !== "teacher")) {
     return <div className="min-h-screen pt-32 text-center">Unauthorized</div>;
   }
 
@@ -2475,39 +2622,45 @@ export default function AdminDashboard() {
         >
           📂 Content Management
         </button>
-        <button
-          id="tab-btn-materials"
-          onClick={() => setActiveTab("materials")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === "materials"
-              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
-              : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          Content Engine
-        </button>
-        <button
-          id="tab-btn-users"
-          onClick={() => setActiveTab("users")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === "users"
-              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
-              : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          Student Roster
-        </button>
-        <button
-          id="tab-btn-mentors"
-          onClick={() => setActiveTab("mentors")}
-          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === "mentors"
-              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
-              : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          Faculty / Mentors
-        </button>
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-materials"
+            onClick={() => setActiveTab("materials")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "materials"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Content Engine
+          </button>
+        )}
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-users"
+            onClick={() => setActiveTab("users")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "users"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Student Roster
+          </button>
+        )}
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-mentors"
+            onClick={() => setActiveTab("mentors")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "mentors"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            Faculty / Mentors
+          </button>
+        )}
 
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
@@ -2523,7 +2676,7 @@ export default function AdminDashboard() {
           </button>
         )}
 
-        {(user?.role === "superadmin" || user?.role === "admin") && (
+        {((user?.role as string) === "superadmin" || (user?.role as string) === "admin" || (user?.role as string) === "teacher") && (
           <button
             id="tab-btn-support-chats"
             onClick={() => setActiveTab("support_chats")}
@@ -2533,7 +2686,7 @@ export default function AdminDashboard() {
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}
           >
-            <span>💬 Live Chats</span>
+            <span>💬 Live Chats & doubts</span>
             {sessions.some(s => s.unreadByAdmin) && (
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             )}
@@ -7330,249 +7483,736 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === "support_chats" && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px] animate-fade-in text-white mb-10 text-left">
-          {/* Left Column: All Sessions List */}
-          <div className="lg:col-span-4 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px]">
-            <div className="mb-4">
-              <h3 className="text-lg font-bold text-[#E5D2A5] tracking-wide uppercase">Active Student Threads</h3>
-              <p className="text-[11px] text-white/50">Click on any course student to join or inspect their chat instantly.</p>
+        <div className="space-y-6">
+          {/* Support Hub Header and Inner Tab Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-900/60 backdrop-blur-md border border-white/10 p-4 rounded-2xl gap-4 text-left">
+            <div>
+              <h2 className="text-xl font-bold text-white tracking-wide flex items-center gap-2">
+                <span>💬 Faculty Support & Live Chats</span>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 uppercase font-mono tracking-wider font-extrabold">
+                  Workspace
+                </span>
+              </h2>
+              <p className="text-xs text-white/50 mt-0.5">Manage live student chatbot conversations, assign expert doubt tickets, and view resolution metrics.</p>
             </div>
 
-            {/* List entries */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {sessions.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 border border-dashed border-white/5 rounded-xl bg-black/10">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-2">
-                    <History className="w-5 h-5 text-white/30" />
-                  </div>
-                  <span className="text-xs text-zinc-400 font-bold">No active chat sessions</span>
-                  <p className="text-[10px] text-zinc-600 max-w-[180px] mt-1">When students open or type messages to the chatbot, they will appear here in real-time.</p>
-                </div>
-              ) : (
-                sessions.map((sess) => {
-                  const isSelected = sess.id === activeSessionId;
-                  const lastMsg = sess.messages && sess.messages.length > 0 ? sess.messages[sess.messages.length - 1] : null;
-                  const formattedTime = sess.updatedAt 
-                    ? new Date(sess.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-                    : "Unknown";
-
-                  return (
-                    <div
-                      key={sess.id}
-                      onClick={() => {
-                        setActiveSessionId(sess.id);
-                        // Mark as read by admin when clicked
-                        const sRef = doc(db, "chatbot_sessions", sess.id);
-                        updateDoc(sRef, { unreadByAdmin: false }).catch(err => console.error("Error marking read:", err));
-                      }}
-                      className={`p-3.5 rounded-xl border transition-all cursor-pointer relative group flex flex-col justify-between text-left ${
-                        isSelected
-                          ? "bg-zinc-900 border-[#E5D2A5] shadow-lg shadow-[#E5D2A5]/5"
-                          : "bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/15"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-black truncate text-zinc-100 flex items-center gap-1.5">
-                            <span className="truncate">{sess.userDisplayName || "Guest Student"}</span>
-                            {sess.teacherJoined && (
-                              <span className="text-[8px] bg-emerald-500/10 text-emerald-400 font-extrabold px-1 py-0.2 rounded border border-emerald-500/20 uppercase shrink-0">Live</span>
-                            )}
-                          </h4>
-                          <span className="text-[9px] font-mono text-white/40 block truncate mt-0.5">{sess.userEmail || sess.id}</span>
-                        </div>
-                        {sess.unreadByAdmin && (
-                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" title="New messages!" />
-                        )}
-                      </div>
-
-                      <div className="mt-3 pt-2.5 border-t border-white/[0.04] flex items-center justify-between text-[10px] text-zinc-400 gap-2">
-                        <span className="truncate max-w-[150px] italic font-medium">
-                          {lastMsg ? lastMsg.content : "No messages yet"}
-                        </span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[9px] font-mono text-white/30 shrink-0">{formattedTime}</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteChatSession(sess.id);
-                            }}
-                            title="Delete thread"
-                            className="p-1 rounded hover:bg-rose-500/20 text-white/30 hover:text-rose-400 transition-colors cursor-pointer"
-                          >
-                            <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
+            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10 self-start sm:self-auto select-none">
+              <button
+                onClick={() => setSupportSubTab("tickets")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  supportSubTab === "tickets"
+                    ? "bg-[#E5D2A5] text-zinc-950 font-bold"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                👩‍🏫 Doubt Tickets
+              </button>
+              <button
+                onClick={() => setSupportSubTab("intercepts")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  supportSubTab === "intercepts"
+                    ? "bg-[#E5D2A5] text-zinc-950 font-bold"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                🤖 AI Intercepts
+              </button>
+              {(user?.role === "superadmin" || user?.role === "admin") && (
+                <button
+                  onClick={() => setSupportSubTab("analytics")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    supportSubTab === "analytics"
+                      ? "bg-[#E5D2A5] text-zinc-950 font-bold"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  📈 Analytics & controls
+                </button>
               )}
             </div>
           </div>
 
-          {/* Right Column: Chat view */}
-          <div className="lg:col-span-8 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px]">
-            {activeSessionId ? (
-              (() => {
-                const currentSession = sessions.find(s => s.id === activeSessionId);
-                if (!currentSession) {
-                  return (
-                    <div className="h-full flex flex-col items-center justify-center text-center">
-                      <span className="text-xs text-white/50">Loading selected thread...</span>
-                    </div>
-                  );
-                }
+          {/* INNER TAB 1: FACULTY TICKETS */}
+          {supportSubTab === "tickets" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px] text-white text-left">
+              {/* Left Column: Tickets list and filters */}
+              <div className="lg:col-span-4 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px] overflow-hidden">
+                <div className="space-y-3 mb-4 shrink-0">
+                  <h3 className="text-sm font-bold text-[#E5D2A5] uppercase tracking-wider">Expert Doubts Directory</h3>
+                  
+                  {/* Search query input */}
+                  <input
+                    type="text"
+                    placeholder="Search by student, ID, title..."
+                    value={ticketSearchQuery}
+                    onChange={(e) => setTicketSearchQuery(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs bg-black/60 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-primary"
+                  />
 
-                return (
-                  <div className="flex flex-col h-full">
-                    {/* Active Session Header Banner */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10 mb-4 shrink-0 text-left">
-                      <div>
-                        <div className="flex items-center gap-2.5">
-                          <h3 className="text-base font-bold text-white tracking-wide">{currentSession.userDisplayName || "Student User"}</h3>
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                            currentSession.teacherJoined
-                              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-extrabold shadow-[0_0_8px_rgba(16,185,129,0.1)]"
-                              : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
-                          }`}>
-                            {currentSession.teacherJoined ? "🟢 LIVE TUTORING" : "🤖 AUTOMATIC AI"}
-                          </span>
-                        </div>
-                        <span className="text-xs font-mono text-zinc-400 mt-0.5 block">{currentSession.userEmail || "anonymous"}</span>
+                  {/* Filters Grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={ticketStatusFilter}
+                      onChange={(e) => setTicketStatusFilter(e.target.value)}
+                      className="px-2.5 py-2 bg-black/60 border border-white/10 rounded-lg text-[11px] text-white focus:outline-none"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+
+                    <select
+                      value={ticketSubjectFilter}
+                      onChange={(e) => setTicketSubjectFilter(e.target.value)}
+                      className="px-2.5 py-2 bg-black/60 border border-white/10 rounded-lg text-[11px] text-white focus:outline-none"
+                    >
+                      <option value="all">All Subjects</option>
+                      {subjectsList.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tickets list entries */}
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {allTickets.filter(t => {
+                    if (ticketStatusFilter !== "all" && t.status !== ticketStatusFilter) return false;
+                    if (ticketSubjectFilter !== "all" && t.subjectId !== ticketSubjectFilter) return false;
+                    if (ticketSearchQuery.trim()) {
+                      const q = ticketSearchQuery.toLowerCase();
+                      const matchId = t.ticketId?.toLowerCase().includes(q);
+                      const matchTitle = t.title?.toLowerCase().includes(q);
+                      const matchName = t.studentName?.toLowerCase().includes(q);
+                      const matchEmail = t.studentEmail?.toLowerCase().includes(q);
+                      if (!matchId && !matchTitle && !matchName && !matchEmail) return false;
+                    }
+                    return true;
+                  }).length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 border border-dashed border-white/5 rounded-xl bg-black/10">
+                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-2">
+                        <History className="w-5 h-5 text-white/30" />
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {!currentSession.teacherJoined ? (
-                          <div className="flex items-center gap-2">
-                             <button
-                            onClick={() => handleEndChat(currentSession.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-400 border border-rose-500/30 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
-                          >
-                            <XOctagon className="w-3.5 h-3.5" />
-                            <span>End Chat</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleJoinChat(currentSession.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-white font-extrabold text-[11px] uppercase tracking-wider cursor-pointer shadow-md transition-all active:scale-[0.98]"
-                          >
-                            <User className="w-3.5 h-3.5" />
-                            <span>Join & Intervene</span>
-                          </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                             <button
-                            onClick={() => handleEndChat(currentSession.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-400 border border-rose-500/30 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
-                          >
-                            <XOctagon className="w-3.5 h-3.5" />
-                            <span>End Chat</span>
-                          </button>
-                              
-                          <button
-                            onClick={() => handleLeaveChat(currentSession.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-zinc-500/20 text-zinc-300 hover:text-zinc-400 border border-white/5 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            <span>Handover</span>
-                          </button>
-                          </div>
-                        )}
-                      </div>
+                      <span className="text-xs text-zinc-400 font-bold">No doubts match filters</span>
                     </div>
+                  ) : (
+                    allTickets
+                      .filter(t => {
+                        if (ticketStatusFilter !== "all" && t.status !== ticketStatusFilter) return false;
+                        if (ticketSubjectFilter !== "all" && t.subjectId !== ticketSubjectFilter) return false;
+                        if (ticketSearchQuery.trim()) {
+                          const q = ticketSearchQuery.toLowerCase();
+                          const matchId = t.ticketId?.toLowerCase().includes(q);
+                          const matchTitle = t.title?.toLowerCase().includes(q);
+                          const matchName = t.studentName?.toLowerCase().includes(q);
+                          const matchEmail = t.studentEmail?.toLowerCase().includes(q);
+                          if (!matchId && !matchTitle && !matchName && !matchEmail) return false;
+                        }
+                        return true;
+                      })
+                      .map((t) => {
+                        const isSelected = t.id === selectedTeacherTicketId;
+                        const formattedTime = t.updatedAt
+                          ? new Date(t.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                          : "Just now";
 
-                    {/* Chat Messages Log */}
-                    <div className="flex-1 overflow-y-auto px-1 py-1 space-y-4 mb-4 select-text">
-                      {currentSession.messages && currentSession.messages.length > 0 ? (
-                        currentSession.messages.map((m: any, idx: number) => {
-                          const isStudent = m.role === "user";
-                          const isSys = m.senderName === "System";
-                          const isTeacher = m.role === "teacher" || (!isStudent && (m.senderName?.includes("Teacher") || m.senderName?.includes("Faculty") || m.senderName?.includes("System")));
-                          const isBot = !isStudent && !isTeacher && !isSys;
-
-                          // Format beautiful timestamp
-                          const msgTime = m.timestamp
-                            ? new Date(m.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-                            : "Now";
-
-                          if (isSys || m.role === "teacher") {
-                            return (
-                              <div key={m.id || idx} className="flex justify-center my-2 animate-fade-in text-center w-full">
-                                <div className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-[#E5D2A5] max-w-[80%] font-medium">
-                                  {m.content}
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => setSelectedTeacherTicketId(t.id)}
+                            className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col gap-2 ${
+                              isSelected
+                                ? "bg-zinc-900 border-[#E5D2A5] shadow-lg shadow-[#E5D2A5]/5"
+                                : "bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-1">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[10px] font-mono font-bold bg-[#E5D2A5]/20 text-[#E5D2A5] px-1.5 py-0.2 rounded border border-[#E5D2A5]/30">
+                                    {t.ticketId}
+                                  </span>
+                                  <span className={`text-[8px] uppercase font-bold px-1.5 py-0.2 rounded ${
+                                    t.status === "pending" ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20" :
+                                    t.status === "in_progress" ? "bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse" :
+                                    t.status === "resolved" ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                                    "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20"
+                                  }`}>
+                                    {t.status}
+                                  </span>
                                 </div>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div key={m.id || idx} className={`flex ${isStudent ? "justify-start" : "justify-end"} animate-fade-in w-full`}>
-                              <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-xs leading-relaxed text-left ${
-                                isStudent
-                                  ? "bg-zinc-900 border border-white/5 text-zinc-100 rounded-tl-none"
-                                  : isTeacher
-                                    ? "bg-[#E5D2A5] text-zinc-950 font-semibold rounded-tr-none"
-                                    : "bg-zinc-900/40 border border-[#E5D2A5]/20 text-zinc-200 rounded-tr-none"
-                              }`}>
-                                <div className="flex items-center gap-1.5 mb-1 opacity-50 text-[9px] font-bold uppercase tracking-wider">
-                                  <span>{m.senderName || (isStudent ? "Student" : isBot ? "Nucleus AI" : "Teacher")}</span>
-                                  <span>•</span>
-                                  <span className="font-mono">{msgTime}</span>
-                                </div>
-                                {isStudent ? (
-                                  <div className="whitespace-pre-wrap select-text">{m.content}</div>
-                                ) : (
-                                  <div className="markdown-body select-text">
-                                    <Markdown>{m.content}</Markdown>
-                                  </div>
-                                )}
+                                <h4 className="text-xs font-bold text-zinc-100 mt-1.5 line-clamp-1">{t.title}</h4>
+                                <span className="text-[10px] text-white/40 block mt-0.5">{t.studentName} &bull; Class: {t.className}</span>
                               </div>
                             </div>
-                          );
-                        })
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-center text-zinc-500">
-                          <span>No messages in this chat session.</span>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Admin Message Typing Feed footer */}
-                    <div className="pt-3 border-t border-white/10 flex items-center gap-3 shrink-0">
-                      <input
-                        type="text"
-                        value={adminMessageText}
-                        onChange={(e) => setAdminMessageText(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSendAdminMessage()}
-                        placeholder="Reply directly to the student or explain formulas..."
-                        className="flex-1 px-4 py-3 text-xs bg-zinc-950 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#E5D2A5]"
-                      />
-                      <button
-                        onClick={handleSendAdminMessage}
-                        disabled={!adminMessageText.trim()}
-                        className="p-3.5 rounded-xl bg-[#E5D2A5] hover:bg-[#f4ecd8] text-zinc-950 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                  </div>
-                );
-              })()
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mb-4 border border-white/10">
-                  <MessageSquare className="w-8 h-8 text-white/40" />
+                            <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] text-zinc-500">
+                              <span className="font-semibold text-primary">{t.subjectName}</span>
+                              <span className="font-mono text-[9px] text-white/30">{formattedTime}</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
                 </div>
-                <h3 className="text-base font-bold text-white tracking-wide">Select a Student Chat Thread</h3>
-                <p className="text-xs text-zinc-500 max-w-sm mt-1">
-                  Access incoming questions from students in real time. You can view bot transcriptions and click "Join & Intervene" to intercept and guide them directly.
-                </p>
               </div>
-            )}
-          </div>
+
+              {/* Right Column: Ticket Chat View */}
+              <div className="lg:col-span-8 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px] overflow-hidden">
+                {selectedTeacherTicketId ? (
+                  (() => {
+                    const activeTkt = allTickets.find(t => t.id === selectedTeacherTicketId);
+                    if (!activeTkt) {
+                      return <div className="h-full flex items-center justify-center text-zinc-500">Doubt session not found.</div>;
+                    }
+
+                    const isAssignedToMe = activeTkt.assignedTeacherId === user?.uid;
+                    const isUnassigned = !activeTkt.assignedTeacherId;
+
+                    return (
+                      <div className="flex flex-col h-full">
+                        {/* Header metadata */}
+                        <div className="pb-3 border-b border-white/10 mb-4 shrink-0 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold bg-[#E5D2A5]/10 text-[#E5D2A5] px-1.5 py-0.5 rounded border border-[#E5D2A5]/20">
+                                {activeTkt.ticketId}
+                              </span>
+                              <h3 className="text-base font-black text-white line-clamp-1">{activeTkt.title}</h3>
+                            </div>
+                            <span className="text-xs text-zinc-400 block mt-1">
+                              Student: <strong>{activeTkt.studentName}</strong> ({activeTkt.studentEmail}) &bull; Class: <strong>{activeTkt.className}</strong>
+                            </span>
+                            <span className="text-[10px] text-zinc-500 block mt-0.5">
+                              Subject: <strong>{activeTkt.subjectName}</strong> &bull; Chapter: <strong>{activeTkt.chapterName}</strong>
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isUnassigned ? (
+                              <button
+                                onClick={() => handleClaimTicket(activeTkt.id)}
+                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-black font-extrabold text-[11px] uppercase tracking-wider cursor-pointer shadow-md active:scale-95 transition-all"
+                              >
+                                Claim & Answer Doubt
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-zinc-400">Claimed:</span>
+                                <span className="text-xs font-bold text-[#E5D2A5]">{activeTkt.assignedTeacherName}</span>
+                              </div>
+                            )}
+
+                            {activeTkt.status !== "resolved" && activeTkt.status !== "closed" && (
+                              <button
+                                onClick={() => handleResolveTeacherTicket(activeTkt.id)}
+                                className="p-2 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 transition-all cursor-pointer"
+                                title="Mark as Resolved"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                            )}
+                            {activeTkt.status !== "closed" && (
+                              <button
+                                onClick={() => handleCloseTeacherTicket(activeTkt.id)}
+                                className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white border border-white/5 transition-all cursor-pointer"
+                                title="Close Ticket"
+                              >
+                                <XOctagon className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Doubt Question Detailed Box */}
+                        <div className="bg-white/5 border border-white/5 p-4 rounded-xl text-xs space-y-2 mb-4 shrink-0">
+                          <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-zinc-400 block">Doubt Context & Query</span>
+                          <p className="text-zinc-200 select-text whitespace-pre-wrap">{activeTkt.question}</p>
+                          {activeTkt.attachmentUrl && (
+                            <div className="mt-3 max-w-sm rounded-lg overflow-hidden border border-white/10">
+                              <img src={activeTkt.attachmentUrl} alt="Doubt homework attached" className="w-full h-auto object-contain max-h-40" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Live Message logs */}
+                        <div className="flex-1 overflow-y-auto px-1 py-1 space-y-4 mb-4 select-text scrollbar-thin">
+                          {activeTkt.messages && activeTkt.messages.length > 0 ? (
+                            activeTkt.messages.map((m: any, idx: number) => {
+                              const isSys = m.senderRole === "system";
+                              const isStudent = m.senderRole === "student";
+                              const isFaculty = m.senderRole === "teacher";
+                              const msgTime = m.timestamp
+                                ? new Date(m.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                                : "Now";
+
+                              if (isSys) {
+                                return (
+                                  <div key={m.id || idx} className="flex justify-center my-1 text-center w-full">
+                                    <div className="bg-zinc-900 border border-white/15 rounded-xl px-4 py-2 text-[10px] text-[#E5D2A5] max-w-[80%] font-semibold">
+                                      {m.content}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div key={m.id || idx} className={`flex ${isStudent ? "justify-start" : "justify-end"} w-full`}>
+                                  <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-xs leading-relaxed text-left ${
+                                    isStudent
+                                      ? "bg-zinc-900 border border-white/5 text-zinc-100 rounded-tl-none"
+                                      : "bg-[#E5D2A5] text-zinc-950 font-semibold rounded-tr-none"
+                                  }`}>
+                                    <div className={`flex items-center gap-1.5 mb-1 opacity-50 text-[8px] font-bold uppercase tracking-wider ${isStudent ? "text-zinc-400" : "text-zinc-950/80"}`}>
+                                      <span>{m.senderName} ({m.senderRole})</span>
+                                      <span>&bull;</span>
+                                      <span className="font-mono">{msgTime}</span>
+                                    </div>
+                                    {m.attachmentUrl && (
+                                      <div className="mb-2 max-w-sm rounded-lg overflow-hidden border border-black/10">
+                                        <img src={m.attachmentUrl} alt="Teacher diagram" className="w-full h-auto max-h-40 object-contain" />
+                                      </div>
+                                    )}
+                                    <div className="whitespace-pre-wrap select-text">{m.content}</div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-zinc-600">No messages found.</div>
+                          )}
+                        </div>
+
+                        {/* Image Attachment Preview */}
+                        {teacherTicketImage && (
+                          <div className="p-2.5 bg-zinc-900 border-t border-white/10 flex items-center justify-between shrink-0 mb-2 rounded-xl">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded overflow-hidden relative border border-white/10 shrink-0">
+                                <img src={teacherTicketImage} alt="Teacher explanation" className="w-full h-full object-cover" />
+                              </div>
+                              <span className="text-[11px] font-semibold text-zinc-300">Handwritten Solution/Diagram attached</span>
+                            </div>
+                            <button 
+                              onClick={() => setTeacherTicketImage(null)} 
+                              className="p-1 rounded bg-white/5 text-zinc-400 hover:text-white"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Faculty typing area */}
+                        <div className="pt-3 border-t border-white/10 flex items-center gap-3 shrink-0">
+                          <button
+                            onClick={() => teacherTicketFileInputRef.current?.click()}
+                            title="Attach diagram, handwritten proof or formula capture"
+                            className="p-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5 cursor-pointer"
+                          >
+                            <Paperclip className="w-4 h-4 text-[#E5D2A5]" />
+                          </button>
+                          <input
+                            type="file"
+                            ref={teacherTicketFileInputRef}
+                            onChange={handleTeacherTicketImageChange}
+                            accept="image/*"
+                            className="hidden"
+                          />
+
+                          <input
+                            type="text"
+                            value={teacherTicketReplyText}
+                            onChange={(e) => setTeacherTicketReplyText(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSendTeacherReply()}
+                            placeholder={isUnassigned ? "Please click 'Claim Doubt' to begin replying..." : "Type detailed concept explanations, NCERT references or JEE tips..."}
+                            disabled={isUnassigned}
+                            className="flex-1 px-4 py-3 text-xs bg-zinc-950 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#E5D2A5] disabled:opacity-50"
+                          />
+                          <button
+                            onClick={handleSendTeacherReply}
+                            disabled={(!teacherTicketReplyText.trim() && !teacherTicketImage) || isUnassigned}
+                            className="p-3.5 rounded-xl bg-[#E5D2A5] hover:bg-[#f4ecd8] text-zinc-950 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                    <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mb-4 border border-white/10">
+                      <User className="w-8 h-8 text-white/40" />
+                    </div>
+                    <h3 className="text-base font-bold text-white tracking-wide">Select a Student Doubt Ticket</h3>
+                    <p className="text-xs text-zinc-500 max-w-sm mt-1">
+                      Senior faculty dashboard. Review detailed JEE/NEET questions, click "Claim Doubt" to assign to yourself, and chat directly with students to resolve educational doubts.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* INNER TAB 2: LIVE CHAT INTERCEPTS */}
+          {supportSubTab === "intercepts" && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[600px] text-white text-left animate-fade-in">
+              {/* Left Column: All Sessions List */}
+              <div className="lg:col-span-4 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px]">
+                <div className="mb-4">
+                  <h3 className="text-sm font-bold text-[#E5D2A5] uppercase tracking-wider">Active Chatbot Sessions</h3>
+                  <p className="text-[11px] text-white/50">Intercept or review automated student assistant dialogs in real-time.</p>
+                </div>
+
+                {/* List entries */}
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {sessions.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 border border-dashed border-white/5 rounded-xl bg-black/10">
+                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-2">
+                        <History className="w-5 h-5 text-white/30" />
+                      </div>
+                      <span className="text-xs text-zinc-400 font-bold">No active sessions</span>
+                    </div>
+                  ) : (
+                    sessions.map((sess) => {
+                      const isSelected = sess.id === activeSessionId;
+                      const lastMsg = sess.messages && sess.messages.length > 0 ? sess.messages[sess.messages.length - 1] : null;
+                      const formattedTime = sess.updatedAt 
+                        ? new Date(sess.updatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                        : "Unknown";
+
+                      return (
+                        <div
+                          key={sess.id}
+                          onClick={() => {
+                            setActiveSessionId(sess.id);
+                            const sRef = doc(db, "chatbot_sessions", sess.id);
+                            updateDoc(sRef, { unreadByAdmin: false }).catch(err => console.error(err));
+                          }}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+                            isSelected
+                              ? "bg-zinc-900 border-[#E5D2A5] shadow-lg shadow-[#E5D2A5]/5"
+                              : "bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="min-w-0">
+                              <h4 className="text-xs font-black truncate text-zinc-100 flex items-center gap-1.5">
+                                <span className="truncate">{sess.userDisplayName || "Guest Student"}</span>
+                                {sess.teacherJoined && (
+                                  <span className="text-[8px] bg-emerald-500/10 text-emerald-400 font-extrabold px-1 py-0.2 rounded border border-emerald-500/20 uppercase shrink-0">Live</span>
+                                )}
+                              </h4>
+                              <span className="text-[9px] font-mono text-white/40 block truncate mt-0.5">{sess.userEmail || sess.id}</span>
+                            </div>
+                            {sess.unreadByAdmin && (
+                              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                            )}
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-white/[0.04] flex items-center justify-between text-[10px] text-zinc-400 gap-2">
+                            <span className="truncate max-w-[150px] italic font-medium">
+                              {lastMsg ? lastMsg.content : "No messages yet"}
+                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[9px] font-mono text-white/30 shrink-0">{formattedTime}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteChatSession(sess.id);
+                                }}
+                                className="p-1 rounded hover:bg-rose-500/20 text-white/30 hover:text-rose-400 transition-colors cursor-pointer"
+                              >
+                                <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Intercept Chat View */}
+              <div className="lg:col-span-8 bg-zinc-950/40 rounded-2xl border border-white/10 p-5 flex flex-col h-[700px]">
+                {activeSessionId ? (
+                  (() => {
+                    const currentSession = sessions.find(s => s.id === activeSessionId);
+                    if (!currentSession) return <div className="h-full flex items-center justify-center text-zinc-500">Loading thread...</div>;
+
+                    return (
+                      <div className="flex flex-col h-full">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10 mb-4 shrink-0">
+                          <div>
+                            <div className="flex items-center gap-2.5">
+                              <h3 className="text-base font-bold text-white tracking-wide">{currentSession.userDisplayName || "Student User"}</h3>
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                                currentSession.teacherJoined
+                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                  : "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                              }`}>
+                                {currentSession.teacherJoined ? "🟢 LIVE TUTORING" : "🤖 AUTOMATIC AI"}
+                              </span>
+                            </div>
+                            <span className="text-xs font-mono text-zinc-400 mt-0.5 block">{currentSession.userEmail || "anonymous"}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!currentSession.teacherJoined ? (
+                              <button
+                                onClick={() => handleJoinChat(currentSession.id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-white font-extrabold text-[11px] uppercase tracking-wider cursor-pointer shadow-md transition-all active:scale-[0.98]"
+                              >
+                                <User className="w-3.5 h-3.5" />
+                                <span>Join & Intervene</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleLeaveChat(currentSession.id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-zinc-500/20 text-zinc-300 hover:text-zinc-400 border border-white/5 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span>Handover to AI</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleEndChat(currentSession.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-400 border border-rose-500/30 transition-all text-[11px] font-extrabold uppercase tracking-wider cursor-pointer"
+                            >
+                              <XOctagon className="w-3.5 h-3.5" />
+                              <span>End Session</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Chat messages */}
+                        <div className="flex-1 overflow-y-auto px-1 py-1 space-y-4 mb-4 select-text">
+                          {currentSession.messages && currentSession.messages.length > 0 ? (
+                            currentSession.messages.map((m: any, idx: number) => {
+                              const isStudent = m.role === "user";
+                              const isSys = m.senderName === "System";
+                              const isTeacher = m.role === "teacher" || (!isStudent && (m.senderName?.includes("Teacher") || m.senderName?.includes("Faculty") || m.senderName?.includes("System")));
+                              const isBot = !isStudent && !isTeacher && !isSys;
+                              const msgTime = m.timestamp
+                                ? new Date(m.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                                : "Now";
+
+                              if (isSys || m.role === "teacher") {
+                                return (
+                                  <div key={m.id || idx} className="flex justify-center my-2 text-center w-full">
+                                    <div className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-2 text-[11px] text-[#E5D2A5] max-w-[80%] font-medium">
+                                      {m.content}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div key={m.id || idx} className={`flex ${isStudent ? "justify-start" : "justify-end"} w-full`}>
+                                  <div className={`max-w-[75%] rounded-2xl px-4 py-3 text-xs leading-relaxed text-left ${
+                                    isStudent
+                                      ? "bg-zinc-900 border border-white/5 text-zinc-100 rounded-tl-none"
+                                      : isTeacher
+                                        ? "bg-[#E5D2A5] text-zinc-950 font-semibold rounded-tr-none"
+                                        : "bg-zinc-900/40 border border-[#E5D2A5]/20 text-zinc-200 rounded-tr-none"
+                                  }`}>
+                                    <div className="flex items-center gap-1.5 mb-1 opacity-50 text-[9px] font-bold uppercase tracking-wider">
+                                      <span>{m.senderName || (isStudent ? "Student" : isBot ? "Nucleus AI" : "Teacher")}</span>
+                                      <span>&bull;</span>
+                                      <span className="font-mono">{msgTime}</span>
+                                    </div>
+                                    {isStudent ? (
+                                      <div className="whitespace-pre-wrap select-text">{m.content}</div>
+                                    ) : (
+                                      <div className="markdown-body select-text text-zinc-100">
+                                        <Markdown>{m.content}</Markdown>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-zinc-500">No messages in session.</div>
+                          )}
+                        </div>
+
+                        {/* Typing box */}
+                        <div className="pt-3 border-t border-white/10 flex items-center gap-3 shrink-0">
+                          <input
+                            type="text"
+                            value={adminMessageText}
+                            onChange={(e) => setAdminMessageText(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSendAdminMessage()}
+                            placeholder="Reply as Faculty member..."
+                            className="flex-1 px-4 py-3 text-xs bg-zinc-950 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#E5D2A5]"
+                          />
+                          <button
+                            onClick={handleSendAdminMessage}
+                            disabled={!adminMessageText.trim()}
+                            className="p-3.5 rounded-xl bg-[#E5D2A5] hover:bg-[#f4ecd8] text-zinc-950 disabled:opacity-50 transition-colors cursor-pointer shrink-0"
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center py-20">
+                    <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mb-4 border border-white/10">
+                      <MessageSquare className="w-8 h-8 text-white/40" />
+                    </div>
+                    <h3 className="text-base font-bold text-white tracking-wide">Select a Live Chat Session</h3>
+                    <p className="text-xs text-zinc-500 mt-1">Review live chatbot conversations or take over to provide manual human guidance.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* INNER TAB 3: ANALYTICS & CONTROL PANEL */}
+          {supportSubTab === "analytics" && (user?.role === "superadmin" || user?.role === "admin") && (
+            <div className="space-y-6 animate-fade-in text-white text-left">
+              {/* Analytics summary grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-zinc-900 border border-white/10 p-5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-zinc-400 block">Total doubts logged</span>
+                  <span className="text-3xl font-extrabold text-white mt-1.5 block">{allTickets.length}</span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Escalated from chatbot</span>
+                </div>
+
+                <div className="bg-zinc-900 border border-white/10 p-5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-zinc-400 block">Doubt resolved rate</span>
+                  <span className="text-3xl font-extrabold text-green-400 mt-1.5 block">
+                    {allTickets.length > 0 ? Math.round((allTickets.filter(t => t.status === "resolved").length / allTickets.length) * 100) : 100}%
+                  </span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">
+                    {allTickets.filter(t => t.status === "resolved").length} of {allTickets.length} solved
+                  </span>
+                </div>
+
+                <div className="bg-zinc-900 border border-white/10 p-5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-zinc-400 block">AI resolution rate</span>
+                  <span className="text-3xl font-extrabold text-primary mt-1.5 block">
+                    {sessions.length > 0 ? Math.round((1 - allTickets.length / (sessions.length + allTickets.length)) * 100) : 92}%
+                  </span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">Queries resolved by bot</span>
+                </div>
+
+                <div className="bg-zinc-900 border border-white/10 p-5 rounded-2xl">
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-zinc-400 block">Avg response time</span>
+                  <span className="text-3xl font-extrabold text-[#E5D2A5] mt-1.5 block">
+                    {(() => {
+                      const respondedTickets = allTickets.filter(t => t.messages && t.messages.some((m: any) => m.senderRole === "teacher"));
+                      if (respondedTickets.length === 0) return "14 mins";
+                      
+                      let totalDiffMinutes = 0;
+                      respondedTickets.forEach(t => {
+                        const firstTeacherMsg = t.messages.find((m: any) => m.senderRole === "teacher");
+                        if (firstTeacherMsg) {
+                          const diff = new Date(firstTeacherMsg.timestamp).getTime() - new Date(t.createdAt).getTime();
+                          totalDiffMinutes += Math.max(1, diff / 60000);
+                        }
+                      });
+                      const avg = Math.round(totalDiffMinutes / respondedTickets.length);
+                      return avg > 60 ? `${Math.round(avg/60)} hrs` : `${avg} mins`;
+                    })()}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 mt-1 block">From creation to reply</span>
+                </div>
+              </div>
+
+              {/* Control Settings and Toggle */}
+              <div className="bg-zinc-900 border border-white/10 p-6 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h4 className="font-bold text-[#E5D2A5] text-sm">👩‍🏫 Faculty Doubt Support Escalation</h4>
+                  <p className="text-xs text-zinc-400 mt-1">Enable students to bypass chatbot answers and submit their doubts directly to live teacher rooms if AI answers are insufficient.</p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/60">Escalation Form:</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const newVal = !teacherChatEnabled;
+                        await updateDoc(doc(db, "settings", "global"), {
+                          teacherChatEnabled: newVal
+                        });
+                        setTeacherChatEnabled(newVal);
+                        alert(`Doubt Support Escalation has been ${newVal ? "Enabled" : "Disabled"} successfully.`);
+                      } catch (e) {
+                        console.error(e);
+                        alert("Error toggling doubt setting.");
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                      teacherChatEnabled ? "bg-primary" : "bg-zinc-800"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        teacherChatEnabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Teacher Account Directory list */}
+              <div className="bg-zinc-900 border border-white/10 p-6 rounded-2xl">
+                <h4 className="font-bold text-[#E5D2A5] text-sm uppercase tracking-wider mb-4">Faculty Directory & Claim Stats</h4>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-zinc-300">
+                    <thead>
+                      <tr className="border-b border-white/10 text-left text-zinc-400">
+                        <th className="pb-3 font-semibold uppercase">Faculty Name</th>
+                        <th className="pb-3 font-semibold uppercase">Email ID</th>
+                        <th className="pb-3 font-semibold uppercase">Status</th>
+                        <th className="pb-3 font-semibold uppercase text-right">Doubts Claimed</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {users.filter(u => u.role === "teacher").length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-6 text-center text-zinc-500">
+                            No active teacher accounts found. Modify a user's role in the 'Student Roster' tab to 'teacher' to enroll them.
+                          </td>
+                        </tr>
+                      ) : (
+                        users.filter(u => u.role === "teacher").map(t => (
+                          <tr key={t.id}>
+                            <td className="py-3 font-bold text-white flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-primary/25 flex items-center justify-center text-primary text-[10px] font-bold">
+                                {t.displayName?.slice(0,2).toUpperCase()}
+                              </div>
+                              <span>{t.displayName || "Expert Faculty"}</span>
+                            </td>
+                            <td className="py-3 font-mono text-zinc-400">{t.email}</td>
+                            <td className="py-3">
+                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-bold px-2 py-0.5 rounded border border-emerald-500/20 uppercase">
+                                Active
+                              </span>
+                            </td>
+                            <td className="py-3 text-right font-bold text-white">
+                              {allTickets.filter(tk => tk.assignedTeacherId === t.id).length} doubts solved
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

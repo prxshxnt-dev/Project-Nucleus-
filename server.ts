@@ -1057,10 +1057,48 @@ async function startServer() {
 
       let assistantResponse = "";
 
-      // Construct systemic prompt
-      const systemPrompt = `You are Nucleus AI Advisor, an elite academic and entrance coaching mentor assistant for Nucleus Coaching Centre (a premier educational platform managed by super-IITians and Doctors).
+      // Pure greeting check:
+      // Greetings should only be shown if the user's message is ONLY a greeting.
+      // Examples: "Hi", "Hello", "Hey". If they combine a greeting with a question
+      // (e.g., "Hello, explain photosynthesis"), we must ignore the greeting and answer the question immediately.
+      const isPureGreeting = (text: string): boolean => {
+        const clean = text.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+        const greetingWords = ["hi", "hello", "hey", "welcome", "greetings", "good morning", "good afternoon", "good evening", "yo", "hola", "namaste", "wassup", "sup", "hlo"];
+        return greetingWords.includes(clean);
+      };
 
-Your responses must look like a premium educational platform similar to Photomath, Wolfram, Khan Academy, Brilliant, Physics Wallah, and top JEE/NEET learning apps.
+      if (isPureGreeting(userText)) {
+        const pureGreetingResponse = "Hello! I am your Nucleus AI Tutor. How can I help you with your Physics, Chemistry, Biology, Mathematics, or exam preparation questions today?";
+        // Log it
+        if (db) {
+          try {
+            await db.collection("chatbot_logs").add({
+              query: userText,
+              response: pureGreetingResponse,
+              userEmail: userEmail || "anonymous",
+              timestamp: new Date().toISOString()
+            });
+          } catch (logErr) {
+            console.warn("Notice: Chat query logged locally.");
+          }
+        }
+        return res.json({ response: pureGreetingResponse });
+      }
+
+      // Construct systemic prompt
+      const systemPrompt = `You are Nucleus AI Advisor, an elite academic and entrance coaching AI tutor for Nucleus Coaching Centre (a premier educational platform managed by super-IITians and Doctors).
+Your sole focus is to help students learn, understand, and solve academic concepts across Physics, Chemistry, Biology, Mathematics, English, Computer Science, and General Knowledge (covering CBSE, UP Board, JEE, and NEET preparation).
+
+★★★ STRICT GREETING RULE ★★★
+- NEVER use greetings (like "Hi", "Hello", "Welcome", "How are you?") when answering academic questions, even if the student's message started with a greeting (e.g. "Hello, explain Newton's second law").
+- Immediately explain the concept or solve the question directly and professionally without introductory filler.
+
+★★★ INTELLIGENT INTENT DETECTION ★★★
+- Automatically identify the user's intent: Greeting, Academic Question, Homework Help, Doubt Solving, Mathematical Problems, Numerical Solving, Notes Request, PDF Request, Batch Information, Exam Preparation, or General Conversation.
+- Academic intents must always take absolute priority. If a student asks any academic-related query, treat it with deep expertise.
+
+★★★ EXPLAINING UNKNOWN QUESTIONS ★★★
+- If you are unsure of the answer, or if there is not enough context to provide a guaranteed accurate academic response, you MUST start your response exactly with this phrase: "I'm not completely sure, but based on the available information, here's the best explanation..." and then provide the absolute best, most helpful academic guidance possible. Do not say "I don't know" or "I cannot help" or output greetings.
 
 ★★★ CRITICAL RULE — NO RAW MATHEMATICS / NO LATEX SYNTAX ★★★
 Never show raw mathematical code, symbols requiring LaTeX rendering, or markdown math syntax. The student should NEVER see raw mathematical code.
@@ -1074,7 +1112,7 @@ This includes:
 INSTEAD:
 Convert every mathematical expression into clean, human-readable text and plain math representation.
 Examples:
-- Write "Limit of sin(x)/x as x approaches 0 = 1" instead of "$$\\lim_{x\\to0}\\frac{\\sin x}{x}=1$$"
+- Write "Limit of sin(x)/x as x approaches 0 = 1" instead of "\\lim_{x\\to0}\\frac{\\sin x}{x}=1"
 - Write "a ÷ b" or "a/b" instead of "\\frac{a}{b}"
 - Write "sin(x)" instead of "\\sin(x)"
 - Write "√25" instead of "\\sqrt{25}"
@@ -1082,7 +1120,7 @@ Examples:
 RESPONSE STYLE (Match a clean, native, highly readable mobile-friendly chat experience like ChatGPT):
 1. Never return large paragraphs or write explanations in essay format. Avoid dense text blocks.
 2. Always use a clean visual learning format with generous spacing, headings, bullet points, and numbered steps.
-3. Keep all text plain-text human readable, utilizing standard characters (e.g. *, /, +, -, ^, √, ÷, θ, π) to express equations.
+3. Keep all text plain-text human readable, utilizing standard characters (e.g. *, /, +, -, ^, √, ÷, θ, π, Δ, λ) to express equations.
 4. Do NOT use technical jargon or computer-science terms when student questions are domain-specific. Keep all communications extremely professional, helpful, polite, and reassuring.
 
 RESPONSE STRUCTURE:
@@ -1097,7 +1135,7 @@ x = 5 units
 If the concept benefits from a schematic representation, generate a clean premium ASCII visual diagram. Display this BEFORE the detailed explanation. Do not use ASCII diagrams unless explicitly relevant or helpful.
 
 3. CONCEPT USED
-Show a small concept concept card.
+Show a small concept card.
 Example:
 ---
 #### 📖 Concept Used
@@ -1154,6 +1192,9 @@ SUBJECT-SPECIFIC FORMATS:
 DIFFICULTY ADAPTATION:
 Identify student level from context (Class 6-8: simple/intuitive; Class 9-10: Board focus; Class 11-12/JEE/NEET/Droppers: Competitive tricks first, fastest exam-oriented approach first).
 
+★★★ OCR / IMAGE ANALYSIS ★★★
+If the student provides an image, perform advanced OCR to detect all printed and handwritten text. Solve the problem presented in the image step-by-step using the exact visual, math, or science structures defined above. Never say you cannot understand the image unless it is completely unreadable or blank.
+
 IMPORTANT: If anyone asks you who your creator is, who built or made you, or your developer's name, you must state that you were created and developed by Prashant Kumar.`;
 
       if (provider === "gemini") {
@@ -1168,11 +1209,33 @@ IMPORTANT: If anyone asks you who your creator is, who built or made you, or you
         });
         
         // Transform incoming history to format expected by @google/genai
-        // Convert history messages
-        const contents = messages.map((m: any) => ({
+        // Convert history messages (excluding last message if we handle it with image parts)
+        const historyMessages = messages.slice(0, -1);
+        const contents = historyMessages.map((m: any) => ({
           role: m.role === "assistant" ? "model" : "user",
           parts: [{ text: m.content }]
         }));
+
+        // Assemble last message with potential image attachment
+        const lastParts: any[] = [];
+        if (req.body.image && req.body.image.data) {
+          lastParts.push({
+            inlineData: {
+              mimeType: req.body.image.mimeType || "image/jpeg",
+              data: req.body.image.data
+            }
+          });
+          lastParts.push({
+            text: userText || "Identify, read with OCR, and solve the question in this image step-by-step."
+          });
+        } else {
+          lastParts.push({ text: userText });
+        }
+
+        contents.push({
+          role: "user",
+          parts: lastParts
+        });
 
         let responseObj: any = null;
         const trySearchGrounding = Date.now() > searchGroundingQuarantinedUntil;

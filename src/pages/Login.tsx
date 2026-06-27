@@ -75,14 +75,17 @@ export default function Login() {
         callback: handleCredentialResponse,
         auto_select: false,
         cancel_on_tap_outside: true,
+        use_fedcm_for_prompt: false,
       });
 
-      // Show One Tap
-      google.accounts.id.prompt((notification: any) => {
-        if (notification.isNotDisplayed()) {
-          console.debug('One tap not displayed:', notification.getNotDisplayedReason());
-        }
-      });
+      // Show One Tap only if we are not inside an iframe to prevent FedCM console errors
+      if (window.self === window.top) {
+        google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed()) {
+            console.debug('One tap not displayed:', notification.getNotDisplayedReason());
+          }
+        });
+      }
 
       // Render hidden native sign-in button over custom design
       const btnEl = document.getElementById("google-gsi-button");

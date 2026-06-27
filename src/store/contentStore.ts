@@ -17,6 +17,7 @@ export interface ClassItem {
   id: string;
   className: string;
   order?: number;
+  isHidden?: boolean;
   createdAt?: any;
 }
 
@@ -25,6 +26,8 @@ export interface SubjectItem {
   classId: string;
   subjectName: string;
   order?: number;
+  isHidden?: boolean;
+  hiddenCategories?: string[];
   createdAt?: any;
 }
 
@@ -97,11 +100,11 @@ interface ContentState {
 
   // CRUD Operations
   addClass: (className: string, order: number) => Promise<void>;
-  updateClass: (id: string, className: string, order: number) => Promise<void>;
+  updateClass: (id: string, className: string, order: number, isHidden?: boolean) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
 
   addSubject: (classId: string, subjectName: string, order: number) => Promise<void>;
-  updateSubject: (id: string, classId: string, subjectName: string, order: number) => Promise<void>;
+  updateSubject: (id: string, classId: string, subjectName: string, order: number, isHidden?: boolean, hiddenCategories?: string[]) => Promise<void>;
   deleteSubject: (id: string) => Promise<void>;
 
   addChapter: (classId: string, subjectId: string, chapterName: string) => Promise<void>;
@@ -238,13 +241,17 @@ export const useContentStore = create<ContentState>((set, get) => ({
     }
   },
 
-  updateClass: async (id, className, order) => {
+  updateClass: async (id, className, order, isHidden) => {
     const path = `classes/${id}`;
     try {
-      await updateDoc(doc(db, "classes", id), {
+      const updateData: any = {
         className,
         order: Number(order) || 0,
-      });
+      };
+      if (isHidden !== undefined) {
+        updateData.isHidden = isHidden;
+      }
+      await updateDoc(doc(db, "classes", id), updateData);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
     }
@@ -286,14 +293,21 @@ export const useContentStore = create<ContentState>((set, get) => ({
     }
   },
 
-  updateSubject: async (id, classId, subjectName, order) => {
+  updateSubject: async (id, classId, subjectName, order, isHidden, hiddenCategories) => {
     const path = `subjects/${id}`;
     try {
-      await updateDoc(doc(db, "subjects", id), {
+      const updateData: any = {
         classId,
         subjectName,
         order: Number(order) || 0,
-      });
+      };
+      if (isHidden !== undefined) {
+        updateData.isHidden = isHidden;
+      }
+      if (hiddenCategories !== undefined) {
+        updateData.hiddenCategories = hiddenCategories;
+      }
+      await updateDoc(doc(db, "subjects", id), updateData);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
     }

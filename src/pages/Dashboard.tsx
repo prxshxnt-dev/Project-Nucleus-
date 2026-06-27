@@ -179,6 +179,22 @@ export default function Dashboard() {
     }
   }, []);
 
+  // Auto-switch active category if it gets hidden for the active subject
+  useEffect(() => {
+    if (activeSubjectId) {
+      const activeSubjItem = subjects.find(s => s.id === activeSubjectId);
+      const hiddenCategories = activeSubjItem?.hiddenCategories || [];
+      const isUserAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      const allTabs = ['Notes', 'PYQs', 'Assignments', 'DPPs', 'Videos', 'Formula Sheets', 'Tests'];
+      const visibleTabs = allTabs.filter(tab => !hiddenCategories.includes(tab));
+      
+      if (visibleTabs.length > 0 && !visibleTabs.includes(activeCategory)) {
+        setActiveCategory(visibleTabs[0]);
+      }
+    }
+  }, [activeSubjectId, subjects, user?.role, activeCategory]);
+
   const handleViewMaterial = (mat: any) => {
     if (!mat?.url) return;
     try {
@@ -875,30 +891,42 @@ export default function Dashboard() {
               { id: 'class_jee', className: 'JEE' },
               { id: 'class_neet', className: 'NEET' },
               { id: 'class_droppers', className: 'Droppers' }
-            ]).map((cls) => {
-              const subCount = subjects.filter(s => s.classId === cls.id).length;
-              return (
-                <div
-                  key={cls.id}
-                  onClick={() => {
-                    setActiveClassId(cls.id);
-                    setActiveSubjectId(null);
-                    setActiveChapterId(null);
-                  }}
-                  className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] shadow-sm transition-all"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary group-hover:bg-accent-primary group-hover:text-zinc-950 transition-all mb-4">
-                    <Folder className="w-6 h-6 shrink-0 fill-current" />
+            ])
+              .filter(cls => (user?.role === 'admin' || user?.role === 'superadmin') || !cls.isHidden)
+              .map((cls) => {
+                const subCount = subjects.filter(s => s.classId === cls.id).length;
+                const isClsHidden = cls.isHidden === true;
+                return (
+                  <div
+                    key={cls.id}
+                    onClick={() => {
+                      setActiveClassId(cls.id);
+                      setActiveSubjectId(null);
+                      setActiveChapterId(null);
+                    }}
+                    className={`group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border cursor-pointer hover:scale-[1.02] shadow-sm transition-all relative ${
+                      isClsHidden
+                        ? "border-red-500/30 opacity-75 hover:opacity-100"
+                        : "border-border-color hover:border-accent-primary/60"
+                    }`}
+                  >
+                    {isClsHidden && (
+                      <span className="absolute top-2.5 right-2.5 text-[8px] font-black font-mono tracking-wider bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">
+                        HIDDEN
+                      </span>
+                    )}
+                    <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary group-hover:bg-accent-primary group-hover:text-zinc-950 transition-all mb-4">
+                      <Folder className="w-6 h-6 shrink-0 fill-current" />
+                    </div>
+                    <h4 className="font-display font-black text-base text-text-primary group-hover:text-accent-primary transition-colors truncate">
+                      {cls.className}
+                    </h4>
+                    <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
+                      {subCount} Subject Folders
+                    </p>
                   </div>
-                  <h4 className="font-display font-black text-base text-text-primary group-hover:text-accent-primary transition-colors truncate">
-                    {cls.className}
-                  </h4>
-                  <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
-                    {subCount} Subject Folders
-                  </p>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         )}
 
@@ -915,30 +943,42 @@ export default function Dashboard() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {subjects.filter(s => s.classId === activeClassId).map((subj) => {
-                const chapCount = chapters.filter(c => c.subjectId === subj.id).length;
-                return (
-                  <div
-                    key={subj.id}
-                    onClick={() => {
-                      setActiveSubjectId(subj.id);
-                      setActiveChapterId(null);
-                    }}
-                    className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] transition-all"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-black transition-all mb-4">
-                      <Folder className="w-6 h-6 shrink-0 fill-current" />
+              {subjects
+                .filter(s => s.classId === activeClassId && ((user?.role === 'admin' || user?.role === 'superadmin') || !s.isHidden))
+                .map((subj) => {
+                  const chapCount = chapters.filter(c => c.subjectId === subj.id).length;
+                  const isSubjHidden = subj.isHidden === true;
+                  return (
+                    <div
+                      key={subj.id}
+                      onClick={() => {
+                        setActiveSubjectId(subj.id);
+                        setActiveChapterId(null);
+                      }}
+                      className={`group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border cursor-pointer hover:scale-[1.02] transition-all relative ${
+                        isSubjHidden
+                          ? "border-red-500/30 opacity-75 hover:opacity-100"
+                          : "border-border-color hover:border-accent-primary/60"
+                      }`}
+                    >
+                      {isSubjHidden && (
+                        <span className="absolute top-2.5 right-2.5 text-[8px] font-black font-mono tracking-wider bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">
+                          HIDDEN
+                        </span>
+                      )}
+                      <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-black transition-all mb-4">
+                        <Folder className="w-6 h-6 shrink-0 fill-current" />
+                      </div>
+                      <h4 className="font-display font-black text-base text-text-primary group-hover:text-indigo-400 transition-colors truncate">
+                        {subj.subjectName}
+                      </h4>
+                      <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
+                        {chapCount} Chapters
+                      </p>
                     </div>
-                    <h4 className="font-display font-black text-base text-text-primary group-hover:text-indigo-400 transition-colors truncate">
-                      {subj.subjectName}
-                    </h4>
-                    <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
-                      {chapCount} Chapters
-                    </p>
-                  </div>
-                );
-              })}
-              {subjects.filter(s => s.classId === activeClassId).length === 0 && (
+                  );
+                })}
+              {subjects.filter(s => s.classId === activeClassId && ((user?.role === 'admin' || user?.role === 'superadmin') || !s.isHidden)).length === 0 && (
                 <div className="p-8 text-center bg-bg-secondary/20 border border-dashed border-border-color rounded-2xl col-span-full">
                   <p className="text-xs text-text-muted font-mono">No subjects added for this class standard yet.</p>
                 </div>
@@ -1023,28 +1063,38 @@ export default function Dashboard() {
 
             {/* Material Categories Tabs bar inside Chapter */}
             <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-bg-secondary/40 p-1.5 rounded-2xl border border-border-color">
-              {[
-                { label: 'Notes', icon: '📝' },
-                { label: 'PYQs', icon: '🏆' },
-                { label: 'Assignments', icon: '📂' },
-                { label: 'DPPs', icon: '📚' },
-                { label: 'Videos', icon: '🎥' },
-                { label: 'Formula Sheets', icon: '📐' },
-                { label: 'Tests', icon: '✏️' }
-              ].map((catTab) => (
-                <button
-                  key={catTab.label}
-                  onClick={() => setActiveCategory(catTab.label)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                    activeCategory === catTab.label
-                      ? 'bg-accent-primary text-zinc-950 shadow-md font-bold'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                  }`}
-                >
-                  <span>{catTab.icon}</span>
-                  <span>{catTab.label}</span>
-                </button>
-              ))}
+              {(() => {
+                const activeSubjItem = subjects.find(s => s.id === activeSubjectId);
+                const hiddenCategories = activeSubjItem?.hiddenCategories || [];
+                const isUserAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+                const allTabs = [
+                  { label: 'Notes', icon: '📝' },
+                  { label: 'PYQs', icon: '🏆' },
+                  { label: 'Assignments', icon: '📂' },
+                  { label: 'DPPs', icon: '📚' },
+                  { label: 'Videos', icon: '🎥' },
+                  { label: 'Formula Sheets', icon: '📐' },
+                  { label: 'Tests', icon: '✏️' }
+                ];
+                return allTabs
+                  .filter((catTab) => !hiddenCategories.includes(catTab.label))
+                  .map((catTab) => {
+                    return (
+                      <button
+                        key={catTab.label}
+                        onClick={() => setActiveCategory(catTab.label)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 relative ${
+                          activeCategory === catTab.label
+                            ? 'bg-accent-primary text-zinc-950 shadow-md font-bold'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                        }`}
+                      >
+                        <span>{catTab.icon}</span>
+                        <span>{catTab.label}</span>
+                      </button>
+                    );
+                  });
+              })()}
             </div>
 
             {/* Render matched materials files */}

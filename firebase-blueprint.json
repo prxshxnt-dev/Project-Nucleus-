@@ -132,7 +132,9 @@
       "description": "Educative course standard.",
       "type": "object",
       "properties": {
-        "className": { "type": "string" }
+        "className": { "type": "string" },
+        "order": { "type": "number" },
+        "isHidden": { "type": "boolean", "description": "Whether this class is hidden from the student folder explorer." }
       },
       "required": ["className"]
     },
@@ -142,7 +144,14 @@
       "type": "object",
       "properties": {
         "classId": { "type": "string" },
-        "subjectName": { "type": "string" }
+        "subjectName": { "type": "string" },
+        "order": { "type": "number" },
+        "isHidden": { "type": "boolean", "description": "Whether this subject is hidden from the student folder explorer." },
+        "hiddenCategories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of category tabs (Notes, PYQs, etc.) that are hidden for this subject."
+        }
       },
       "required": ["classId", "subjectName"]
     },

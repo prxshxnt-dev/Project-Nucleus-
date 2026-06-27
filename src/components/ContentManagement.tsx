@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useContentStore } from "../store/contentStore";
 import { ContentCard } from "./ContentCard";
-import { RefreshCw, Search, Plus, Trash2, Edit2, FolderOpen, Video, FileText, Cloud } from "lucide-react";
+import { RefreshCw, Search, Plus, Trash2, Edit2, FolderOpen, Video, FileText, Cloud, Eye, EyeOff } from "lucide-react";
 import { parseYouTubeVideoId } from "./CustomVideoPlayer";
 
 export function ContentManagement() {
@@ -30,7 +30,7 @@ export function ContentManagement() {
     deleteMcqTest,
   } = useContentStore();
 
-  const [activeSubTab, setActiveSubTab] = useState<"classes" | "subjects" | "chapters" | "materials" | "upload" | "cloud" | "tests">("classes");
+  const [activeSubTab, setActiveSubTab] = useState<"classes" | "subjects" | "chapters" | "materials" | "upload" | "cloud" | "tests" | "visibility">("classes");
   const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
 
   const showToast = (message: string, isError = false) => {
@@ -122,6 +122,11 @@ export function ContentManagement() {
   const [cloudLogs, setCloudLogs] = useState<string[]>([]);
   const [isSavingCloud, setIsSavingCloud] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+
+  // Visibility sub-tab specific selection states
+  const [visClassId, setVisClassId] = useState("");
+  const [visSubjectId, setVisSubjectId] = useState("");
+  const [visChapterId, setVisChapterId] = useState("");
 
   // Load cloud sync settings on mount
   useEffect(() => {
@@ -798,6 +803,7 @@ export function ContentManagement() {
           { id: "tests", label: "✏️ MCQ Tests Manager", count: mcqTests.length },
           { id: "upload", label: "🚀 Live Upload Hub", count: undefined },
           { id: "cloud", label: "☁️ Cloud Server Sync", count: undefined },
+          { id: "visibility", label: "👀 Folder Visibility", count: undefined },
         ].map((subb) => (
           <button
             key={subb.id}
@@ -2588,6 +2594,373 @@ export function ContentManagement() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* 7. FOLDER VISIBILITY CONTROLS TAB */}
+            {activeSubTab === "visibility" && (
+              <div className="space-y-6 animate-fadeIn font-sans text-left">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-white font-display uppercase tracking-tight">Folder Visibility Configuration</h3>
+                    <p className="text-xs text-white/50 mt-0.5">Control which class standards and subject directories are visible to student users in the dashboard folder explorer.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Class-wise Visibility Controls */}
+                  <div className="theme-card-themed bg-white/5 border border-white/10 p-5 rounded-3xl space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black uppercase text-primary/95 font-display tracking-wider">🏫 Class Standards Visibility</h4>
+                      <span className="text-[10px] font-mono font-bold bg-white/10 text-white/70 px-2.5 py-0.5 rounded-full">
+                        {classes.length} Classes
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-white/40 leading-relaxed">
+                      Toggle standard folders to show or hide them from the primary student directory interface.
+                    </p>
+
+                    <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+                      {classes.map((cls) => {
+                        const isClsHidden = cls.isHidden === true;
+                        const subCount = subjects.filter(s => s.classId === cls.id).length;
+                        return (
+                          <div key={cls.id} className="py-3 flex items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="text-xs font-black text-white truncate">{cls.className}</p>
+                              <p className="text-[10px] text-white/40 font-mono mt-0.5 uppercase tracking-wider">
+                                {subCount} Subjects • Priority Sequence: {cls.order || 0}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await updateClass(cls.id, cls.className, cls.order || 0, !isClsHidden);
+                                  showToast(`${cls.className} is now ${!isClsHidden ? "Hidden" : "Visible"}!`);
+                                } catch (err: any) {
+                                  showToast(`Error: ${err.message || "Failed to update"}`);
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150 flex items-center gap-1.5 cursor-pointer border ${
+                                isClsHidden
+                                  ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                              }`}
+                            >
+                              {isClsHidden ? (
+                                <>
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                  <span>Hidden</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Visible</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {classes.length === 0 && (
+                        <div className="text-center py-10 text-xs text-white/30 italic">
+                          No class folders available.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subject-wise Visibility Controls */}
+                  <div className="theme-card-themed bg-white/5 border border-white/10 p-5 rounded-3xl space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black uppercase text-primary/95 font-display tracking-wider">📚 Subject Folders Visibility</h4>
+                      <span className="text-[10px] font-mono font-bold bg-white/10 text-white/70 px-2.5 py-0.5 rounded-full">
+                        {subjects.length} Subjects
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <p className="text-xs text-white/40 leading-relaxed">
+                        Toggle specific subject sub-directories within class standards.
+                      </p>
+                      {/* Class Filter */}
+                      <select
+                        value={subjectListFilterClass}
+                        onChange={(e) => setSubjectListFilterClass(e.target.value)}
+                        className="bg-black/60 border border-white/10 rounded-xl px-2 py-1.5 text-[10px] font-bold text-white focus:outline-none focus:border-primary cursor-pointer max-w-[150px]"
+                      >
+                        <option value="">All Classes</option>
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.className}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin">
+                      {subjects
+                        .filter(s => !subjectListFilterClass || s.classId === subjectListFilterClass)
+                        .map((subj) => {
+                          const isSubjHidden = subj.isHidden === true;
+                          const parentClsName = classes.find(c => c.id === subj.classId)?.className || "Unknown Class";
+                          const chapCount = chapters.filter(c => c.subjectId === subj.id).length;
+                          return (
+                            <div key={subj.id} className="py-3 flex items-center justify-between gap-4">
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-white truncate">{subj.subjectName}</p>
+                                <p className="text-[10px] text-white/40 font-mono mt-0.5 uppercase tracking-wider">
+                                  Class: {parentClsName} • {chapCount} Chapters
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await updateSubject(subj.id, subj.classId, subj.subjectName, subj.order || 0, !isSubjHidden);
+                                    showToast(`${subj.subjectName} is now ${!isSubjHidden ? "Hidden" : "Visible"}!`);
+                                  } catch (err: any) {
+                                    showToast(`Error: ${err.message || "Failed to update"}`);
+                                  }
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-150 flex items-center gap-1.5 cursor-pointer border ${
+                                  isSubjHidden
+                                    ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                                }`}
+                              >
+                                {isSubjHidden ? (
+                                  <>
+                                    <EyeOff className="w-3.5 h-3.5" />
+                                    <span>Hidden</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Visible</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      {subjects.filter(s => !subjectListFilterClass || s.classId === subjectListFilterClass).length === 0 && (
+                        <div className="text-center py-10 text-xs text-white/30 italic">
+                          No subjects available for selected class standard.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Section Visibility per Subject */}
+                <div className="theme-card-themed bg-white/5 border border-white/10 p-6 rounded-3xl space-y-4 text-left">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <h4 className="text-sm font-black uppercase text-primary/95 font-display tracking-wider">🎯 Category Visibility & Quick-Publish Panel</h4>
+                    <span className="text-[10px] font-mono font-bold bg-white/10 text-white/70 px-2.5 py-0.5 rounded-full">
+                      Interactive Configuration
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-white/50 leading-relaxed">
+                    Select a Class standard and a Subject folder to choose which category sections (Notes, PYQs, Assignments, DPPs, Videos, Formula Sheets, Tests) are visible to students. You can also quick-publish directly here.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Class Selection */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">1. Select Class Standard *</label>
+                      <select
+                        value={visClassId}
+                        onChange={(e) => {
+                          setVisClassId(e.target.value);
+                          setVisSubjectId("");
+                          setVisChapterId("");
+                        }}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none"
+                      >
+                        <option value="">-- Choose Class --</option>
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.className}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Subject Selection */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">2. Select Subject Folder *</label>
+                      <select
+                        value={visSubjectId}
+                        onChange={(e) => {
+                          setVisSubjectId(e.target.value);
+                          setVisChapterId("");
+                        }}
+                        disabled={!visClassId}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <option value="">-- Choose Subject --</option>
+                        {subjects
+                          .filter(s => s.classId === visClassId)
+                          .map(s => <option key={s.id} value={s.id}>{s.subjectName}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Chapter Selection */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">3. Select Chapter (For Adding Content) *</label>
+                      <select
+                        value={visChapterId}
+                        onChange={(e) => setVisChapterId(e.target.value)}
+                        disabled={!visSubjectId}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <option value="">-- Choose Chapter (Optional) --</option>
+                        {chapters
+                          .filter(c => c.subjectId === visSubjectId)
+                          .map(c => <option key={c.id} value={c.id}>{c.chapterName}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {visSubjectId ? (
+                    <div className="pt-4 grid grid-cols-1 lg:grid-cols-2 gap-6 border-t border-white/5 animate-fadeIn">
+                      {/* Left: Hide/Show Categories */}
+                      <div className="space-y-4">
+                        <h5 className="text-[11px] font-black uppercase text-white/60 tracking-wider">Show/Hide Category Tabs for Students</h5>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
+                          {(() => {
+                            const activeSubj = subjects.find(s => s.id === visSubjectId);
+                            const hiddenCats = activeSubj?.hiddenCategories || [];
+                            const allCategories = [
+                              { label: 'Notes', icon: '📝' },
+                              { label: 'PYQs', icon: '🏆' },
+                              { label: 'Assignments', icon: '📂' },
+                              { label: 'DPPs', icon: '📚' },
+                              { label: 'Videos', icon: '🎥' },
+                              { label: 'Formula Sheets', icon: '📐' },
+                              { label: 'Tests', icon: '✏️' }
+                            ];
+                            
+                            return allCategories.map((cat) => {
+                              const isHidden = hiddenCats.includes(cat.label);
+                              return (
+                                <div key={cat.label} className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-base">{cat.icon}</span>
+                                    <span className="text-xs font-black text-white">{cat.label}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const newHidden = isHidden
+                                        ? hiddenCats.filter(c => c !== cat.label)
+                                        : [...hiddenCats, cat.label];
+                                      try {
+                                        await updateSubject(activeSubj!.id, activeSubj!.classId, activeSubj!.subjectName, activeSubj!.order || 0, activeSubj!.isHidden, newHidden);
+                                        showToast(`${cat.label} tab is now ${isHidden ? "Visible" : "Hidden"} for students of ${activeSubj!.subjectName}!`);
+                                      } catch (err: any) {
+                                        showToast(`Error: ${err.message || "Failed to update"}`);
+                                      }
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer border transition-all ${
+                                      isHidden
+                                        ? "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20"
+                                        : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+                                    }`}
+                                  >
+                                    {isHidden ? "🚫 Hidden" : "👁️ Visible"}
+                                  </button>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Right: Where to Add Content Option (Video or Notes) */}
+                      <div className="space-y-4 flex flex-col justify-between">
+                        <div>
+                          <h5 className="text-[11px] font-black uppercase text-white/60 tracking-wider mb-2">Publish / Add Content Directly</h5>
+                          <p className="text-xs text-white/40 leading-relaxed mb-4">
+                            Launch the publication workflow with pre-filled directories for the selected Class, Subject, and Chapter.
+                          </p>
+                          
+                          <div className="p-3 bg-black/20 border border-white/5 rounded-xl space-y-1.5 text-xs text-white/60 mb-4">
+                            <div className="flex justify-between font-mono text-[10px]">
+                              <span>Target Standard:</span>
+                              <span className="font-bold text-white">{classes.find(c => c.id === visClassId)?.className || ""}</span>
+                            </div>
+                            <div className="flex justify-between font-mono text-[10px]">
+                              <span>Target Subject:</span>
+                              <span className="font-bold text-white">{subjects.find(s => s.id === visSubjectId)?.subjectName || ""}</span>
+                            </div>
+                            <div className="flex justify-between font-mono text-[10px]">
+                              <span>Target Chapter:</span>
+                              <span className="font-bold text-accent-primary">
+                                {visChapterId ? chapters.find(c => c.id === visChapterId)?.chapterName : "None selected (Recommended)"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-auto">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMaterialId(null);
+                              setMatClassId(visClassId);
+                              setMatSubId(visSubjectId);
+                              setMatChapId(visChapterId || "");
+                              setMatType("note");
+                              setMatCategory("notes");
+                              setMatTitle("");
+                              setMatDesc("");
+                              setMatUrl("");
+                              setMatThumb("");
+                              setMatHidden(false);
+                              setMatGroup("all");
+                              setMatPlan("free");
+                              setSelectedFile(null);
+                              setActiveSubTab("upload");
+                              showToast("Ready to write Study Note / upload PDF!");
+                            }}
+                            className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 hover:from-indigo-500/30 hover:to-indigo-500/10 border border-indigo-500/20 hover:border-indigo-500/50 text-indigo-300 font-bold font-display text-xs text-center uppercase tracking-wider cursor-pointer hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-2"
+                          >
+                            <span className="text-xl">📝</span>
+                            <span>Create Study Notes</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMaterialId(null);
+                              setMatClassId(visClassId);
+                              setMatSubId(visSubjectId);
+                              setMatChapId(visChapterId || "");
+                              setMatType("lecture");
+                              setMatCategory("video_lectures");
+                              setMatTitle("");
+                              setMatDesc("");
+                              setMatUrl("");
+                              setMatThumb("");
+                              setMatHidden(false);
+                              setMatGroup("all");
+                              setMatPlan("free");
+                              setSelectedFile(null);
+                              setActiveSubTab("upload");
+                              showToast("Ready to publish Video Lecture!");
+                            }}
+                            className="p-4 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-500/5 hover:from-red-500/30 hover:to-red-500/10 border border-red-500/20 hover:border-red-500/50 text-red-300 font-bold font-display text-xs text-center uppercase tracking-wider cursor-pointer hover:scale-[1.02] transition-all flex flex-col items-center justify-center gap-2"
+                          >
+                            <span className="text-xl">🎥</span>
+                            <span>Create Video Lectures</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-6 border-t border-white/5 text-center text-xs text-white/30 italic">
+                      Please select a Class and Subject to load visibility toggle controls and quick-publish shortcuts.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
