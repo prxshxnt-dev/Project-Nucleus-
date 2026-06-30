@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithCredential } from 'firebase/auth';
 import { 
   initializeFirestore, 
+  getFirestore,
   doc, 
   setDoc, 
   getDoc, 
@@ -15,12 +16,65 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { useAuthStore } from '../store/authStore';
 
 const app = initializeApp(firebaseConfig);
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
+
+let firestoreInstance: any;
+const dbId = firebaseConfig.firestoreDatabaseId;
+
+const initAttempts = [
+  // Attempt 1: Custom DB + Long Polling + Persistent Local Cache (Ideal setup for our custom db inside iframes)
+  () => initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  }, dbId),
+
+  // Attempt 2: Custom DB + Long Polling only (If persistent cache is blocked by browser/iframe policy)
+  () => initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  }, dbId),
+
+  // Attempt 3: Custom DB + standard getFirestore (Standard fallback for custom db)
+  () => getFirestore(app, dbId),
+
+  // Attempt 4: Default DB + Long Polling + Persistent Local Cache (If custom DB doesn't exist, try default DB)
+  () => initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
   }),
-}, firebaseConfig.firestoreDatabaseId);
+
+  // Attempt 5: Default DB + Long Polling only
+  () => initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  }),
+
+  // Attempt 6: Default DB standard getFirestore (Absolute baseline)
+  () => getFirestore(app)
+];
+
+for (let i = 0; i < initAttempts.length; i++) {
+  try {
+    firestoreInstance = initAttempts[i]();
+    if (firestoreInstance) {
+      console.log(`Firestore successfully initialized on Attempt ${i + 1}`);
+      break;
+    }
+  } catch (err) {
+    console.warn(`Firestore initialization Attempt ${i + 1} failed:`, err);
+  }
+}
+
+if (!firestoreInstance) {
+  try {
+    firestoreInstance = getFirestore(app);
+  } catch (criticalErr) {
+    console.error("All Firestore initialization attempts failed!", criticalErr);
+  }
+}
+
+export const db = firestoreInstance;
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

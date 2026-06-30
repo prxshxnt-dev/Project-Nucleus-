@@ -131,11 +131,29 @@ async function startServer() {
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       const firebaseApp = initializeApp(config);
-      const rawDb = initializeFirestore(firebaseApp, {
-        experimentalForceLongPolling: true
-      }, config.firestoreDatabaseId);
-      db = new FirestoreWrapper(rawDb);
-      console.log("Backend Firestore Client SDK initialized successfully with project ID:", config.projectId);
+      
+      let rawDb: any = null;
+      try {
+        rawDb = initializeFirestore(firebaseApp, {
+          experimentalForceLongPolling: true
+        }, config.firestoreDatabaseId);
+      } catch (e1) {
+        console.warn("Backend failed to initialize custom Firestore database, falling back to default database ID:", e1);
+        try {
+          rawDb = initializeFirestore(firebaseApp, {
+            experimentalForceLongPolling: true
+          });
+        } catch (e2) {
+          console.error("Critical: Backend failed to initialize any Firestore database instance:", e2);
+        }
+      }
+      
+      if (rawDb) {
+        db = new FirestoreWrapper(rawDb);
+        console.log("Backend Firestore Client SDK initialized successfully with project ID:", config.projectId);
+      } else {
+        console.error("Backend Firestore Client SDK initialization yielded null database reference.");
+      }
     } else {
       console.warn("Backend Firebase config file not found.");
     }
