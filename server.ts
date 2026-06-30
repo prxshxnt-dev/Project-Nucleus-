@@ -479,18 +479,20 @@ async function startServer() {
         reason = "SMTP credentials missing or unconfigured on workspace/database.";
       }
 
-      // Always return simulated state as well (or backup details) so student can read from simulation mode instantly!
-      console.log(`[OTP DISPATCH SIMULATOR] Email: '${emailClean}' | OTP Code: '${otp}'`);
+      if (!emailSent) {
+        return res.status(400).json({
+          success: false,
+          error: `Failed to deliver verification code email: ${reason || "SMTP server error"}. Please check your SMTP configuration in the Admin Dashboard or try again.`
+        });
+      }
+
+      console.log(`[OTP DISPATCH REAL] Email: '${emailClean}' | OTP Code: '${otp}' successfully dispatched.`);
       
       const obfuscatedEmail = emailClean.replace(/(.{2})(.*)(@.*)/, "$1***$3");
       return res.json({
         success: true,
-        simulated: !emailSent,
-        otp: otp,
         email: emailClean,
-        message: emailSent
-          ? `A secure verification code has been dispatched to your email: ${obfuscatedEmail}`
-          : `[Simulation Mode] Verification code generated! Check server console log or developer tools.`
+        message: `A secure verification code has been dispatched to your email: ${obfuscatedEmail}`
       });
     } catch (err: any) {
       console.error("OTP Send error:", err);
@@ -533,7 +535,7 @@ async function startServer() {
 
       const verified = await verifyOtpCode(emailClean, otp, type);
 
-      if (verified || otp === "123456") {
+      if (verified) {
         return res.json({ success: true, message: "Verification completed successfully." });
       } else {
         return res.status(400).json({ error: "Invalid or expired verification PIN. Please request a new one." });
@@ -566,10 +568,7 @@ async function startServer() {
       }
 
       if (!validated) {
-        // Sandbox bypass for 123456
-        if (otp !== "123456") {
-          return res.status(400).json({ error: "Invalid or expired verification PIN code." });
-        }
+        return res.status(400).json({ error: "Invalid or expired verification PIN code." });
       }
 
       // Check for duplicates
@@ -676,7 +675,7 @@ async function startServer() {
       // 1. Verify OTP matching strictly email
       let validated = await verifyOtpCode(emailClean, otp, "login");
 
-      if (!validated && otp !== "123456") {
+      if (!validated) {
         return res.status(400).json({ error: "Invalid or expired verification OTP." });
       }
 
@@ -832,14 +831,11 @@ async function startServer() {
       }
 
       if (emailSent) {
-        return res.json({ success: true, message: `A password reset PIN was sent to ${emailClean}.` });
+        return res.json({ success: true, message: `A password reset PIN was sent to your email address: ${emailClean}.` });
       } else {
-        console.log(`[SIMULATOR RESET PIN] Sent to: ${emailClean}. OTP: ${otp}`);
-        return res.json({
-          success: true,
-          simulated: true,
-          otp: otp,
-          message: `[Sandbox Mode] Reset PIN (${otp}) simulated for ${emailClean}.`
+        return res.status(400).json({
+          success: false,
+          error: "Failed to send password reset code. Please ensure the email SMTP system is configured properly on the Admin Dashboard."
         });
       }
     } catch (err: any) {
@@ -857,7 +853,7 @@ async function startServer() {
       const emailClean = email.toLowerCase().trim();
 
       const validated = await verifyOtpCode(emailClean, otp, "reset");
-      if (!validated && otp !== "123456") {
+      if (!validated) {
         return res.status(400).json({ error: "Incorrect or expired reset PIN." });
       }
 

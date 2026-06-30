@@ -32,8 +32,6 @@ export default function ForgotPassword() {
   // Inline OTP states for Forgot Password
   const [isOtpMode, setIsOtpMode] = useState(false);
   const [enteredOtp, setEnteredOtp] = useState('');
-  const [simulatedOtpCode, setSimulatedOtpCode] = useState<string | null>(null);
-  const [isSimulated, setIsSimulated] = useState(false);
   const [cooldown, setCooldown] = useState(60);
   const [isResending, setIsResending] = useState(false);
   const [alreadyHaveOtp, setAlreadyHaveOtp] = useState(false);
@@ -105,8 +103,6 @@ export default function ForgotPassword() {
         toast.success(data.message || 'Verification email dispatched successfully!');
         
         // Keep state and enter Forgot Password OTP verification inline mode
-        setSimulatedOtpCode(data.otp || null);
-        setIsSimulated(!!data.simulated);
         setCooldown(60);
         setIsOtpMode(true);
       } catch (err: any) {
@@ -169,9 +165,6 @@ export default function ForgotPassword() {
 
       toast.success(data.message || 'Verification PIN sent successfully!');
       setCooldown(60);
-      
-      setSimulatedOtpCode(data.otp || null);
-      setIsSimulated(!!data.simulated);
     } catch (err: any) {
       toast.error(err.message || 'Failed to resend. Please try again.');
     } finally {
@@ -311,31 +304,6 @@ export default function ForgotPassword() {
                         Enter the verification code sent to <strong className="text-[#1F1F1F] font-bold block mt-0.5">{email}</strong>
                       </p>
                     </div>
-
-                    {/* Sandbox Info */}
-                    {isSimulated && simulatedOtpCode && (
-                      <div className="p-3.5 bg-[#FFFAEB] border border-[#FFE082] rounded-2xl text-center space-y-2">
-                        <p className="text-[10px] text-[#856404] font-medium leading-relaxed">
-                          🔑 <strong>Sandbox / Simulation Mode</strong>:<br />
-                          Copy the dynamic custom PIN to continue:
-                        </p>
-                        <div className="flex items-center justify-center gap-2">
-                          <span className="font-mono text-sm font-black text-primary tracking-widest px-2.5 py-0.5 bg-white border border-primary/20 rounded-md">
-                            {simulatedOtpCode}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEnteredOtp(simulatedOtpCode);
-                              toast.success("Security PIN auto-filled successfully!");
-                            }}
-                            className="px-2 py-0.5 text-[10px] bg-primary hover:bg-primary/95 text-white rounded-md font-bold transition-all duration-200 shadow-sm"
-                          >
-                            Auto-fill PIN
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                     <form onSubmit={handleVerifyOtp} className="space-y-5">
                       <div>

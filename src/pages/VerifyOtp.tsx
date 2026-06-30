@@ -51,7 +51,6 @@ export default function VerifyOtp() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [cooldown, setCooldown] = useState(60); // 60s cooldown countdown
-  const [currentSimulatedOtp, setCurrentSimulatedOtp] = useState<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -60,15 +59,6 @@ export default function VerifyOtp() {
     if (!state || (!state.email && !state.phone)) {
       toast.error('Identity detail (Email or Phone) is missing. Starting over.');
       navigate('/signup', { replace: true });
-      return;
-    }
-    if (state.simulated && state.simulatedOtp) {
-      setCurrentSimulatedOtp(state.simulatedOtp);
-    } else if (state.simulatedOtp) {
-      setCurrentSimulatedOtp(state.simulatedOtp);
-    } else {
-      // Default sandbox bypass key
-      setCurrentSimulatedOtp('123456');
     }
   }, [state, navigate]);
 
@@ -90,14 +80,6 @@ export default function VerifyOtp() {
     }
   }, []);
 
-  // Log simulated OTP quietly to console for easy developer bypass without visual noise in UI
-  useEffect(() => {
-    if (currentSimulatedOtp) {
-      console.log(`[STATION PROTOCOL SIMULATION]: Received dynamic verification code: ${currentSimulatedOtp}`);
-    }
-  }, [currentSimulatedOtp]);
-
-  // Handle Box Keyboard Typing Input
   const handleChange = (index: number, value: string) => {
     if (isNaN(Number(value))) return; // only digits permitted
 
@@ -154,14 +136,6 @@ export default function VerifyOtp() {
     }
   };
 
-  const handleAutoFill = () => {
-    if (currentSimulatedOtp && currentSimulatedOtp.length === 6) {
-      setOtp(currentSimulatedOtp.split(''));
-      toast.success("Security PIN auto-filled successfully!");
-    }
-  };
-
-  // Resend OTP trigger
   const handleResend = async () => {
     if (cooldown > 0 || isResending) return;
 
@@ -180,17 +154,6 @@ export default function VerifyOtp() {
 
       toast.success(data.message || 'Verification PIN sent successfully!');
       setCooldown(60); // reset cooldown limit
-      
-      if (data.simulated && data.otp) {
-        setCurrentSimulatedOtp(data.otp);
-        if (state) {
-          const updatedState = { ...state, simulatedOtp: data.otp, simulated: true };
-          setState(updatedState);
-          sessionStorage.setItem('temp_otp_state', JSON.stringify(updatedState));
-        }
-      } else {
-        setCurrentSimulatedOtp(null);
-      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to trigger OTP delivery.');
     } finally {
@@ -240,29 +203,6 @@ export default function VerifyOtp() {
         }
 
         if (!response.ok) {
-          // Robust client-side registration fallback for sandbox
-          if (joinedOtp === currentSimulatedOtp || joinedOtp === '123456') {
-            console.warn("API register failed. Falling back to local offline user session initialization.");
-            const simulatedUser = {
-              uid: "simulated-" + Math.random().toString(36).substring(2, 11),
-              email: state.email,
-              phone: state.phone || '',
-              displayName: state.name || 'Student Member',
-              role: "student" as const,
-              planId: "free" as const,
-              classGroup: state.classGroup || "11",
-              streak: 4,
-              todayStudyMinutes: 30
-            };
-            localStorage.setItem('currentUser', JSON.stringify(simulatedUser));
-            localStorage.setItem('accessToken', "simulated-token-jwt-" + Date.now());
-            localStorage.setItem('isLoggedIn', 'true');
-            setUser(simulatedUser);
-            setLoading(false);
-            toast.success(`Welcome to Nucleus Coaching, ${simulatedUser.displayName}! (Sandbox Mode)`);
-            navigate('/select-standard', { replace: true });
-            return;
-          }
           throw new Error(data.error || 'Account Registration verification failed.');
         }
 
@@ -304,29 +244,6 @@ export default function VerifyOtp() {
         }
 
         if (!response.ok) {
-          // Passwordless OTP login fallback
-          if (joinedOtp === currentSimulatedOtp || joinedOtp === '123456') {
-            console.warn("API login failed. Falling back to local offline user session login.");
-            const simulatedUser = {
-              uid: "simulated-student-" + Date.now(),
-              email: state.email,
-              phone: state.phone || '',
-              displayName: state.email.split('@')[0],
-              role: "student" as const,
-              planId: "free" as const,
-              classGroup: state.classGroup || "11",
-              streak: 4,
-              todayStudyMinutes: 30
-            };
-            localStorage.setItem('currentUser', JSON.stringify(simulatedUser));
-            localStorage.setItem('accessToken', "simulated-token-jwt-" + Date.now());
-            localStorage.setItem('isLoggedIn', 'true');
-            setUser(simulatedUser);
-            setLoading(false);
-            toast.success(`Welcome back, ${simulatedUser.displayName}! (Sandbox Mode)`);
-            navigate('/dashboard', { replace: true });
-            return;
-          }
           throw new Error(data.error || 'Identity Verification failed.');
         }
 
@@ -367,17 +284,6 @@ export default function VerifyOtp() {
         }
 
         if (!response.ok) {
-          if (joinedOtp === currentSimulatedOtp || joinedOtp === '123456') {
-            toast.success('Security identity verified. Set your new password. (Sandbox Mode)');
-            navigate('/forgot-password', { 
-              state: { 
-                email: state.email,
-                otp: joinedOtp,
-                verified: true
-              } 
-            });
-            return;
-          }
           throw new Error(data.error || 'Password Reset Verification failed.');
         }
 
@@ -428,28 +334,6 @@ export default function VerifyOtp() {
             {state?.phone && <span className="block mt-0.5 font-bold text-black">{state.phone}</span>}
           </p>
         </div>
-
-        {/* Sandbox Info */}
-        {currentSimulatedOtp && (
-          <div className="mb-6 p-4 bg-[#FFFAEB] border border-[#FFE082] rounded-2xl text-center space-y-2">
-            <p className="text-xs text-[#856404] font-medium leading-relaxed">
-              🔑 <strong className="font-bold">Sandbox / Simulation Mode</strong>:<br />
-              Since SMTP email credentials are unconfigured or failed to send, you can use the code below to verify your account:
-            </p>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <span className="font-mono text-lg font-black text-primary tracking-widest px-3 py-1 bg-white border border-primary/20 rounded-xl shadow-sm">
-                {currentSimulatedOtp}
-              </span>
-              <button
-                type="button"
-                onClick={handleAutoFill}
-                className="px-3 py-1.5 text-xs bg-primary hover:bg-[#3730A3] text-white rounded-xl font-bold transition-all duration-200 shadow-sm"
-              >
-                Auto-fill PIN
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Verification Form */}
         <form onSubmit={handleVerify} className="space-y-6">

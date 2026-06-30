@@ -221,19 +221,7 @@ export default function Login() {
       }
 
       if (!response.ok || !data.success) {
-        const simulatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-        console.log(`[LOGIN OTP FALLBACK] Dynamic simulation bypass code generated: ${simulatedCode}`);
-        toast.info("Using local sandbox verification backup for login.");
-        
-        navigate('/verify-otp', {
-          state: {
-            email: targetClean.toLowerCase(),
-            type: 'login',
-            simulated: true,
-            simulatedOtp: simulatedCode
-          }
-        });
-        return;
+        throw new Error(data.error || 'Failed to send verification code.');
       }
 
       toast.success(data.message || 'Verification login PIN dispatched!');
@@ -242,23 +230,11 @@ export default function Login() {
       navigate('/verify-otp', {
         state: {
           email: targetClean.toLowerCase(),
-          type: 'login',
-          simulated: !!data.simulated,
-          simulatedOtp: data.otp || null
+          type: 'login'
         }
       });
     } catch (err: any) {
-      // Ultimately fallback in case of complete API/Server down to let user log in simulated
-      const simulatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      toast.info("Entering login bypass simulation session.");
-      navigate('/verify-otp', {
-        state: {
-          email: targetClean.toLowerCase(),
-          type: 'login',
-          simulated: true,
-          simulatedOtp: simulatedCode
-        }
-      });
+      toast.error(err.message || 'An error occurred during OTP request.');
     } finally {
       setIsSubmitting(false);
     }

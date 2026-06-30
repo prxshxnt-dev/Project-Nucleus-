@@ -195,24 +195,7 @@ export default function Signup() {
       }
 
       if (!response.ok || !data.success) {
-        // Fall back gracefully to simulation mode with a randomized 6-digit PIN
-        const simulatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-        console.log(`[SIGNUP FALLBACK] Active offline registration bypass code generated: ${simulatedCode}`);
-        toast.info("Switched to high-reliability local sandbox verification mode.");
-        
-        navigate('/verify-otp', {
-          state: {
-            email: email.toLowerCase().trim(),
-            phone: phone.trim(),
-            name: name.trim(),
-            password: password,
-            classGroup: classGroup,
-            type: 'register',
-            simulated: true,
-            simulatedOtp: simulatedCode
-          }
-        });
-        return;
+        throw new Error(data.error || 'Failed to dispatch verification security code.');
       }
 
       toast.success(data.message || 'Verification PIN sent successfully!');
@@ -225,9 +208,7 @@ export default function Signup() {
           name: name.trim(),
           password: password,
           classGroup: classGroup,
-          type: 'register',
-          simulated: !!data.simulated,
-          simulatedOtp: data.otp || null
+          type: 'register'
         }
       });
     } catch (err: any) {
@@ -246,21 +227,7 @@ export default function Signup() {
           }
         });
       } else {
-        // Safe sandbox fallback as a ultimate backup in case of complete network/server crash
-        const simulatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-        toast.info("Entering resilient offline simulation session.");
-        navigate('/verify-otp', {
-          state: {
-            email: email.toLowerCase().trim(),
-            phone: phone.trim(),
-            name: name.trim(),
-            password: password,
-            classGroup: classGroup,
-            type: 'register',
-            simulated: true,
-            simulatedOtp: simulatedCode
-          }
-        });
+        toast.error(errMsg || 'An error occurred during registration. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
