@@ -154,6 +154,13 @@ export default function VerifyOtp() {
     }
   };
 
+  const handleAutoFill = () => {
+    if (currentSimulatedOtp && currentSimulatedOtp.length === 6) {
+      setOtp(currentSimulatedOtp.split(''));
+      toast.success("Security PIN auto-filled successfully!");
+    }
+  };
+
   // Resend OTP trigger
   const handleResend = async () => {
     if (cooldown > 0 || isResending) return;
@@ -328,6 +335,28 @@ export default function VerifyOtp() {
             {state?.phone && <span className="block mt-0.5 font-bold text-black">{state.phone}</span>}
           </p>
         </div>
+
+        {/* Sandbox Info */}
+        {currentSimulatedOtp && (
+          <div className="mb-6 p-4 bg-[#FFFAEB] border border-[#FFE082] rounded-2xl text-center space-y-2">
+            <p className="text-xs text-[#856404] font-medium leading-relaxed">
+              🔑 <strong className="font-bold">Sandbox / Simulation Mode</strong>:<br />
+              Since SMTP email credentials are unconfigured or failed to send, you can use the code below to verify your account:
+            </p>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <span className="font-mono text-lg font-black text-primary tracking-widest px-3 py-1 bg-white border border-primary/20 rounded-xl shadow-sm">
+                {currentSimulatedOtp}
+              </span>
+              <button
+                type="button"
+                onClick={handleAutoFill}
+                className="px-3 py-1.5 text-xs bg-primary hover:bg-[#3730A3] text-white rounded-xl font-bold transition-all duration-200 shadow-sm"
+              >
+                Auto-fill PIN
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Verification Form */}
         <form onSubmit={handleVerify} className="space-y-6">
