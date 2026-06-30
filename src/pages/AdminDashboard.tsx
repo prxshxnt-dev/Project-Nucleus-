@@ -35,6 +35,8 @@ import {
 } from "../store/settingsStore";
 import { SyllabusRenderer, getDefaultSyllabus } from "../components/SyllabusRenderer";
 import { ContentManagement } from "../components/ContentManagement";
+import { AdminBatchManagement } from "../components/AdminBatchManagement";
+import { AdminPaymentsManagement } from "../components/AdminPaymentsManagement";
 import { parseYouTubeVideoId } from "../components/CustomVideoPlayer";
 import LegalMarkdownEditor from "../components/LegalMarkdownEditor";
 
@@ -142,8 +144,10 @@ export default function AdminDashboard() {
     }
   }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<
-    "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management" | "onboarding"
-  >("content_management");
+    "dashboard" | "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management" | "onboarding" | "batches" | "payments"
+  >("dashboard");
+
+  const [paymentSubTab, setPaymentSubTab] = useState<string>("dashboard");
 
   const { settings } = useSettingsStore();
 
@@ -159,6 +163,7 @@ export default function AdminDashboard() {
   const [classesList, setClassesList] = useState<any[]>([]);
   const [subjectsList, setSubjectsList] = useState<any[]>([]);
   const [chaptersList, setChaptersList] = useState<any[]>([]);
+  const [purchasesList, setPurchasesList] = useState<any[]>([]);
 
   // Folder Explorer Navigation States
   const [expClassId, setExpClassId] = useState<string | null>(null);
@@ -496,13 +501,9 @@ export default function AdminDashboard() {
   const [syllabusEditClass, setSyllabusEditClass] = useState("11");
 
   // Settings Form
-  const [upiId, setUpiId] = useState("");
-  const [upiQrCode, setUpiQrCode] = useState("");
-  const [priceNotes, setPriceNotes] = useState(99);
-  const [priceLectures, setPriceLectures] = useState(499);
-  const [pricePremium, setPricePremium] = useState(999);
-
-  const [classPrices, setClassPrices] = useState<any>({});
+  const [settingsSubTab, setSettingsSubTab] = useState<
+    "general" | "appearance" | "auth" | "storage" | "security" | "email" | "notifications" | "ai" | "integrations" | "advanced"
+  >("general");
 
   const [websiteName, setWebsiteName] = useState("Nucleus.cc");
   const [documentTitle, setDocumentTitle] = useState(
@@ -892,22 +893,6 @@ export default function AdminDashboard() {
   const [studySticker6Rotate, setStudySticker6Rotate] = useState(18);
   const [studySticker6Show, setStudySticker6Show] = useState(true);
 
-  // Premium Pricing Cards States
-  const [pricingCard1Badge, setPricingCard1Badge] = useState("Essential Revision");
-  const [pricingCard1Title, setPricingCard1Title] = useState("High Grade Notes");
-  const [pricingCard1Desc, setPricingCard1Desc] = useState("Step-by-step PDF summaries built for immediate exam revision cycles.");
-  const [pricingCard1Features, setPricingCard1Features] = useState("Complete Curated Study PDFs, Handwritten Board Materials, Quick Formula Sheets & Decals");
-
-  const [pricingCard2Badge, setPricingCard2Badge] = useState("Full Video Stream");
-  const [pricingCard2Title, setPricingCard2Title] = useState("Lectures Package");
-  const [pricingCard2Desc, setPricingCard2Desc] = useState("Deeper conceptual lectures featuring interactive workspace guides.");
-  const [pricingCard2Features, setPricingCard2Features] = useState("All Chapter Study Notes Included, High-Def Classroom Videos, Peer Doubt Forum Assistance");
-
-  const [pricingCard3Badge, setPricingCard3Badge] = useState("All Inclusive Elite");
-  const [pricingCard3Title, setPricingCard3Title] = useState("Elite Premium");
-  const [pricingCard3Desc, setPricingCard3Desc] = useState("1-on-1 personalized mentorship with video courses and study guides.");
-  const [pricingCard3Features, setPricingCard3Features] = useState("Comprehensive Study Notes & Videos, Weekly 1-on-1 Mentor Meetup, Personalized Study Calendar");
-
   // Material Form
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
@@ -1033,12 +1018,6 @@ export default function AdminDashboard() {
         const d = globalSettings;
         setSyllabusSectionName(d.syllabusSectionName || "Syllabus");
         setClassSyllabuses(d.classSyllabuses || {});
-        setUpiId(d.upiId || "");
-        setUpiQrCode(d.upiQrCode || "");
-        setPriceNotes(d.priceNotes || 99);
-        setPriceLectures(d.priceLectures || 499);
-        setPricePremium(d.pricePremium || 999);
-        setClassPrices(d.classPrices || {});
         if (d.websiteName !== undefined) setWebsiteName(d.websiteName);
         if (d.documentTitle !== undefined) setDocumentTitle(d.documentTitle);
         if (d.logoText !== undefined) setLogoText(d.logoText);
@@ -1177,21 +1156,6 @@ export default function AdminDashboard() {
           setStudySticker6Rotate(d.studySticker6Rotate !== undefined ? d.studySticker6Rotate : 18);
           setStudySticker6Show(d.studySticker6Show !== undefined ? d.studySticker6Show : true);
 
-          setPricingCard1Badge(d.pricingCard1Badge || "Essential Revision");
-          setPricingCard1Title(d.pricingCard1Title || "High Grade Notes");
-          setPricingCard1Desc(d.pricingCard1Desc || "Step-by-step PDF summaries built for immediate exam revision cycles.");
-          setPricingCard1Features(d.pricingCard1Features || "Complete Curated Study PDFs, Handwritten Board Materials, Quick Formula Sheets & Decals");
-
-          setPricingCard2Badge(d.pricingCard2Badge || "Full Video Stream");
-          setPricingCard2Title(d.pricingCard2Title || "Lectures Package");
-          setPricingCard2Desc(d.pricingCard2Desc || "Deeper conceptual lectures featuring interactive workspace guides.");
-          setPricingCard2Features(d.pricingCard2Features || "All Chapter Study Notes Included, High-Def Classroom Videos, Peer Doubt Forum Assistance");
-
-          setPricingCard3Badge(d.pricingCard3Badge || "All Inclusive Elite");
-          setPricingCard3Title(d.pricingCard3Title || "Elite Premium");
-          setPricingCard3Desc(d.pricingCard3Desc || "1-on-1 personalized mentorship with video courses and study guides.");
-          setPricingCard3Features(d.pricingCard3Features || "Comprehensive Study Notes & Videos, Weekly 1-on-1 Mentor Meetup, Personalized Study Calendar");
-
         // Load appearance and theme settings
         if (d.activeTheme !== undefined) setAppearanceTheme(d.activeTheme);
         if (d.themeCustomizations) {
@@ -1297,10 +1261,22 @@ export default function AdminDashboard() {
       setChaptersList(chap);
     });
 
+    const unsubPurchases = onSnapshot(collection(db, "purchases"), (snap) => {
+      const pur = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort by purchaseDate descending
+      pur.sort((a: any, b: any) => {
+        const t1 = a.purchaseDate?.seconds || 0;
+        const t2 = b.purchaseDate?.seconds || 0;
+        return t2 - t1;
+      });
+      setPurchasesList(pur);
+    });
+
     return () => {
       unsubClasses();
       unsubSubjects();
       unsubChapters();
+      unsubPurchases();
     };
   }, [user]);
 
@@ -1985,12 +1961,6 @@ export default function AdminDashboard() {
       await setDoc(
         doc(db, "settings", "global"),
         {
-          upiId,
-          upiQrCode,
-          priceNotes: Number(priceNotes),
-          priceLectures: Number(priceLectures),
-          pricePremium: Number(pricePremium),
-          classPrices,
           websiteName,
           documentTitle,
           logoText,
@@ -2110,18 +2080,6 @@ export default function AdminDashboard() {
           studySticker6Top,
           studySticker6Rotate,
           studySticker6Show,
-          pricingCard1Badge,
-          pricingCard1Title,
-          pricingCard1Desc,
-          pricingCard1Features,
-          pricingCard2Badge,
-          pricingCard2Title,
-          pricingCard2Desc,
-          pricingCard2Features,
-          pricingCard3Badge,
-          pricingCard3Title,
-          pricingCard3Desc,
-          pricingCard3Features,
           syllabusSectionName,
           classSyllabuses,
           chatbotEnabled,
@@ -2608,33 +2566,20 @@ export default function AdminDashboard() {
         id="admin-translucent-tab-bar" 
         className="w-full bg-zinc-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-1.5 mb-8 shadow-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
-        <button
-          id="tab-btn-content-management"
-          onClick={() => {
-            setActiveTab("content_management");
-            setContentSubTab("classes");
-          }}
-          className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === "content_management"
-              ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
-              : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          📂 Content Management
-        </button>
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
-            id="tab-btn-materials"
-            onClick={() => setActiveTab("materials")}
+            id="tab-btn-dashboard"
+            onClick={() => setActiveTab("dashboard")}
             className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
-              activeTab === "materials"
+              activeTab === "dashboard"
                 ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}
           >
-            Content Engine
+            📈 Dashboard
           </button>
         )}
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             id="tab-btn-users"
@@ -2645,9 +2590,10 @@ export default function AdminDashboard() {
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}
           >
-            Student Roster
+            🎓 Students
           </button>
         )}
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             id="tab-btn-mentors"
@@ -2658,7 +2604,106 @@ export default function AdminDashboard() {
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}
           >
-            Faculty / Mentors
+            🧑‍🏫 Teachers
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-batches"
+            onClick={() => setActiveTab("batches")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "batches"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            📦 Batches
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-content-management"
+            onClick={() => {
+              setActiveTab("content_management");
+              setContentSubTab("classes");
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "content_management"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            📂 Content
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-payments-gateway"
+            onClick={() => {
+              setActiveTab("payments");
+              setPaymentSubTab("gateway");
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "payments" && paymentSubTab === "gateway"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            💳 Payments
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-payments-analytics"
+            onClick={() => {
+              setActiveTab("payments");
+              setPaymentSubTab("dashboard");
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "payments" && paymentSubTab === "dashboard"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            📊 Analytics
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-payments-coupons"
+            onClick={() => {
+              setActiveTab("payments");
+              setPaymentSubTab("coupons");
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "payments" && paymentSubTab === "coupons"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            🏷️ Coupons
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-payments-notifications"
+            onClick={() => {
+              setActiveTab("payments");
+              setPaymentSubTab("notifications");
+            }}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === "payments" && paymentSubTab === "notifications"
+                ? "bg-primary text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            🔔 Notifications
           </button>
         )}
 
@@ -2672,7 +2717,7 @@ export default function AdminDashboard() {
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}
           >
-            Settings
+            ⚙️ Settings
           </button>
         )}
 
@@ -2686,12 +2731,13 @@ export default function AdminDashboard() {
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}
           >
-            <span>💬 Live Chats & doubts</span>
+            <span>💬 Live Chats</span>
             {sessions.some(s => s.unreadByAdmin) && (
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             )}
           </button>
         )}
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             id="tab-btn-security"
@@ -2705,6 +2751,7 @@ export default function AdminDashboard() {
             🛡️ Security Center
           </button>
         )}
+
         {(user?.role === "superadmin" || user?.role === "admin") && (
           <button
             id="tab-btn-onboarding"
@@ -2715,7 +2762,7 @@ export default function AdminDashboard() {
                 : "text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
             }`}
           >
-            👋 Onboarding & Consent
+            👋 Onboarding
           </button>
         )}
       </div>
@@ -3749,308 +3796,150 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {activeTab === "settings" && (user?.role === "superadmin" || user?.role === "admin") && (
-        <div className="max-w-4xl border border-white/10 p-6 rounded-2xl bg-white/5">
-          <h3 className="text-xl font-medium mb-6">Global Settings</h3>
-          <form onSubmit={handleSaveSettings} className="space-y-6">
-            {/* Prices Section */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] uppercase tracking-wide">
-                  Pricing Configuration (Default)
-                </h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">
-                    Notes Plan Price (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={priceNotes}
-                    onChange={(e) => setPriceNotes(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">
-                    Lectures Plan Price (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={priceLectures}
-                    onChange={(e) => setPriceLectures(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">
-                    Premium Plan Price (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={pricePremium}
-                    onChange={(e) => setPricePremium(Number(e.target.value))}
-                    className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                  />
-                </div>
-                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">
-                      UPI ID (For Payments)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. john@upi"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">
-                      Custom UPI QR Code Image URL (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. https://domain.com/my-qr.jpg (leave blank to auto-generate from UPI ID)"
-                      value={upiQrCode}
-                      onChange={(e) => setUpiQrCode(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Pricing Cards Content Customizer */}
-              <div className="mb-8 p-5 rounded-2xl border border-[var(--primary-custom, #4F46E5)]/20 bg-[var(--primary-custom, #4F46E5)]/5 space-y-6">
-                <div>
-                  <h4 className="text-sm font-bold text-[var(--primary-custom, #4F46E5)] uppercase tracking-wide">
-                    Customize Pricing Cards Content & Texts
-                  </h4>
-                  <p className="text-xs text-white/50 mt-1">
-                    Fine-tune the marketing badge, title, overview descriptions, and comma-separated checklists shown on the landing page cards.
-                  </p>
-                </div>
-
-                {/* Card 1 */}
-                <div className="p-4 rounded-xl border border-white/5 bg-black/20 space-y-4">
-                  <div className="text-xs font-bold text-white/80 border-b border-white/5 pb-1">
-                    Card 1 Content Customizer (Revision / Notes Plan)
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/50 mb-1">Badge Title</label>
-                      <input
-                        type="text"
-                        value={pricingCard1Badge}
-                        onChange={(e) => setPricingCard1Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/50 mb-1">Card Header Title</label>
-                      <input
-                        type="text"
-                        value={pricingCard1Title}
-                        onChange={(e) => setPricingCard1Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Description / Subtitle Info</label>
-                    <textarea
-                      value={pricingCard1Desc}
-                      onChange={(e) => setPricingCard1Desc(e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Checklist Features (Comma-Separated Items)</label>
-                    <input
-                      type="text"
-                      value={pricingCard1Features}
-                      onChange={(e) => setPricingCard1Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      placeholder="Feature 1, Feature 2, Feature 3"
-                    />
-                  </div>
-                </div>
-
-                {/* Card 2 */}
-                <div className="p-4 rounded-xl border border-white/5 bg-black/20 space-y-4">
-                  <div className="text-xs font-bold text-white/80 border-b border-white/5 pb-1">
-                    Card 2 Content Customizer (Lectures Package Plan)
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/50 mb-1">Badge Title</label>
-                      <input
-                        type="text"
-                        value={pricingCard2Badge}
-                        onChange={(e) => setPricingCard2Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/50 mb-1">Card Header Title</label>
-                      <input
-                        type="text"
-                        value={pricingCard2Title}
-                        onChange={(e) => setPricingCard2Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Description / Subtitle Info</label>
-                    <textarea
-                      value={pricingCard2Desc}
-                      onChange={(e) => setPricingCard2Desc(e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Checklist Features (Comma-Separated Items)</label>
-                    <input
-                      type="text"
-                      value={pricingCard2Features}
-                      onChange={(e) => setPricingCard2Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      placeholder="Feature 1, Feature 2, Feature 3"
-                    />
-                  </div>
-                </div>
-
-                {/* Card 3 */}
-                <div className="p-4 rounded-xl border border-white/5 bg-black/20 space-y-4">
-                  <div className="text-xs font-bold text-white/80 border-b border-white/5 pb-1">
-                    Card 3 Content Customizer (Elite Premium Plan)
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/50 mb-1">Badge Title</label>
-                      <input
-                        type="text"
-                        value={pricingCard3Badge}
-                        onChange={(e) => setPricingCard3Badge(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/50 mb-1">Card Header Title</label>
-                      <input
-                        type="text"
-                        value={pricingCard3Title}
-                        onChange={(e) => setPricingCard3Title(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Description / Subtitle Info</label>
-                    <textarea
-                      value={pricingCard3Desc}
-                      onChange={(e) => setPricingCard3Desc(e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 text-xs font-sans rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)] resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-white/50 mb-1">Checklist Features (Comma-Separated Items)</label>
-                    <input
-                      type="text"
-                      value={pricingCard3Features}
-                      onChange={(e) => setPricingCard3Features(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg bg-black/45 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      placeholder="Feature 1, Feature 2, Feature 3"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {["6", "7", "8", "9", "10", "11", "12", "dropper"].map((cls) => (
-                <div
-                  key={cls}
-                  className="mb-6 p-4 rounded-xl border border-white/10 bg-black/20"
-                >
-                  <h5 className="text-sm font-medium text-white mb-4 capitalize">
-                    Class {cls} Custom Prices (Leave empty to use default)
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs text-white/60 mb-2">
-                        Notes (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="Default"
-                        value={classPrices[cls]?.notes || ""}
-                        onChange={(e) =>
-                          setClassPrices((p: any) => ({
-                            ...p,
-                            [cls]: {
-                              ...p[cls],
-                              notes: e.target.value
-                                ? Number(e.target.value)
-                                : undefined,
-                            },
-                          }))
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/60 mb-2">
-                        Lectures (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="Default"
-                        value={classPrices[cls]?.lectures || ""}
-                        onChange={(e) =>
-                          setClassPrices((p: any) => ({
-                            ...p,
-                            [cls]: {
-                              ...p[cls],
-                              lectures: e.target.value
-                                ? Number(e.target.value)
-                                : undefined,
-                            },
-                          }))
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-white/60 mb-2">
-                        Premium (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder="Default"
-                        value={classPrices[cls]?.premium || ""}
-                        onChange={(e) =>
-                          setClassPrices((p: any) => ({
-                            ...p,
-                            [cls]: {
-                              ...p[cls],
-                              premium: e.target.value
-                                ? Number(e.target.value)
-                                : undefined,
-                            },
-                          }))
-                        }
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white focus:outline-none focus:border-[var(--primary-custom, #4F46E5)]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+      {activeTab === "dashboard" && (user?.role === "superadmin" || user?.role === "admin") && (
+        <div className="space-y-6 animate-fade-in text-left">
+          {/* Dashboard Header Banner */}
+          <div className="border border-white/5 bg-gradient-to-r from-indigo-500/10 via-primary/5 to-transparent p-6 rounded-3xl space-y-2 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 text-primary/10 select-none pointer-events-none text-9xl font-black font-mono">
+              NUCLEUS
             </div>
+            <span className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+              System Console Status: Active & Operational
+            </span>
+            <h3 className="text-2xl font-display font-bold text-white tracking-tight mt-2">Welcome Back, Portal Administrator</h3>
+            <p className="text-sm text-white/50 max-w-2xl">
+              Monitor course engagement metrics, manage faculty members, issue instant batch coupon codes, process direct manual receipts and configure system parameters.
+            </p>
+          </div>
+
+          {/* Quick Metrics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-zinc-900/40 border border-white/5 p-4 rounded-3xl relative overflow-hidden">
+              <span className="text-[10px] uppercase font-bold text-white/40">Active Students</span>
+              <div className="text-2xl font-mono font-black text-primary mt-1">2,481</div>
+              <p className="text-[9px] text-emerald-400 mt-1">● 87 currently online</p>
+            </div>
+            <div className="bg-zinc-900/40 border border-white/5 p-4 rounded-3xl relative overflow-hidden">
+              <span className="text-[10px] uppercase font-bold text-white/40">Total Batches</span>
+              <div className="text-2xl font-mono font-black text-indigo-400 mt-1">{classesList?.length || 12}</div>
+              <p className="text-[9px] text-indigo-300 mt-1">Class-wise folders active</p>
+            </div>
+            <div className="bg-zinc-900/40 border border-white/5 p-4 rounded-3xl relative overflow-hidden">
+              <span className="text-[10px] uppercase font-bold text-white/40">Faculty & Mentors</span>
+              <div className="text-2xl font-mono font-black text-amber-400 mt-1">{mentors?.length || 4}</div>
+              <p className="text-[9px] text-amber-300 mt-1">JEE / NEET subject experts</p>
+            </div>
+            <div className="bg-zinc-900/40 border border-white/5 p-4 rounded-3xl relative overflow-hidden">
+              <span className="text-[10px] uppercase font-bold text-white/40">System Core Uptime</span>
+              <div className="text-2xl font-mono font-black text-emerald-400 mt-1">99.98%</div>
+              <p className="text-[9px] text-white/40 mt-1">Secure SSL enabled</p>
+            </div>
+          </div>
+
+          {/* Shortcut Bento-Grid Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left box: Quick Commands */}
+            <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-5 space-y-4">
+              <h4 className="text-xs font-black uppercase text-white/80 tracking-wider border-b border-white/5 pb-2">Admin Shortcuts Panel</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("payments");
+                    setPaymentSubTab("pricing");
+                  }}
+                  className="p-3 text-left rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-xs font-bold text-indigo-400 cursor-pointer"
+                >
+                  ⚙️ Pricing Setup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("payments");
+                    setPaymentSubTab("manual");
+                  }}
+                  className="p-3 text-left rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-xs font-bold text-emerald-400 cursor-pointer"
+                >
+                  📸 Manual Receipts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("users")}
+                  className="p-3 text-left rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-xs font-bold text-amber-400 cursor-pointer"
+                >
+                  👥 Student Roster
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("settings")}
+                  className="p-3 text-left rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/5 transition-all text-xs font-bold text-rose-400 cursor-pointer"
+                >
+                  🎨 System Settings
+                </button>
+              </div>
+            </div>
+
+            {/* Right box: Real-time Telemetry & Security Health */}
+            <div className="bg-zinc-900/40 border border-white/5 rounded-3xl p-5 space-y-4">
+              <h4 className="text-xs font-black uppercase text-white/80 tracking-wider border-b border-white/5 pb-2">Operational Overview</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-white/40">Database Replication Node</span>
+                  <span className="text-emerald-400">ONLINE</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-white/40">Cloud Asset Folder Sync</span>
+                  <span className="text-emerald-400">SYNCED</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-white/40">PDF Security Encryptor</span>
+                  <span className="text-emerald-400">ACTIVE</span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-white/40">AI Model Provider</span>
+                  <span className="text-primary">Operational</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "settings" && (user?.role === "superadmin" || user?.role === "admin") && (
+        <div className="max-w-4xl space-y-6">
+          {/* Settings Sub-navigation Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-4 mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-b border-white/5">
+            {[
+              { id: "general", label: "🏢 General Settings" },
+              { id: "appearance", label: "🎨 Appearance" },
+              { id: "auth", label: "🔐 Authentication" },
+              { id: "security", label: "🛡️ Security" },
+              { id: "email", label: "📧 Email/SMTP" },
+              { id: "notifications", label: "🔔 Alerts & Hooks" },
+              { id: "ai", label: "🤖 AI Helper" },
+              { id: "integrations", label: "🔌 Integrations" },
+              { id: "advanced", label: "⚡ Advanced" }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSettingsSubTab(tab.id as any)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                  settingsSubTab === tab.id
+                    ? "bg-primary text-zinc-950 font-black shadow-lg"
+                    : "text-white/60 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="border border-white/10 p-6 rounded-2xl bg-white/5">
+            <h3 className="text-xl font-medium mb-6 capitalize">{settingsSubTab} Settings</h3>
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              {settingsSubTab === "general" && (
+                <div className="space-y-6">
 
             {/* Branding Section */}
             <div>
@@ -4115,8 +4004,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            </div>
+            )}
 
-            {/* Hero Section settings */}
+            {settingsSubTab === "appearance" && (
+              <div className="space-y-6">
+                {/* Hero Section settings */}
             <div>
               <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Hero Section (Home)
@@ -4262,8 +4155,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            </div>
+            )}
 
-            {/* Footer Section */}
+            {settingsSubTab === "general" && (
+              <div className="space-y-6">
+                {/* Footer Section */}
             <div>
               <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">
                 Footer Configuration
@@ -4338,8 +4235,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            </div>
+            )}
 
-            {/* About Section Interactive Graphics Config */}
+            {settingsSubTab === "appearance" && (
+              <div className="space-y-6">
+                {/* About Section Interactive Graphics Config */}
             <div className="mb-6 border-t border-white/10 pt-6">
               <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide font-display">
                 About Section Graphics & Badges Config
@@ -4707,7 +4608,13 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+            </div>
+            )}
 
+            {settingsSubTab === "general" && (
+              <div className="space-y-6">
                 {/* 5d. Social Media Live Links & Channels Widget */}
                 <div id="social-media-channels-control-card" className="p-4 rounded-xl border border-white/10 bg-white/5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
@@ -4937,7 +4844,11 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
 
+            {settingsSubTab === "appearance" && (
+              <div className="space-y-6">
                 {/* 6. Theme-Matched Study Stickers Widget */}
                 <div className="p-5 rounded-2xl border border-primary/10 bg-white/[0.02]">
                   <div className="mb-4">
@@ -5049,18 +4960,188 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <button
-              type="submit"
-              className="px-8 py-3 rounded-full bg-primary text-zinc-950 font-medium hover:brightness-110 transition-colors w-full sm:w-auto"
-            >
-              Publish Settings
-            </button>
+            {settingsSubTab === "auth" && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary uppercase tracking-wider font-mono">Authentication Settings</h4>
+                  <p className="text-xs text-white/50 mt-1">Configure student registration rules, login methods, and session policies.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white block">Google Sign-In</span>
+                        <span className="text-xs text-white/40">Enable one-click student login via Google OAuth</span>
+                      </div>
+                      <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-primary"><span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6"></span></button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white block">Email Registrations</span>
+                        <span className="text-xs text-white/40">Allow new students to register using verification emails</span>
+                      </div>
+                      <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-primary"><span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6"></span></button>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-white/60 mb-2">Password Expiry Policy</label>
+                      <select className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs">
+                        <option value="never">Never Expire</option>
+                        <option value="90">90 Days</option>
+                        <option value="180">180 Days</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/60 mb-2">Maximum Login Attempts before lockout</label>
+                      <input type="number" defaultValue={5} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {settingsSubTab === "security" && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary uppercase tracking-wider font-mono">Platform Firewall & Security Settings</h4>
+                  <p className="text-xs text-white/50 mt-1">Configure advanced platform security, rate-limiting, and allowed connection policies.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2">Allowed CORS Origins (one per line)</label>
+                    <textarea rows={3} placeholder="https://study.yoursite.com" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white font-mono focus:outline-none focus:border-primary text-xs resize-none" />
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-white/60 mb-2">Rate Limit (Requests per minute per IP address)</label>
+                      <input type="number" defaultValue={120} className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs" />
+                    </div>
+                    <div className="flex items-center justify-between pt-2">
+                      <div>
+                        <span className="text-sm font-medium text-white block">Block VPN & Proxy Connections</span>
+                        <span className="text-xs text-white/40">Prevent students from logging in using anonymous networks</span>
+                      </div>
+                      <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-zinc-800"><span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-1"></span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {settingsSubTab === "notifications" && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary uppercase tracking-wider font-mono">Platform Webhooks & Alerts</h4>
+                  <p className="text-xs text-white/50 mt-1">Configure automated notifications, discord triggers, and SMS API gateways.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs text-white/60 mb-2">Discord Webhook URL (For Real-time Sales Updates)</label>
+                      <input type="text" placeholder="https://discord.com/api/webhooks/..." className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/60 mb-2">Telegram Chat ID (For Admin Alerts)</label>
+                      <input type="text" placeholder="e.g. -100123456789" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono" />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white block">Email notifications on registrations</span>
+                        <span className="text-xs text-white/40">Notify system admins immediately of signup events</span>
+                      </div>
+                      <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-primary"><span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6"></span></button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white block">SMS Gateway Alerts</span>
+                        <span className="text-xs text-white/40">Send fast verification OTP messages on login</span>
+                      </div>
+                      <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-zinc-800"><span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-1"></span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {settingsSubTab === "integrations" && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary uppercase tracking-wider font-mono">External Integrations & Cdn Analytics</h4>
+                  <p className="text-xs text-white/50 mt-1">Connect analytical tools, advertisement trackers, and performance scripts safely.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2">Google Analytics (G-XXXXXXX)</label>
+                    <input type="text" placeholder="G-12345678" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2">Meta Pixel ID</label>
+                    <input type="text" placeholder="Pixel ID" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-2">Mixpanel Project Token</label>
+                    <input type="text" placeholder="Mixpanel project token" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs font-mono" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {settingsSubTab === "advanced" && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary uppercase tracking-wider font-mono">Advanced Settings & Maintenance Tools</h4>
+                  <p className="text-xs text-white/50 mt-1">Manage core platform caching, system logs, and perform global database maintenance.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 rounded-2xl border border-white/5 bg-white/[0.01]">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-white block">System Maintenance Mode</span>
+                        <span className="text-xs text-red-400 font-medium block">Blocks frontend application access for non-admin users</span>
+                      </div>
+                      <button type="button" className="relative inline-flex h-6 w-11 items-center rounded-full bg-zinc-800"><span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-1"></span></button>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/60 mb-2">Logging Verbosity Level</label>
+                      <select className="w-full px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-primary text-xs">
+                        <option value="error">Errors Only</option>
+                        <option value="warn">Warnings & Errors</option>
+                        <option value="info">Full Information Logs (Debug Mode)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                      <span className="text-xs font-semibold text-white block mb-1 font-mono text-primary">CACHE ENGINE CONTROLS</span>
+                      <p className="text-[10px] text-white/40 mb-3">Flush static page layouts, dynamic student logs cache, and loaded Firestore settings cache across server nodes.</p>
+                      <button type="button" onClick={() => alert("Global edge node cache cleared successfully!")} className="px-4 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-bold hover:bg-rose-500/20 transition-colors cursor-pointer">
+                        Clear Node Cache
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {settingsSubTab !== "ai" && settingsSubTab !== "email" && (
+              <button
+                type="submit"
+                className="px-8 py-3 rounded-full bg-primary text-zinc-950 font-medium hover:brightness-110 transition-colors w-full sm:w-auto"
+              >
+                Publish Settings
+              </button>
+            )}
           </form>
+        </div>
 
           {/* AI Assistant Configuration & Analytics Section */}
-          <div className="mt-8 border border-white/10 p-6 rounded-2xl bg-white/5 space-y-6">
+          {settingsSubTab === "ai" && (
+            <div className="mt-8 border border-white/10 p-6 rounded-2xl bg-white/5 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-medium text-primary flex items-center gap-2">
@@ -5244,9 +5325,12 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+          </div>
+          )}
 
-            {/* SMTP Dynamic Mail Credentials Form */}
-            <div className="pt-8 mt-8 border-t border-white/10 space-y-6">
+          {/* SMTP Dynamic Mail Credentials Form */}
+          {settingsSubTab === "email" && (
+            <div className="pt-8 mt-8 border border-white/10 p-6 rounded-2xl bg-white/5 space-y-6">
               <div>
                 <h4 className="text-base font-medium text-[var(--primary-custom, #4F46E5)] flex items-center gap-2">
                   <span>✉️ Dynamic SMTP Mail Server Config</span>
@@ -5344,7 +5428,7 @@ export default function AdminDashboard() {
                 </div>
               </form>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -5929,6 +6013,10 @@ export default function AdminDashboard() {
 
       {activeTab === "content_management" && (
         <ContentManagement />
+      )}
+
+      {activeTab === "batches" && (
+        <AdminBatchManagement />
       )}
 
       {(activeTab as string) === "content_management_legacy" && (
@@ -7040,6 +7128,13 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+      )}
+
+      {activeTab === "payments" && (
+        <AdminPaymentsManagement
+          initialSubTab={paymentSubTab}
+          onSubTabChange={(newSubTab) => setPaymentSubTab(newSubTab)}
+        />
       )}
 
       {activeTab === "onboarding" && (

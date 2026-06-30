@@ -215,6 +215,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /batches/{batchId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /subjects/{subjectId} {
       allow read: if true;
       allow write: if isAdmin();

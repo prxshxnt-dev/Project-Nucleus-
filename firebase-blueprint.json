@@ -138,6 +138,22 @@
       },
       "required": ["className"]
     },
+    "Batch": {
+      "title": "Batch",
+      "description": "Premium course batch for student enrollment.",
+      "type": "object",
+      "properties": {
+        "className": { "type": "string", "description": "The name of the batch." },
+        "order": { "type": "number" },
+        "price": { "type": "number", "description": "Regular batch price." },
+        "discountPrice": { "type": "number", "description": "Discounted batch price." },
+        "upiId": { "type": "string", "description": "UPI ID for scanning payments." },
+        "thumbnailUrl": { "type": "string", "description": "Image display for batch card." },
+        "description": { "type": "string" },
+        "createdAt": { "type": "any" }
+      },
+      "required": ["className", "price", "upiId"]
+    },
     "Subject": {
       "title": "Subject",
       "description": "Educative course subject.",
@@ -309,6 +325,10 @@
     "classes/{classId}": {
       "schema": { "$ref": "#/entities/Class" },
       "description": "Stores Class standards."
+    },
+    "batches/{batchId}": {
+      "schema": { "$ref": "#/entities/Batch" },
+      "description": "Stores premium course batches with pricing and UPI details."
     },
     "subjects/{subjectId}": {
       "schema": { "$ref": "#/entities/Subject" },

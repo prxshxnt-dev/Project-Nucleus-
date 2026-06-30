@@ -219,10 +219,13 @@ export const YouTubeCustomPlayer = ({
 
   const [isTheater, setIsTheater] = useState(false);
   const [isPip, setIsPip] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isVirtualFullscreen, setIsVirtualFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showSpeedDropdown, setShowSpeedDropdown] = useState(false);
   const [showQualityDropdown, setShowQualityDropdown] = useState(false);
 
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerId = useRef(`yt-player-${Math.random().toString(36).substring(2, 11)}`);
   const playerInstanceRef = useRef<any>(null);
   const timePollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -231,6 +234,61 @@ export const YouTubeCustomPlayer = ({
   const singleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartYRef = useRef<number>(0);
   const [doubleTapVisual, setDoubleTapVisual] = useState<{ show: boolean; side: 'left' | 'right' }>({ show: false, side: 'left' });
+
+  // Fullscreen event listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(screenfull.isFullscreen);
+    };
+    if (screenfull.isEnabled) {
+      screenfull.on('change', handleFullscreenChange);
+    }
+    return () => {
+      if (screenfull.isEnabled) {
+        screenfull.off('change', handleFullscreenChange);
+      }
+    };
+  }, []);
+
+  // Escape key listener for virtual fullscreen exit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isVirtualFullscreen) {
+        setIsVirtualFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isVirtualFullscreen]);
+
+  // Lock orientation to landscape when in fullscreen
+  useEffect(() => {
+    const isCurrentlyFullscreen = isFullscreen || isVirtualFullscreen;
+    const orientation = (screen as any).orientation || (screen as any).mozOrientation || (screen as any).msOrientation;
+    if (isCurrentlyFullscreen) {
+      if (orientation && typeof orientation.lock === 'function') {
+        orientation.lock('landscape').catch((err: any) => {
+          console.warn('Orientation lock to landscape failed:', err);
+        });
+      }
+    } else {
+      if (orientation && typeof orientation.unlock === 'function') {
+        try {
+          orientation.unlock();
+        } catch (err) {
+          console.warn('Orientation unlock failed:', err);
+        }
+      }
+    }
+  }, [isFullscreen, isVirtualFullscreen]);
+
+  const handleToggleFullscreen = () => {
+    if (screenfull.isEnabled && playerContainerRef.current) {
+      screenfull.toggle(playerContainerRef.current);
+    } else {
+      setIsVirtualFullscreen(prev => !prev);
+    }
+  };
 
   // 1. Initialize Player Instance using YouTube IFrame Player API
   useEffect(() => {
@@ -558,10 +616,14 @@ export const YouTubeCustomPlayer = ({
     return `${mm}:${ss}`;
   };
 
+  const isCurrentlyFullscreen = isFullscreen || isVirtualFullscreen;
+
   // Determine adaptiveness of container sizes
   let containerClasses = "relative w-full aspect-video bg-black flex flex-col justify-between overflow-hidden select-none";
 
-  if (isTheater) {
+  if (isCurrentlyFullscreen) {
+    containerClasses = "fixed inset-0 z-[99999] bg-black flex flex-col justify-between overflow-hidden select-none animate-fullscreen-zoom";
+  } else if (isTheater) {
     containerClasses = "fixed inset-0 z-[9999] bg-zinc-950 flex flex-col justify-between overflow-hidden p-4 md:p-8 select-none";
   } else if (isPip) {
     containerClasses = "fixed bottom-6 right-6 w-80 h-[180px] md:w-[360px] md:h-[202px] z-[9990] bg-black shadow-2xl rounded-2xl border border-white/10 flex flex-col justify-between overflow-hidden select-none animate-fade-in";
@@ -581,6 +643,7 @@ export const YouTubeCustomPlayer = ({
 
   return (
     <div
+      ref={playerContainerRef}
       className={containerClasses}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => playing && setShowControls(false)}
@@ -589,6 +652,19 @@ export const YouTubeCustomPlayer = ({
       onContextMenu={(e) => e.preventDefault()}
     >
       <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fullscreenZoomIn {
+          from {
+            transform: scale(0.92);
+            opacity: 0.8;
+          }
+          to {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+        .animate-fullscreen-zoom {
+          animation: fullscreenZoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
         #${playerId.current} {
           width: 100% !important;
           height: 100% !important;
@@ -602,6 +678,22 @@ export const YouTubeCustomPlayer = ({
           left: 0;
           border-radius: inherit;
         }
+        ${isCurrentlyFullscreen ? `
+          .student-secure-view {
+            transform: none !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            z-index: 999999 !important;
+          }
+        ` : ''}
       `}} />
 
       {/* 1. Underlying YouTube Iframe (Completely blocked from user clicks) */}
@@ -816,9 +908,9 @@ export const YouTubeCustomPlayer = ({
             </div>
 
             {/* Buttons & Indicators Layer */}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
               {/* Left Action Buttons */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 {/* Play/Pause */}
                 <button
                   onClick={handlePlayPause}
@@ -865,7 +957,7 @@ export const YouTubeCustomPlayer = ({
                     type="range" min={0} max={1} step={0.05}
                     value={muted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-16 h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-[#E5D2A5]"
+                    className="w-16 h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-[#E5D2A5] hidden sm:block"
                   />
                 </div>
 
@@ -876,7 +968,7 @@ export const YouTubeCustomPlayer = ({
               </div>
 
               {/* Right Menu Buttons */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* Quality Indicator (Custom Dropdown) */}
                 <div className="relative">
                   <button
@@ -957,7 +1049,7 @@ export const YouTubeCustomPlayer = ({
                 {/* Pip toggle */}
                 <button
                   onClick={() => { setIsPip(!isPip); setIsTheater(false); }}
-                  className={`text-zinc-300 hover:text-[#E5D2A5] transition-colors focus:outline-none ${isPip ? 'text-[#E5D2A5]' : ''}`}
+                  className={`text-zinc-300 hover:text-[#E5D2A5] transition-colors focus:outline-none hidden sm:inline-flex ${isPip ? 'text-[#E5D2A5]' : ''}`}
                   title={isPip ? "Disable PiP Mode" : "Enable PiP Mode"}
                 >
                   <Tv className="w-4 h-4" />
@@ -966,10 +1058,19 @@ export const YouTubeCustomPlayer = ({
                 {/* Theater mode toggle */}
                 <button
                   onClick={() => { setIsTheater(!isTheater); setIsPip(false); }}
-                  className={`text-zinc-300 hover:text-[#E5D2A5] transition-colors focus:outline-none ${isTheater ? 'text-[#E5D2A5]' : ''}`}
+                  className={`text-zinc-300 hover:text-[#E5D2A5] transition-colors focus:outline-none hidden sm:inline-flex ${isTheater ? 'text-[#E5D2A5]' : ''}`}
                   title={isTheater ? "Normal Mode" : "Theater Mode"}
                 >
                   <Layout className="w-4 h-4" />
+                </button>
+
+                {/* Fullscreen toggle */}
+                <button
+                  onClick={handleToggleFullscreen}
+                  className={`text-zinc-300 hover:text-[#E5D2A5] transition-colors focus:outline-none ${(isFullscreen || isVirtualFullscreen) ? 'text-[#E5D2A5]' : ''}`}
+                  title={(isFullscreen || isVirtualFullscreen) ? "Exit Fullscreen" : "Fullscreen"}
+                >
+                  {(isFullscreen || isVirtualFullscreen) ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -995,8 +1096,20 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
   const [loaded, setLoaded] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isVirtualFullscreen, setIsVirtualFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // Escape key listener for virtual fullscreen exit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isVirtualFullscreen) {
+        setIsVirtualFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isVirtualFullscreen]);
   
   const [watermarkPos, setWatermarkPos] = useState({ top: '30%', left: '20%' });
 
@@ -1207,6 +1320,8 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
   const handleToggleFullscreen = () => {
     if (screenfull.isEnabled && playerContainerRef.current) {
       screenfull.toggle(playerContainerRef.current);
+    } else {
+      setIsVirtualFullscreen(prev => !prev);
     }
   };
 
@@ -1223,6 +1338,27 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
       }
     };
   }, []);
+
+  // Lock orientation to landscape when in fullscreen
+  useEffect(() => {
+    const isCurrentlyFullscreen = isFullscreen || isVirtualFullscreen;
+    const orientation = (screen as any).orientation || (screen as any).mozOrientation || (screen as any).msOrientation;
+    if (isCurrentlyFullscreen) {
+      if (orientation && typeof orientation.lock === 'function') {
+        orientation.lock('landscape').catch((err: any) => {
+          console.warn('Orientation lock to landscape failed:', err);
+        });
+      }
+    } else {
+      if (orientation && typeof orientation.unlock === 'function') {
+        try {
+          orientation.unlock();
+        } catch (err) {
+          console.warn('Orientation unlock failed:', err);
+        }
+      }
+    }
+  }, [isFullscreen, isVirtualFullscreen]);
 
   const handleMouseMove = () => {
     setShowControls(true);
@@ -1388,15 +1524,51 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
     );
   }
 
+  const isCurrentlyFullscreen = isFullscreen || isVirtualFullscreen;
+
   return (
     <div 
       ref={playerContainerRef} 
-      className="relative w-full h-full bg-black group flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(99, 102, 241,0.05)]"
+      className={isCurrentlyFullscreen
+        ? "fixed inset-0 z-[99999] bg-black group flex flex-col justify-center overflow-hidden select-none animate-fullscreen-zoom"
+        : "relative w-full h-full bg-black group flex flex-col justify-center overflow-hidden rounded-xl border border-white/5 shadow-[0_0_30px_rgba(99, 102, 241,0.05)]"
+      }
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={() => setShowControls(true)}
       onContextMenu={(e) => { e.preventDefault(); }}
     >
+      {isCurrentlyFullscreen && (
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes fullscreenZoomIn {
+            from {
+              transform: scale(0.92);
+              opacity: 0.8;
+            }
+            to {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+          .animate-fullscreen-zoom {
+            animation: fullscreenZoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+          .student-secure-view {
+            transform: none !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            z-index: 999999 !important;
+          }
+        `}} />
+      )}
       {/* Dynamic Moving Security Watermark */}
       {settings.secVideoWatermarkEnabled !== false && user && (
         <motion.div
@@ -1524,7 +1696,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
 
             {/* Controls Row */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4">
                     <button onClick={handlePlayPause} className="text-[#E5D2A5] hover:text-white transition-colors">
                         {playing ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
                     </button>
@@ -1550,7 +1722,7 @@ export const CustomVideoPlayer = ({ url, playing: forcePlaying = true, course }:
 
                 <div>
                     <button onClick={handleToggleFullscreen} className="text-white hover:text-[#E5D2A5] transition-colors">
-                        {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+                        {isCurrentlyFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
                     </button>
                 </div>
             </div>

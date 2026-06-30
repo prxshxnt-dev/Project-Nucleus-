@@ -15,10 +15,30 @@ import { db, auth, handleFirestoreError, OperationType } from "../lib/firebase";
 
 export interface ClassItem {
   id: string;
-  className: string;
+  className: string; // Batch Name
   order?: number;
   isHidden?: boolean;
   createdAt?: any;
+
+  // Batch specific fields
+  classGroup?: string; // Associated Class Standard (e.g., "Class 6", "Class 12 JEE")
+  thumbnailUrl?: string; // Thumbnail Image URL
+  bannerUrl?: string; // Banner Image URL
+  description?: string; // Description
+  price?: number; // Price in ₹
+  discountPrice?: number; // Discount Price in ₹
+  teacherName?: string; // Teacher/Faculty Name
+  validity?: string; // e.g. "Lifetime", "6 Months"
+  status?: "published" | "hidden" | "draft"; // Batch visibility status
+  badge?: "New" | "Popular" | "Limited" | "Premium" | ""; // Visual badge tag
+  batchColor?: string; // Glassmorphic background tint
+  buttonColor?: string; // Interactive color
+  category?: string; // Main category
+  slug?: string; // URL safe string
+  seoTitle?: string;
+  seoDescription?: string;
+  previewVideoUrl?: string; // YouTube or video URL
+  upiId?: string; // UPI ID set for this batch
 }
 
 export interface SubjectItem {
@@ -99,8 +119,8 @@ interface ContentState {
   initSync: () => () => void;
 
   // CRUD Operations
-  addClass: (className: string, order: number) => Promise<void>;
-  updateClass: (id: string, className: string, order: number, isHidden?: boolean) => Promise<void>;
+  addClass: (className: string, order: number, extra?: Partial<ClassItem>) => Promise<void>;
+  updateClass: (id: string, className: string, order: number, isHidden?: boolean, extra?: Partial<ClassItem>) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
 
   addSubject: (classId: string, subjectName: string, order: number) => Promise<void>;
@@ -228,25 +248,27 @@ export const useContentStore = create<ContentState>((set, get) => ({
     };
   },
 
-  addClass: async (className, order) => {
+  addClass: async (className, order, extra = {}) => {
     const path = "classes";
     try {
       await addDoc(collection(db, path), {
         className,
         order: Number(order) || 0,
         createdAt: serverTimestamp(),
+        ...extra
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, path);
     }
   },
 
-  updateClass: async (id, className, order, isHidden) => {
+  updateClass: async (id, className, order, isHidden, extra = {}) => {
     const path = `classes/${id}`;
     try {
       const updateData: any = {
         className,
         order: Number(order) || 0,
+        ...extra
       };
       if (isHidden !== undefined) {
         updateData.isHidden = isHidden;

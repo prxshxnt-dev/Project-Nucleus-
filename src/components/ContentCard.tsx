@@ -93,13 +93,13 @@ export const ContentCard: React.FC<ContentCardProps> = ({
       {/* Background Hover Accent Glow */}
       <div className="absolute -inset-px rounded-[var(--theme-card-radius,16px)] bg-gradient-to-tr from-[var(--primary-custom)]/5 via-transparent to-[var(--theme-accent-glow)]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none -z-10" />
 
-      {/* Admin Quick Action Handles (Edit/Delete) */}
-      {(onEdit || onDelete) && (
-        <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10" onClick={(e) => e.stopPropagation()}>
+      {/* Admin Quick Action Handles (Edit/Delete) - For Material Card */}
+      {type === "material" && (onEdit || onDelete) && (
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity duration-200 z-10" onClick={(e) => e.stopPropagation()}>
           {onEdit && (
             <button
               onClick={onEdit}
-              className="p-1.5 rounded-lg bg-black/5 hover:bg-black/15 text-zinc-600 hover:text-zinc-900 dark:bg-white/5 dark:hover:bg-white/10 dark:text-zinc-400 dark:hover:text-white transition duration-150"
+              className="p-1.5 rounded-lg bg-black/5 hover:bg-black/15 text-zinc-600 hover:text-zinc-900 dark:bg-white/5 dark:hover:bg-white/10 dark:text-zinc-400 dark:hover:text-white transition duration-150 cursor-pointer"
               title="Edit Node"
             >
               <Edit2 className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({
           {onDelete && (
             <button
               onClick={onDelete}
-              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 face-red hover:text-red-700 transition duration-150"
+              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-700 transition duration-150 cursor-pointer"
               title="Delete Node"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -119,25 +119,52 @@ export const ContentCard: React.FC<ContentCardProps> = ({
 
       {type === "folder" ? (
         <div className="flex flex-col items-center text-center py-2 flex-1 justify-between">
-          <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-115 border", folderBgColor)}>
-            <FolderIcon className="w-7 h-7 fill-current" />
+          <div className="w-full flex flex-col items-center">
+            <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-115 border", folderBgColor)}>
+              <FolderIcon className="w-7 h-7 fill-current" />
+            </div>
+
+            <div className="w-full">
+              <h4 className="text-xs font-black text-zinc-900 dark:text-white truncate" title={title}>
+                {title}
+              </h4>
+              {description && (
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+                  {description}
+                </p>
+              )}
+              {count !== undefined && (
+                <span className="inline-block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 mt-2 bg-zinc-500/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
+                  {count} {count === 1 ? "item" : "items"}
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="w-full">
-            <h4 className="text-xs font-black text-zinc-900 dark:text-white truncate" title={title}>
-              {title}
-            </h4>
-            {description && (
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
-                {description}
-              </p>
-            )}
-            {count !== undefined && (
-              <span className="inline-block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 mt-2 bg-zinc-500/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
-                {count} {count === 1 ? "item" : "items"}
-              </span>
-            )}
-          </div>
+          {/* Dedicated always-visible action menu for folders */}
+          {(onEdit || onDelete) && (
+            <div className="flex items-center justify-center gap-3 mt-4 pt-3 border-t border-zinc-100 dark:border-white/5 w-full z-10" onClick={(e) => e.stopPropagation()}>
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-zinc-500 hover:text-primary dark:text-zinc-400 dark:hover:text-primary transition-colors px-2.5 py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 cursor-pointer"
+                  title="Rename or Edit Folder"
+                >
+                  <Edit2 className="w-3 h-3 text-primary" /> Edit
+                </button>
+              )}
+              {onEdit && onDelete && <span className="text-zinc-200 dark:text-white/10 select-none">|</span>}
+              {onDelete && (
+                <button
+                  onClick={onDelete}
+                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-red-500/80 hover:text-red-500 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-500/5 cursor-pointer"
+                  title="Delete Folder"
+                >
+                  <Trash2 className="w-3 h-3" /> Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col h-full justify-between flex-1">

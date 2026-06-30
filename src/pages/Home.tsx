@@ -154,6 +154,7 @@ export default function Home() {
   const { settings } = useSettingsStore();
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<any[]>([]);
+  const [classesList, setClassesList] = useState<any[]>([]);
   const [mentors1, setMentors1] = useState<any[]>([]);
   const [mentors2, setMentors2] = useState<any[]>([]);
   const [selectedClassGroup, setSelectedClassGroup] = useState<string>('all');
@@ -191,6 +192,18 @@ export default function Home() {
         setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
         console.error("Error fetching materials for home:", error);
+      }
+
+      try {
+        const classesSnap = await getDocs(query(collection(db, 'classes')));
+        const fetchedClasses = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        fetchedClasses.sort((a: any, b: any) => {
+          if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+          return (a.className || '').localeCompare(b.className || '');
+        });
+        setClassesList(fetchedClasses);
+      } catch (error) {
+        console.error("Error fetching classes for home:", error);
       }
       
       try {
@@ -653,7 +666,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Materials Showcase */}
+      {/* Batches Showcase */}
       <section id="classes" className="py-24 relative z-20 bg-bg-secondary/40 border-t border-border-color rounded-t-[40px] md:rounded-t-[60px]">
         {/* Soft decorative background glows */}
         <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-accent-primary/5 rounded-full blur-[100px] pointer-events-none" />
@@ -661,7 +674,7 @@ export default function Home() {
 
         <div className="max-w-7xl mx-auto px-6 mb-16 text-center">
           
-          {/* Main heading in a container to absolute-position the rays and underline */}
+          {/* Main heading */}
           <div className="inline-block relative">
             {/* Handdrawn blue rays (\ | /) above and left of the heading */}
             <div className="absolute -top-10 -left-6 md:-top-12 md:-left-8 text-blue-500 w-12 h-12 opacity-85 select-none pointer-events-none flex items-center justify-center">
@@ -673,9 +686,9 @@ export default function Home() {
             </div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-black tracking-tight text-text-primary leading-tight md:leading-normal mb-6 px-4">
-              Your Study Resources, <br className="sm:hidden" /> All in{" "}
+              Explore Our Active <br className="sm:hidden" /> Prep{" "}
               <span className="relative inline-block whitespace-nowrap p-1">
-                One Place!
+                Batches
                 {/* Custom purple highlighter/felt-tip pen underline */}
                 <svg className="absolute -bottom-3 left-0 w-full h-4 text-purple-400 dark:text-purple-500 opacity-90" viewBox="0 0 100 10" preserveAspectRatio="none">
                   <path d="M 2 8 C 30 5, 70 4, 98 7" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
@@ -685,394 +698,107 @@ export default function Home() {
           </div>
 
           <p className="text-text-secondary text-sm md:text-base max-w-3xl mx-auto mb-16 leading-relaxed font-semibold">
-            {(settings as any).resourcesSubtitle || 
-              "Access everything you need to learn smarter, from concise notes and personalized books to interactive tests, insightful blogs, & live video lessons. Study made simple, engaging, and super fun with Nucleus Classes!"}
+            Enroll in our top-rated academic batches designed for board and competitive exam success. Our structured learning plans feature live interactive sessions, expert mentor doubt-solving, and complete study materials.
           </p>
 
-          {/* New Interactive Bento grid from Reference Images */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left mb-16">
-            
-            {/* Left Column: Big Lavender mockup Notes & PDFs card (Image 1 style) */}
-            <motion.div 
-              whileHover={{ y: -6 }}
-              className="lg:col-span-7 bg-[#F3E8FF] dark:bg-[#1E1E2E] rounded-[36px] p-8 md:p-10 border border-purple-200/50 dark:border-purple-900/40 relative overflow-hidden flex flex-col justify-between min-h-[500px] md:min-h-[560px] shadow-lg group cursor-pointer"
-              style={{ borderRadius: 'var(--theme-card-radius, 32px)' }}
-              onClick={() => navigate('/learn')}
-            >
-              {/* Highlight background blobs */}
-              <div className="absolute -right-20 -top-20 w-64 h-64 bg-purple-300/30 dark:bg-purple-900/30 rounded-full blur-[100px] pointer-events-none" />
-              <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-300/20 dark:bg-indigo-900/20 rounded-full blur-[100px] pointer-events-none" />
+          {/* Grid of Batches */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
+            {(classesList.length > 0 ? classesList : [
+              { id: 'class_jee', className: 'Class 12 JEE Elite 2026', price: 4999, discountPrice: 2499, teacherName: 'Alok Pandey', validity: '12 Months', badge: 'Popular', description: 'Complete syllabus preparation for JEE Main & Advanced with premium lecture recordings.' },
+              { id: 'class_neet', className: 'Class 12 NEET Alpha 2026', price: 4999, discountPrice: 1999, teacherName: 'Dr. R.K. Sen', validity: '12 Months', badge: 'New', description: 'Comprehensive preparation for NEET Medical exams with chapter PDFs & DPPs.' },
+              { id: 'class_10', className: 'Class 10 CBSE Board 2026', price: 2999, discountPrice: 999, teacherName: 'S.K. Gupta', validity: 'Lifetime', badge: 'Limited', description: 'Complete board preparation with solved daily practice problems & mocks.' }
+            ])
+              .filter(cls => !cls.isHidden)
+              .map((cls, idx) => {
+                const thumb = cls.thumbnailUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60";
+                const hasDiscount = cls.discountPrice && cls.discountPrice < cls.price;
 
-              {/* Text content upper section */}
-              <div className="relative z-20">
-                <h3 className="font-display font-black text-3xl md:text-4xl text-indigo-950 dark:text-purple-100 mb-3 tracking-tight">
-                  Notes & PDFs
-                </h3>
-                
-                <div className="inline-flex items-center gap-1.5 text-indigo-700 dark:text-purple-300 font-bold text-base hover:text-indigo-800 transition-colors">
-                  <span className="text-[#8B5CF6] font-extrabold text-lg">Explore now</span>
-                  <ArrowRight className="w-5 h-5 text-[#8B5CF6] group-hover:translate-x-1.5 transition-transform" />
-                </div>
-              </div>
+                return (
+                  <motion.div
+                    key={cls.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ delay: idx * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ y: -8, scale: 1.015 }}
+                    className="group relative overflow-hidden rounded-[32px] border bg-glass-bg border-border-color hover:border-accent-primary/40 flex flex-col transition-all duration-300 cursor-pointer shadow-sm hover:shadow-2xl"
+                    style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+                    onClick={() => {
+                      if (!user) {
+                        navigate('/login');
+                      } else {
+                        navigate('/dashboard');
+                      }
+                    }}
+                  >
+                    {/* Gradient background sheen */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-accent-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-              {/* Stack of interactive handwritten notebook mockups (realistic formula sheets) */}
-              <div className="relative w-full h-[280px] md:h-[340px] mt-8 flex items-end justify-center select-none pointer-events-none">
-                
-                {/* Underneath Notebook Page: Chemistry/Uses of Graphite */}
-                <div 
-                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-slate-200/60 dark:border-zinc-800 p-5 md:p-6 flex flex-col text-left transition-all duration-300 origin-bottom"
-                  style={{
-                    transform: 'none',
-                    backgroundImage: 'repeating-linear-gradient(#ffffff 0px, #ffffff 21px, #eef2f6 22px)',
-                    backgroundSize: '100% 22px'
-                  }}
-                >
-                  {/* Left padding vertical margin line */}
-                  <div className="absolute left-6 top-0 bottom-0 w-[1.5px] bg-red-200" />
-
-                  {/* Chemistry handwritten formulas & Graphite hexa structure */}
-                  <div className="pl-6 pt-2 font-handwriting text-[9px] md:text-[10px] text-slate-700 dark:text-slate-300 font-medium leading-[22px] overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px] md:text-[12px]"># USES OF GRAPHITE</span>
-                      <span className="text-[8px] px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-200 rounded font-bold font-mono border-none select-none">RANK #1 TIPS</span>
-                    </div>
-
-                    <div className="mt-2 font-mono flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-indigo-600 dark:text-indigo-400">COVALENT BONDING</p>
-                        <p className="mt-1 leading-snug">• Good conductor of electricity because of free electrons.</p>
-                        <p className="mt-1 leading-snug">• Dull & Black in appearance.</p>
-                        <p className="mt-1 leading-snug">• Used in Electrodes (Anode / Cathode), battery.</p>
-                      </div>
+                    {/* Image / Thumbnail Container */}
+                    <div className="w-full h-48 bg-bg-secondary relative overflow-hidden border-b border-border-color/50">
+                      <img 
+                        src={thumb} 
+                        alt={cls.className} 
+                        className="w-full h-full object-cover group-hover:scale-108 transition-all duration-700"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-bg-primary/90 to-transparent" />
                       
-                      {/* Graphite carbon sheets diagram */}
-                      <div className="hidden sm:block mr-2 opacity-80">
-                        <svg className="w-16 h-12 stroke-slate-500 fill-none" viewBox="0 0 80 60">
-                          <polygon points="15,15 25,10 35,15 35,25 25,30 15,25" strokeWidth="1.5" />
-                          <polygon points="35,15 45,10 55,15 55,25 45,30 35,25" strokeWidth="1.5" />
-                          <polygon points="25,30 35,25 35,25 45,30 45,40 35,45 25,40" strokeWidth="1.5" />
-                          <text x="21" y="24" className="text-[6px] font-mono fill-slate-500 border-none select-none">C</text>
-                          <text x="41" y="24" className="text-[6px] font-mono fill-slate-500 border-none select-none">C</text>
-                        </svg>
-                      </div>
+                      {/* Floating Badge */}
+                      {cls.badge && (
+                        <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-accent-primary text-button-text font-black text-[9px] uppercase tracking-wider shadow-sm">
+                          {cls.badge}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
 
-                {/* Top Overlay Notebook Page: Hydrocarbons & Formulas */}
-                <div 
-                  className="absolute w-[88%] h-[240px] md:h-[290px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-700 p-5 md:p-6 flex flex-col text-left transition-all duration-300 origin-bottom"
-                  style={{
-                    transform: 'translateY(12px)',
-                    backgroundImage: 'repeating-linear-gradient(#ffffff 0px, #ffffff 21px, #e2e8f0 22px)',
-                    backgroundSize: '100% 22px'
-                  }}
-                >
-                  {/* Left margin red lines */}
-                  <div className="absolute left-6 top-0 bottom-0 w-[1.5px] bg-red-200" />
-                  
-                  {/* Binder notebook rings on left margin to make it look incredibly real */}
-                  <div className="absolute left-1 top-6 flex flex-col gap-6 z-10">
-                    {[1, 2, 3, 4, 5].map((iPr) => (
-                      <div key={iPr} className="w-2.5 h-3.5 rounded-full border border-slate-400 bg-slate-200 shadow-inner flex items-center justify-center">
-                        <div className="w-1 h-2 bg-slate-400 rounded-full" />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Content of the notebook sheet */}
-                  <div className="pl-6 pt-1 font-handwriting text-[9px] md:text-[10px] text-slate-700 dark:text-slate-300 font-medium leading-[22px] overflow-hidden">
-                    <p className="font-extrabold text-indigo-900 dark:text-white uppercase tracking-wider text-[11px] md:text-[12px]">SATURATED HYDROCARBONS</p>
-                    
-                    <div className="mt-2 font-mono grid grid-cols-1 sm:grid-cols-12 gap-2">
-                      <div className="sm:col-span-8">
-                        <p className="font-bold text-purple-600 dark:text-purple-400">• ALKANES:</p>
-                        <p className="text-gray-600 dark:text-gray-300 leading-snug pl-2">Hydrocarbons containing Single covalent bonds. Eg: Methane (<span className="text-red-500 font-bold">CH₄</span>)</p>
-                        
-                        <p className="font-bold text-purple-600 dark:text-purple-400 mt-1">• UNSATURATED:</p>
-                        <p className="text-gray-600 dark:text-gray-300 leading-snug pl-2">Contain double or triple carbon covalent bonds.</p>
-                        <p className="text-gray-600 dark:text-gray-300 pl-4 leading-tight font-sans">- Alkenes Formula: <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">CnH₂n</span></p>
-                        <p className="text-gray-600 dark:text-gray-300 pl-4 leading-tight font-sans">- Alkynes Formula: <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">CnH₂n₋₂</span></p>
+                    <div className="p-6 flex flex-col flex-1 relative z-20">
+                      {/* Meta Information Tags */}
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span className="px-2.5 py-1 rounded-lg bg-bg-secondary text-[9px] text-text-muted border border-border-color uppercase tracking-widest font-black font-mono">
+                          🧑‍🏫 {cls.teacherName || "Expert Faculty"}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg bg-bg-secondary text-[9px] text-text-muted border border-border-color uppercase tracking-widest font-black font-mono">
+                          📅 {cls.validity || "Full Access"}
+                        </span>
                       </div>
 
-                      {/* Chemical sketch - methane skeletal */}
-                      <div className="hidden sm:col-span-4 sm:flex items-center justify-center bg-yellow-50/50 dark:bg-yellow-950/20 p-2 rounded-xl border border-yellow-200/50 dark:border-yellow-900/30 scale-90">
-                        <div className="flex flex-col items-center justify-center font-mono text-[9px] text-gray-800 dark:text-gray-200 leading-none">
-                          <span>H</span>
-                          <span className="h-2.5 w-[1.5px] bg-slate-400 my-0.5"></span>
-                          <div className="flex items-center gap-1">
-                            <span>H</span>
-                            <span className="w-2.5 h-[1.5px] bg-slate-400"></span>
-                            <span className="font-extrabold text-red-600">C</span>
-                            <span className="w-2.5 h-[1.5px] bg-slate-400"></span>
-                            <span>H</span>
+                      {/* Title */}
+                      <h3 className="font-display text-xl font-bold text-text-primary mb-2 group-hover:text-accent-primary transition-colors duration-300 line-clamp-1 truncate">
+                        {cls.className}
+                      </h3>
+
+                      {/* Description */}
+                      <p className="text-text-secondary text-xs font-semibold mb-6 flex-1 leading-relaxed line-clamp-2">
+                        {cls.description || "Get access to complete premium study modules, class files, and test solutions."}
+                      </p>
+
+                      {/* Price & Call To Action */}
+                      <div className="pt-4 border-t border-border-color/40 flex items-center justify-between mt-auto">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-text-muted font-bold tracking-wider uppercase font-mono">Enrolling Price</span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-lg font-black text-text-primary">
+                              ₹{cls.discountPrice || cls.price}
+                            </span>
+                            {hasDiscount && (
+                              <span className="text-xs text-text-muted line-through font-medium">
+                                ₹{cls.price}
+                              </span>
+                            )}
                           </div>
-                          <span className="h-2.5 w-[1.5px] bg-slate-400 my-0.5"></span>
-                          <span>H</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-accent-primary group-hover:translate-x-1 transition-transform text-xs font-bold font-mono">
+                          <span>View & Join</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-              </div>
-            </motion.div>
-
-            {/* Right Column: Dynamic Stacked Bento Cards */}
-            <div className="lg:col-span-5 flex flex-col gap-6 justify-between">
-              
-              {/* Bento Card 1: "Get Notes and PDFs" - Image 2 Style */}
-              <motion.div 
-                whileHover={{ y: -4, scale: 1.01 }}
-                className="bg-[#FFF8EE] dark:bg-[#25201A] border border-amber-200/50 dark:border-amber-900/40 p-6 md:p-8 rounded-[32px] flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-sm hover:shadow-md transition-all h-[155px]"
-                onClick={() => navigate('/learn')}
-              >
-                <div className="flex flex-col justify-center max-w-[70%] z-10">
-                  <h3 className="font-display font-bold text-xl md:text-2xl text-slate-800 dark:text-amber-100 tracking-tight leading-snug">
-                    Get Notes and PDFs
-                  </h3>
-                  <p className="text-amber-700/70 dark:text-amber-400/75 text-[11px] font-semibold mt-1 tracking-wide uppercase">
-                    Red-highlighted summaries
-                  </p>
-                </div>
-
-                {/* Custom Notebook spirals & red highlighter pencil SVG (Exact Illustration style!) */}
-                <div className="relative pr-2 scale-[1.05] group-hover:scale-110 transition-transform duration-300 z-10">
-                  <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none">
-                    <rect x="18" y="22" width="56" height="58" rx="8" fill="#FFFBEB" stroke="#D1A153" strokeWidth="3.5" />
-                    
-                    <line x1="28" y1="36" x2="62" y2="36" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
-                    <line x1="28" y1="46" x2="62" y2="46" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
-                    <line x1="28" y1="56" x2="62" y2="56" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
-                    <line x1="28" y1="66" x2="62" y2="66" stroke="#E2C286" strokeWidth="2.5" strokeLinecap="round" />
-                    
-                    <rect x="24" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
-                    <rect x="38" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
-                    <rect x="52" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
-                    <rect x="66" y="14" width="5" height="12" rx="2.5" fill="#94A3B8" stroke="#475569" strokeWidth="2" />
-
-                    <g transform="translate(10, -5) rotate(15 50 50)">
-                      <rect x="62" y="42" width="12" height="28" rx="3" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" />
-                      <path d="M 62 42 L 68 34 L 74 42 Z" fill="#EF4444" stroke="#B91C1C" strokeWidth="2" strokeLinejoin="round" />
-                      <polygon points="65,34 68,28 71,28 70,34" fill="#1E293B" />
-                      <rect x="64" y="70" width="8" height="4" rx="1" fill="#1E293B" />
-                      <rect x="65" y="46" width="3" height="20" fill="#FCA5A5" opacity="0.6" />
-                    </g>
-                    
-                    <path d="M 33 54 L 56 46" stroke="#EF4444" strokeWidth="8" strokeLinecap="round" opacity="0.25" />
-                  </svg>
-                </div>
-
-                {/* Classic Blue Arrow indicator on top-right */}
-                <div className="absolute top-4 right-4 text-blue-500 w-5 h-5 flex items-center justify-center hover:scale-105 transition-transform">
-                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-current stroke-[3px]" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              </motion.div>
-
-              {/* Bento Card 2: "Watch Live Tutorials" */}
-              <motion.div 
-                whileHover={{ y: -4, scale: 1.01 }}
-                className="bg-[#EEFDFC] dark:bg-[#152524] border border-teal-200/50 dark:border-teal-900/40 p-6 md:p-8 rounded-[32px] flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-sm hover:shadow-md transition-all h-[155px]"
-                onClick={() => navigate('/learn')}
-              >
-                <div className="flex flex-col justify-center max-w-[70%] z-10">
-                  <h3 className="font-display font-bold text-xl md:text-2xl text-slate-800 dark:text-teal-100 tracking-tight leading-snug">
-                    Watch Video Tutorials
-                  </h3>
-                  <p className="text-teal-700/70 dark:text-teal-400/75 text-[11px] font-semibold mt-1 tracking-wide uppercase">
-                    Interactive Video Assets
-                  </p>
-                </div>
-
-                {/* Custom Video Camera illustration */}
-                <div className="relative pr-2 scale-[1.05] group-hover:scale-110 transition-transform duration-300 z-10 text-teal-600">
-                  <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none">
-                    <rect x="18" y="28" width="46" height="44" rx="8" fill="#CCFBF1" stroke="#0D9488" strokeWidth="3.5" />
-                    <polygon points="64,40 84,30 84,70 64,60" fill="#CCFBF1" stroke="#0D9488" strokeWidth="3.5" strokeLinejoin="round" />
-                    <circle cx="41" cy="50" r="8" fill="#0D9488" />
-                    <polygon points="38,46 47,50 38,54" fill="#FFFFFF" />
-                  </svg>
-                </div>
-
-                {/* Top-Right Blue Arrow */}
-                <div className="absolute top-4 right-4 text-blue-500 w-5 h-5 flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-current stroke-[3px]" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              </motion.div>
-
-              {/* Bento Card 3: "Adaptive Chapter Tests" */}
-              <motion.div 
-                whileHover={{ y: -4, scale: 1.01 }}
-                className="bg-[#FCF0FF] dark:bg-[#25152A] border border-fuchsia-200/50 dark:border-fuchsia-900/40 p-6 md:p-8 rounded-[32px] flex items-center justify-between relative overflow-hidden group cursor-pointer shadow-sm hover:shadow-md transition-all h-[155px]"
-                onClick={() => navigate('/learn')}
-              >
-                <div className="flex flex-col justify-center max-w-[70%] z-10">
-                  <h3 className="font-display font-bold text-xl md:text-2xl text-slate-800 dark:text-fuchsia-100 tracking-tight leading-snug">
-                    Take Chapter Tests
-                  </h3>
-                  <p className="text-fuchsia-700/70 dark:text-fuchsia-400/75 text-[11px] font-semibold mt-1 tracking-wide uppercase">
-                    Track adaptive marks
-                  </p>
-                </div>
-
-                {/* Custom checklist board layout */}
-                <div className="relative pr-2 scale-[1.05] group-hover:scale-110 transition-transform duration-300 z-10">
-                  <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none">
-                    <rect x="22" y="24" width="56" height="56" rx="8" fill="#FAE8FF" stroke="#C084FC" strokeWidth="3.5" />
-                    <rect x="42" y="14" width="16" height="12" rx="3" fill="#D8B4FE" stroke="#A855F7" strokeWidth="2.5" />
-                    
-                    {/* Tick markers */}
-                    <path d="M 32 40 L 36 44 L 46 32" stroke="#A855F7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M 32 58 L 36 62 L 46 50" stroke="#A855F7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                    
-                    <line x1="52" y1="38" x2="68" y2="38" stroke="#C084FC" strokeWidth="3" strokeLinecap="round" />
-                    <line x1="52" y1="56" x2="68" y2="56" stroke="#C084FC" strokeWidth="3" strokeLinecap="round" />
-                  </svg>
-                </div>
-
-                {/* Top-Right Blue Arrow */}
-                <div className="absolute top-4 right-4 text-blue-500 w-5 h-5 flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 stroke-current stroke-[3px]" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              </motion.div>
-
-            </div>
-
+                  </motion.div>
+                );
+              })}
           </div>
-
-          {/* Catalog Class Selector Segment */}
-          {materials.length > 0 && (
-            <div className="pt-12 border-t border-border-color/60 relative z-20">
-              <div className="text-center mb-8">
-                <span className="text-[10px] px-3 py-1 rounded-full bg-accent-primary/10 text-accent-primary font-black uppercase tracking-widest border border-accent-primary/20">
-                  Live Resource Repository
-                </span>
-                <h4 className="text-2xl font-display font-bold text-text-primary mt-3">
-                  Syllabus Documents & Uploads Showcase
-                </h4>
-              </div>
-
-              {/* Fully styled cute Class selection buttons */}
-              <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-4xl mx-auto bg-glass-bg/85 p-2 rounded-3xl border border-border-color backdrop-blur-md mb-10">
-                <button 
-                  onClick={() => setSelectedClassGroup('all')} 
-                  className={`px-5 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-black transition-all cursor-pointer ${
-                    selectedClassGroup === 'all' 
-                      ? 'bg-accent-primary text-button-text shadow-sm' 
-                      : 'text-text-muted hover:text-text-primary hover:bg-white/5'
-                  }`}
-                >
-                  All Levels
-                </button>
-                {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map((numPr) => (
-                  <button 
-                    key={numPr}
-                    onClick={() => setSelectedClassGroup(numPr)} 
-                    className={`px-4.5 py-2.5 rounded-2xl text-xs uppercase tracking-widest font-black transition-all cursor-pointer ${
-                      selectedClassGroup === numPr 
-                        ? 'bg-accent-primary text-button-text shadow-sm' 
-                        : 'text-text-muted hover:text-text-primary hover:bg-white/5'
-                    }`}
-                  >
-                    {numPr === 'dropper' ? 'Droppers' : `Class ${numPr}`}
-                  </button>
-                ))}
-              </div>
-
-              {/* Grid of the resources cards loaded from Database */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {materials
-                  .filter(m => selectedClassGroup === 'all' || m.classGroup === selectedClassGroup || !m.classGroup || user?.unlockedMaterials?.includes(m.id))
-                  .slice(0, 6)
-                  .map((mat, i) => {
-                     const hasSpecificAccess = user?.unlockedMaterials?.includes(mat.id);
-                     const hasAccess = hasSpecificAccess || user?.role === 'admin' || user?.role === 'superadmin';
-                     
-                     return (
-                       <motion.div 
-                         key={mat.id}
-                         initial={{ opacity: 0, y: 30 }}
-                         whileInView={{ opacity: 1, y: 0 }}
-                         viewport={{ once: true, margin: "-50px" }}
-                         transition={{ delay: i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                         whileHover={{ y: -8, scale: 1.015 }}
-                         className="group relative overflow-hidden rounded-[32px] border bg-glass-bg border-border-color hover:border-accent-primary/40 flex flex-col transition-all duration-300 cursor-pointer shadow-sm hover:shadow-2xl"
-                         style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
-                         onClick={() => {
-                           if (!user) {
-                             alert("login first to unlock this");
-                           } else {
-                             navigate('/learn');
-                           }
-                         }}
-                       >
-                         {/* Gradient background sheen */}
-                         <div className="absolute inset-0 bg-gradient-to-tr from-accent-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-                         {mat.thumbnailUrl ? (
-                           <div className="w-full h-44 bg-bg-secondary relative overflow-hidden border-b border-border-color/50">
-                             <img src={mat.thumbnailUrl} alt={mat.title} className="w-full h-full object-cover group-hover:scale-108 transition-all duration-700" />
-                             <div className="absolute inset-0 bg-gradient-to-t from-bg-primary/80 to-transparent" />
-                             {/* Thumbnail badge for type */}
-                             <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-white/95 dark:bg-zinc-900/95 font-bold tracking-wide uppercase text-[8px] flex items-center gap-1">
-                               {mat.type === 'note' ? <BookOpen className="w-2.5 h-2.5 text-accent-primary" /> : <Video className="w-2.5 h-2.5 text-[#ff8a9e]" />}
-                               <span className="text-text-primary">{mat.type === 'note' ? 'Syllabus Note' : 'Video Tutorial'}</span>
-                             </div>
-                           </div>
-                         ) : null}
-                         
-                         <div className="p-6 flex flex-col flex-1 relative z-20">
-                           <div className="flex items-center justify-between mb-4">
-                             {!mat.thumbnailUrl && (
-                                <div className={`p-3 rounded-2xl transition-colors duration-500 ${
-                                  mat.type === 'note' 
-                                    ? 'bg-[#ff8a9e]/10 text-[#ff8a9e]' 
-                                    : 'bg-accent-primary/10 text-accent-primary'
-                                }`}>
-                                  {mat.type === 'note' ? <BookOpen className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                                </div>
-                             )}
-                             <div className="px-3 py-1.5 rounded-full bg-bg-secondary text-[9px] text-text-muted border border-border-color uppercase tracking-widest font-black font-mono">
-                               {mat.classGroup === "all" || !mat.classGroup ? "All Batches" : "Class " + mat.classGroup}
-                             </div>
-                           </div>
-
-                           <h3 className="font-display text-xl font-bold text-text-primary mb-2 group-hover:text-accent-primary transition-colors duration-300 line-clamp-1 truncate">
-                             {mat.title}
-                           </h3>
-                           
-                           <p className="text-text-secondary text-xs font-semibold mb-6 flex-1 leading-relaxed line-clamp-2">
-                             {mat.description || 'Unlock this extensive curated educational material compiled by the top rankers.'}
-                           </p>
-
-                           <div className="pt-4 border-t border-border-color/40 flex items-center justify-between text-text-muted mt-auto">
-                             <div className="flex items-center gap-2 text-xs font-bold transition-all duration-300">
-                               {hasAccess ? (
-                                 <div className="flex items-center gap-1.5 text-accent-primary group-hover:translate-x-1 transition-transform">
-                                   <span>Study Now</span>
-                                   <ArrowRight className="w-3.5 h-3.5" />
-                                 </div>
-                               ) : (
-                                 <div className="flex items-center gap-1.5 p-1 rounded-md text-text-muted group-hover:text-text-primary transition-colors">
-                                   <Lock className="w-3.5 h-3.5" />
-                                   <span>Syllabus Locked</span>
-                                 </div>
-                               )}
-                             </div>
-                           </div>
-                         </div>
-                       </motion.div>
-                     );
-                  })}
-              </div>
-            </div>
-          )}
 
         </div>
       </section>

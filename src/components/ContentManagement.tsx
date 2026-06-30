@@ -70,10 +70,28 @@ export function ContentManagement() {
   const [qExplanation, setQExplanation] = useState("");
   const [editingQIndex, setEditingQIndex] = useState<number | null>(null);
 
-  // Form states for Classes
+  // Form states for Classes (Batches)
   const [classId, setClassId] = useState<string | null>(null);
   const [classNameState, setClassNameState] = useState("");
   const [classOrder, setClassOrder] = useState<number>(0);
+  const [classGroup, setClassGroup] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState<number>(0);
+  const [discountPrice, setDiscountPrice] = useState<number>(0);
+  const [teacherName, setTeacherName] = useState("");
+  const [validity, setValidity] = useState("Lifetime");
+  const [status, setStatus] = useState<"published" | "hidden" | "draft">("published");
+  const [badge, setBadge] = useState<"New" | "Popular" | "Limited" | "Premium" | "">("");
+  const [batchColor, setBatchColor] = useState("default");
+  const [buttonColor, setButtonColor] = useState("default");
+  const [category, setCategory] = useState("School");
+  const [slug, setSlug] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [previewVideoUrl, setPreviewVideoUrl] = useState("");
+  const [classUpiId, setClassUpiId] = useState("");
 
   // Form states for Subjects
   const [subjectId, setSubjectId] = useState<string | null>(null);
@@ -369,22 +387,66 @@ export function ContentManagement() {
   }, [subjectListFilterClass, chapterListFilterClass, activeSubTab]);
 
   // Submit Handlers
+  const resetClassForm = () => {
+    setClassId(null);
+    setClassNameState("");
+    setClassOrder(0);
+    setClassGroup("");
+    setThumbnailUrl("");
+    setBannerUrl("");
+    setDescription("");
+    setPrice(0);
+    setDiscountPrice(0);
+    setTeacherName("");
+    setValidity("Lifetime");
+    setStatus("published");
+    setBadge("");
+    setBatchColor("default");
+    setButtonColor("default");
+    setCategory("School");
+    setSlug("");
+    setSeoTitle("");
+    setSeoDescription("");
+    setPreviewVideoUrl("");
+    setClassUpiId("");
+  };
+
   const handleClassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!classNameState.trim()) return showToast("Class Name is required", true);
+    if (!classNameState.trim()) return showToast("Batch Name is required", true);
+    
+    const extraFields = {
+      classGroup: classGroup || classNameState,
+      thumbnailUrl: thumbnailUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60",
+      bannerUrl: bannerUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80",
+      description: description || "Complete study program",
+      price: Number(price) || 0,
+      discountPrice: discountPrice ? Number(discountPrice) : 0,
+      teacherName: teacherName || "Senior Faculty",
+      validity: validity || "Lifetime",
+      status: (status || "published") as "published" | "hidden" | "draft",
+      badge: (badge || "") as "New" | "Popular" | "Limited" | "Premium" | "",
+      batchColor: batchColor || "default",
+      buttonColor: buttonColor || "default",
+      category: category || "School",
+      slug: slug || classNameState.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      seoTitle: seoTitle || classNameState,
+      seoDescription: seoDescription || description,
+      previewVideoUrl: previewVideoUrl || "",
+      upiId: classUpiId || "",
+    };
+
     try {
       if (classId) {
-        await updateClass(classId, classNameState, classOrder);
-        showToast("Class standard updated in index registry!");
+        await updateClass(classId, classNameState, classOrder, status === "hidden", extraFields);
+        showToast("Batch properties updated successfully!");
       } else {
-        await addClass(classNameState, classOrder);
-        showToast("New Class standard deployed to database!");
+        await addClass(classNameState, classOrder, extraFields);
+        showToast("New Batch standard deployed to database!");
       }
-      setClassNameState("");
-      setClassOrder(0);
-      setClassId(null);
+      resetClassForm();
     } catch (err: any) {
-      showToast("Class operation failed", true);
+      showToast("Batch operation failed", true);
     }
   };
 
@@ -796,7 +858,7 @@ export function ContentManagement() {
         </h3>
         
         {[
-          { id: "classes", label: "🏫 Classes standard", count: classes.length },
+          { id: "classes", label: "🎓 Batch Management", count: classes.length },
           { id: "subjects", label: "📚 Subject Folders", count: subjects.length },
           { id: "chapters", label: "📂 Chapter Folders", count: chapters.length },
           { id: "materials", label: "📄 Vault Database", count: materials.length },
@@ -842,54 +904,228 @@ export function ContentManagement() {
               <div className="space-y-6 animate-fadeIn">
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                   <div>
-                    <h3 className="text-lg font-black text-white font-display uppercase tracking-tight">Class standards folders</h3>
-                    <p className="text-xs text-white/50 mt-0.5">Primary standard directories like Class 11, JEE, Drop-out sections.</p>
+                    <h3 className="text-lg font-black text-white font-display uppercase tracking-tight">🎓 Paid Batch Management</h3>
+                    <p className="text-xs text-white/50 mt-0.5">Configure, edit, price, and publish courses and batches for direct student enrollment.</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                   {/* Class Add/Edit card */}
-                  <div className="theme-card-themed bg-white/5 p-5 border border-white/10 h-fit">
-                    <h4 className="text-xs font-black uppercase text-primary/95 mb-4">
-                      {classId ? "🖋️ Edit Class Folder properties" : "📂 Register new Standard Folder"}
+                  <div className="theme-card-themed bg-white/5 p-5 border border-white/10 h-fit max-h-[85vh] overflow-y-auto scrollbar-thin">
+                    <h4 className="text-xs font-black uppercase text-primary/95 mb-4 font-display tracking-wider">
+                      {classId ? "🖋️ Edit Paid Batch properties" : "🎓 Create New Paid Batch"}
                     </h4>
-                    <form onSubmit={handleClassSubmit} className="space-y-4">
+                    <form onSubmit={handleClassSubmit} className="space-y-4 text-left">
                       <div>
-                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Class Name *</label>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Batch Name *</label>
                         <input
                           type="text"
                           required
-                          placeholder="e.g. Class 11, NEET Batch, JEE Prep"
+                          placeholder="e.g. Class 12 JEE Elite 2026"
                           value={classNameState}
                           onChange={(e) => setClassNameState(e.target.value)}
                           className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
                         />
                       </div>
+
                       <div>
-                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5 font-mono">Ordering Priority weight</label>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Associated Class Standard *</label>
                         <input
-                          type="number"
-                          placeholder="0"
-                          value={classOrder || ""}
-                          onChange={(e) => setClassOrder(Number(e.target.value) || 0)}
-                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono placeholder-white/20"
+                          type="text"
+                          required
+                          placeholder="e.g. Class 12, JEE, NEET, Class 6"
+                          value={classGroup}
+                          onChange={(e) => setClassGroup(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
                         />
-                        <span className="text-[9px] text-white/30 block mt-1.5 leading-normal">
-                          Folders sort dynamically by ordering priority weight ascending.
-                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Teacher / Lead Instructor *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Alok Pandey, H.C. Verma"
+                          value={teacherName}
+                          onChange={(e) => setTeacherName(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Description *</label>
+                        <textarea
+                          placeholder="Provide overview of batch topics, features..."
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          rows={2}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Price (₹) *</label>
+                          <input
+                            type="number"
+                            required
+                            placeholder="Price"
+                            value={price || ""}
+                            onChange={(e) => setPrice(Number(e.target.value) || 0)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Discount Price (₹)</label>
+                          <input
+                            type="number"
+                            placeholder="Discount Price"
+                            value={discountPrice || ""}
+                            onChange={(e) => setDiscountPrice(Number(e.target.value) || 0)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Validity *</label>
+                          <select
+                            value={validity}
+                            onChange={(e) => setValidity(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="Lifetime">Lifetime</option>
+                            <option value="3 Months">3 Months</option>
+                            <option value="6 Months">6 Months</option>
+                            <option value="12 Months">12 Months</option>
+                            <option value="24 Months">24 Months</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Batch Category *</label>
+                          <select
+                            value={category}
+                            onChange={(e) => setCategory(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="School">School/Board</option>
+                            <option value="JEE">JEE Prep</option>
+                            <option value="NEET">NEET Prep</option>
+                            <option value="Dropper">Dropper Batch</option>
+                            <option value="Premium">Premium Spec</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Status *</label>
+                          <select
+                            value={status}
+                            onChange={(e) => setStatus(e.target.value as any)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="published">Published</option>
+                            <option value="hidden">Hidden</option>
+                            <option value="draft">Draft</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Badge Banner</label>
+                          <select
+                            value={badge}
+                            onChange={(e) => setBadge(e.target.value as any)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="">None</option>
+                            <option value="New">New</option>
+                            <option value="Popular">Popular</option>
+                            <option value="Limited">Limited</option>
+                            <option value="Premium">Premium</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5 font-mono">Order Rank</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={classOrder || ""}
+                            onChange={(e) => setClassOrder(Number(e.target.value) || 0)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary font-mono placeholder-white/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Theme Theme</label>
+                          <select
+                            value={batchColor}
+                            onChange={(e) => setBatchColor(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="default">Luxury Gold</option>
+                            <option value="blue">Cosmic Blue</option>
+                            <option value="purple">Glass Purple</option>
+                            <option value="emerald">Emerald Mint</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Thumbnail Image URL</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://..."
+                          value={thumbnailUrl}
+                          onChange={(e) => setThumbnailUrl(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Banner Image URL</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://..."
+                          value={bannerUrl}
+                          onChange={(e) => setBannerUrl(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Preview Video URL (YouTube)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. https://www.youtube.com/watch?v=..."
+                          value={previewVideoUrl}
+                          onChange={(e) => setPreviewVideoUrl(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-white/40 mb-1.5">Batch Custom UPI ID (Set for this batch)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. upihandle@ybl"
+                          value={classUpiId}
+                          onChange={(e) => setClassUpiId(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-primary placeholder-white/20"
+                        />
+                        <p className="text-[10px] text-white/40 mt-1">If set, student purchase clicks will deep-link directly to this custom UPI id.</p>
                       </div>
 
                       <div className="flex items-center gap-2 pt-2">
                         <button type="submit" className="flex-1 bg-primary text-zinc-950 font-black uppercase text-[10px] py-2.5 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer">
-                          {classId ? "Save Changes" : "Create Folder"}
+                          {classId ? "Save Changes" : "Create Batch"}
                         </button>
                         {classId && (
                           <button
                             type="button"
                             onClick={() => {
-                              setClassId(null);
-                              setClassNameState("");
-                              setClassOrder(0);
+                              resetClassForm();
                             }}
                             className="bg-white/10 text-white font-bold uppercase text-[10px] px-3 py-2.5 rounded-xl hover:bg-white/15 transition-all cursor-pointer"
                           >
@@ -904,7 +1140,7 @@ export function ContentManagement() {
                   <div className="xl:col-span-2 space-y-4">
                     {classes.length === 0 ? (
                       <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/5 opacity-40 text-xs">
-                        No class folders mapped. Enter a name above to begin layout construction!
+                        No active batches. Set up a batch name and price above to launch!
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-sans">
@@ -916,13 +1152,31 @@ export function ContentManagement() {
                                 type="folder"
                                 folderType="class"
                                 title={cls.className}
-                                description={`Priority sequence: ${cls.order || 0}`}
+                                description={`Price: ₹${cls.price || 0} | Validity: ${cls.validity || "Lifetime"} | Status: ${cls.status || "published"}`}
                                 count={subCount}
                                 onEdit={(e) => {
                                   e.stopPropagation();
                                   setClassId(cls.id);
                                   setClassNameState(cls.className);
                                   setClassOrder(cls.order || 0);
+                                  setClassGroup(cls.classGroup || "");
+                                  setThumbnailUrl(cls.thumbnailUrl || "");
+                                  setBannerUrl(cls.bannerUrl || "");
+                                  setDescription(cls.description || "");
+                                  setPrice(cls.price || 0);
+                                  setDiscountPrice(cls.discountPrice || 0);
+                                  setTeacherName(cls.teacherName || "");
+                                  setValidity(cls.validity || "Lifetime");
+                                  setStatus(cls.status || "published");
+                                  setBadge(cls.badge || "");
+                                  setBatchColor(cls.batchColor || "default");
+                                  setButtonColor(cls.buttonColor || "default");
+                                  setCategory(cls.category || "School");
+                                  setSlug(cls.slug || "");
+                                  setSeoTitle(cls.seoTitle || "");
+                                  setSeoDescription(cls.seoDescription || "");
+                                  setPreviewVideoUrl(cls.previewVideoUrl || "");
+                                  setClassUpiId(cls.upiId || "");
                                 }}
                                 onDelete={(e) => {
                                   e.stopPropagation();

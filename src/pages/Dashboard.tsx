@@ -1,10 +1,10 @@
 import { motion } from 'motion/react';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw, Folder, FolderOpen, Search, Download, Bookmark, FileText } from 'lucide-react';
+import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw, Folder, FolderOpen, Search, Download, Bookmark, FileText, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, getDocs, doc, updateDoc, setDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot, increment } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, setDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot, increment, deleteDoc } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useNavigate, Link } from 'react-router-dom';
 import ReactPlayer from 'react-player';
@@ -50,6 +50,18 @@ export default function Dashboard() {
   const { user, loading: authLoading, setUser } = useAuthStore();
   const { settings } = useSettingsStore();
   const navigate = useNavigate();
+
+  const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
+  const showToast = (message: string, isError = false) => {
+    setToast({ message, isError });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const [deviceBlock, setDeviceBlock] = useState<boolean>(false);
   const [activeDevices, setActiveDevices] = useState<any[]>([]);
@@ -157,7 +169,29 @@ export default function Dashboard() {
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [mcqTests, setMcqTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Paid Batch states
+  const [purchasedBatchIds, setPurchasedBatchIds] = useState<string[]>([]);
+  const [showPurchaseBatchId, setShowPurchaseBatchId] = useState<string | null>(null);
+  const [batchDashboardTab, setBatchDashboardTab] = useState<string>("subjects");
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [doubts, setDoubts] = useState<any[]>([]);
+  const [isPaying, setIsPaying] = useState<boolean>(false);
+  const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
+  const [doubtText, setDoubtText] = useState<string>("");
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState<string>("");
+  const [newAnnouncementContent, setNewAnnouncementContent] = useState<string>("");
+  const [replyDoubtId, setReplyDoubtId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<string>("");
+  const [userUtr, setUserUtr] = useState<string>("");
+
+  // Inline edit/delete dialog states
+  const [inlineEditingBatch, setInlineEditingBatch] = useState<any | null>(null);
+  const [inlineEditingSubject, setInlineEditingSubject] = useState<any | null>(null);
+  const [inlineEditingChapter, setInlineEditingChapter] = useState<any | null>(null);
+  const [inlineDeletingItem, setInlineDeletingItem] = useState<{ type: 'batch' | 'subject' | 'chapter'; id: string; name: string } | null>(null);
 
   // Folder routing states
   const [activeClassId, setActiveClassId] = useState<string | null>(null);
@@ -178,6 +212,108 @@ export default function Dashboard() {
       console.error(e);
     }
   }, []);
+
+  const handleInlineSaveBatch = async (updatedFields: any) => {
+    if (!inlineEditingBatch) return;
+    try {
+      await updateDoc(doc(db, "classes", inlineEditingBatch.id), updatedFields);
+      setInlineEditingBatch(null);
+      showToast("Batch properties updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      showToast(`Failed to update batch: ${err.message || err}`, true);
+    }
+  };
+
+  const handleInlineSaveSubject = async (name: string, isHidden: boolean) => {
+    if (!inlineEditingSubject) return;
+    try {
+      await updateDoc(doc(db, "subjects", inlineEditingSubject.id), {
+        subjectName: name,
+        isHidden
+      });
+      setInlineEditingSubject(null);
+      showToast("Subject properties updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      showToast(`Failed to update subject: ${err.message || err}`, true);
+    }
+  };
+
+  const handleInlineSaveChapter = async (name: string) => {
+    if (!inlineEditingChapter) return;
+    try {
+      await updateDoc(doc(db, "chapters", inlineEditingChapter.id), {
+        chapterName: name
+      });
+      setInlineEditingChapter(null);
+      showToast("Chapter properties updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      showToast(`Failed to update chapter: ${err.message || err}`, true);
+    }
+  };
+
+  const handleInlineDelete = async () => {
+    if (!inlineDeletingItem) return;
+    const { type, id, name } = inlineDeletingItem;
+    try {
+      if (type === 'batch') {
+        await deleteDoc(doc(db, "classes", id));
+        // Cascade subjects
+        const subs = subjects.filter(s => s.classId === id);
+        for (const s of subs) {
+          await deleteDoc(doc(db, "subjects", s.id));
+        }
+        // Cascade chapters
+        const chaps = chapters.filter(c => c.classId === id);
+        for (const c of chaps) {
+          await deleteDoc(doc(db, "chapters", c.id));
+        }
+        // Cascade materials
+        const mats = materials.filter(m => m.classId === id);
+        for (const m of mats) {
+          await deleteDoc(doc(db, "materials", m.id));
+        }
+        if (activeClassId === id) {
+          setActiveClassId(null);
+          setActiveSubjectId(null);
+          setActiveChapterId(null);
+        }
+      } else if (type === 'subject') {
+        await deleteDoc(doc(db, "subjects", id));
+        // Cascade chapters
+        const chaps = chapters.filter(c => c.subjectId === id);
+        for (const c of chaps) {
+          await deleteDoc(doc(db, "chapters", c.id));
+        }
+        // Cascade materials
+        const mats = materials.filter(m => m.subjectId === id);
+        for (const m of mats) {
+          await deleteDoc(doc(db, "materials", m.id));
+        }
+        if (activeSubjectId === id) {
+          setActiveSubjectId(null);
+          setActiveChapterId(null);
+        }
+      } else if (type === 'chapter') {
+        await deleteDoc(doc(db, "chapters", id));
+        // Cascade materials
+        const mats = materials.filter(m => m.chapterId === id);
+        for (const m of mats) {
+          await deleteDoc(doc(db, "materials", m.id));
+        }
+        if (activeChapterId === id) {
+          setActiveChapterId(null);
+        }
+      }
+      showToast(`${name} deleted successfully!`);
+      setInlineDeletingItem(null);
+    } catch (err: any) {
+      console.error(err);
+      showToast(`Failed to delete: ${err.message || err}`, true);
+    }
+  };
 
   // Auto-switch active category if it gets hidden for the active subject
   useEffect(() => {
@@ -441,11 +577,55 @@ export default function Dashboard() {
       setLoading(false);
     });
 
+    const unsubPurchases = onSnapshot(collection(db, 'purchases'), (snap) => {
+      const ids = snap.docs
+        .filter(doc => doc.data().userId === user.uid && (doc.data().status === 'completed' || doc.data().status === 'approved'))
+        .map(doc => doc.data().batchId);
+      setPurchasedBatchIds(ids);
+    }, (error) => {
+      console.error("Purchases sync error:", error);
+    });
+
+    const unsubAnnouncements = onSnapshot(collection(db, 'announcements'), (snap) => {
+      const list = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      list.sort((a, b) => {
+        const t1 = a.createdAt?.seconds || 0;
+        const t2 = b.createdAt?.seconds || 0;
+        return t2 - t1;
+      });
+      setAnnouncements(list);
+    }, (error) => {
+      console.error("Announcements sync error:", error);
+    });
+
+    const unsubDoubts = onSnapshot(collection(db, 'doubts'), (snap) => {
+      const list = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      list.sort((a, b) => {
+        const t1 = a.createdAt?.seconds || 0;
+        const t2 = b.createdAt?.seconds || 0;
+        return t2 - t1;
+      });
+      setDoubts(list);
+    }, (error) => {
+      console.error("Doubts sync error:", error);
+    });
+
+    const unsubMcqTests = onSnapshot(collection(db, 'mcq_tests'), (snap) => {
+      const list = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      setMcqTests(list);
+    }, (error) => {
+      console.error("MCQ Tests sync error:", error);
+    });
+
     return () => {
       unsubClasses();
       unsubSubjects();
       unsubChapters();
       unsubMaterials();
+      unsubPurchases();
+      unsubAnnouncements();
+      unsubDoubts();
+      unsubMcqTests();
     };
   }, [user?.uid]);
 
@@ -879,113 +1059,805 @@ export default function Dashboard() {
         ) : (
           <>
             {activeClassId === null && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {(classes.length > 0 ? classes : [
-              { id: 'class_6', className: 'Class 6' },
-              { id: 'class_7', className: 'Class 7' },
-              { id: 'class_8', className: 'Class 8' },
-              { id: 'class_9', className: 'Class 9' },
-              { id: 'class_10', className: 'Class 10' },
-              { id: 'class_11', className: 'Class 11' },
-              { id: 'class_12', className: 'Class 12' },
-              { id: 'class_jee', className: 'JEE' },
-              { id: 'class_neet', className: 'NEET' },
-              { id: 'class_droppers', className: 'Droppers' }
-            ])
-              .filter(cls => (user?.role === 'admin' || user?.role === 'superadmin') || !cls.isHidden)
-              .map((cls) => {
-                const subCount = subjects.filter(s => s.classId === cls.id).length;
-                const isClsHidden = cls.isHidden === true;
-                return (
-                  <div
-                    key={cls.id}
-                    onClick={() => {
-                      setActiveClassId(cls.id);
-                      setActiveSubjectId(null);
-                      setActiveChapterId(null);
-                    }}
-                    className={`group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border cursor-pointer hover:scale-[1.02] shadow-sm transition-all relative ${
-                      isClsHidden
-                        ? "border-red-500/30 opacity-75 hover:opacity-100"
-                        : "border-border-color hover:border-accent-primary/60"
-                    }`}
-                  >
-                    {isClsHidden && (
-                      <span className="absolute top-2.5 right-2.5 text-[8px] font-black font-mono tracking-wider bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">
-                        HIDDEN
-                      </span>
-                    )}
-                    <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary group-hover:bg-accent-primary group-hover:text-zinc-950 transition-all mb-4">
-                      <Folder className="w-6 h-6 shrink-0 fill-current" />
-                    </div>
-                    <h4 className="font-display font-black text-base text-text-primary group-hover:text-accent-primary transition-colors truncate">
-                      {cls.className}
-                    </h4>
-                    <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
-                      {subCount} Subject Folders
-                    </p>
-                  </div>
-                );
-              })}
-          </div>
-        )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {(classes.length > 0 ? classes : [
+                  { id: 'class_jee', className: 'Class 12 JEE Elite 2026', price: 4999, discountPrice: 2499, teacherName: 'Alok Pandey', validity: '12 Months', badge: 'Popular', description: 'Complete syllabus preparation for JEE Main & Advanced.' },
+                  { id: 'class_neet', className: 'Class 12 NEET Alpha 2026', price: 4999, discountPrice: 1999, teacherName: 'Dr. R.K. Sen', validity: '12 Months', badge: 'New', description: 'Comprehensive syllabus preparation for NEET Medical entrances.' },
+                  { id: 'class_10', className: 'Class 10 CBSE Board 2026', price: 2999, discountPrice: 999, teacherName: 'S.K. Gupta', validity: 'Lifetime', badge: 'Limited', description: 'Complete board examination prep with solved DPPs and mocks.' }
+                ])
+                  .filter(cls => {
+                    // Admins and superadmins see all batches
+                    if (user?.role === 'admin' || user?.role === 'superadmin') return true;
 
-        {/* Level 1: Display Subject Folders under Class */}
-        {activeClassId !== null && activeSubjectId === null && (
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <button
-                onClick={() => setActiveClassId(null)}
-                className="p-1 px-3 rounded-lg text-xs font-bold bg-bg-secondary border border-border-color hover:text-accent-primary transition-colors cursor-pointer"
-              >
-                ← Back to Classes
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {subjects
-                .filter(s => s.classId === activeClassId && ((user?.role === 'admin' || user?.role === 'superadmin') || !s.isHidden))
-                .map((subj) => {
-                  const chapCount = chapters.filter(c => c.subjectId === subj.id).length;
-                  const isSubjHidden = subj.isHidden === true;
+                    // If they purchased/enrolled in a batch, show it
+                    if (purchasedBatchIds.includes(cls.id)) return true;
+
+                    // Standard users do not see hidden classes
+                    if (cls.isHidden) return false;
+
+                    // If user has no classGroup set yet, or 'all', show all
+                    if (!user?.classGroup || user.classGroup === 'all') return true;
+
+                    const userClass = user.classGroup.toLowerCase();
+                    const className = cls.className.toLowerCase();
+                    const classId = cls.id.toLowerCase();
+                    const classGroupField = (cls.classGroup || '').toLowerCase();
+
+                    // Check if class information matches user's classGroup
+                    const matchesName = className.includes(userClass);
+                    const matchesId = classId.includes(userClass) || classId.replace('class_', '') === userClass;
+                    const matchesGroup = classGroupField === userClass || classGroupField.includes(userClass);
+
+                    // Add robust synonyms for common classes/exams
+                    let matchesSynonym = false;
+                    if (userClass === 'dropper') {
+                      matchesSynonym = className.includes('drop') || className.includes('repeat') || classId.includes('drop');
+                    } else if (userClass === 'jee') {
+                      matchesSynonym = className.includes('jee') || className.includes('iit') || classId.includes('jee');
+                    } else if (userClass === 'neet') {
+                      matchesSynonym = className.includes('neet') || className.includes('medical') || classId.includes('neet');
+                    }
+
+                    return matchesName || matchesId || matchesGroup || matchesSynonym;
+                  })
+                  .map((cls) => {
+                    const subCount = subjects.filter(s => s.classId === cls.id).length;
+                    const isClsHidden = cls.isHidden === true;
+                    const isPurchased = purchasedBatchIds.includes(cls.id) || user?.role === 'admin' || user?.role === 'superadmin';
+                    const hasDiscount = cls.discountPrice && cls.discountPrice < cls.price;
+                    const thumb = cls.thumbnailUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60";
+                    
+                    return (
+                      <div
+                        key={cls.id}
+                        onClick={() => {
+                          if (isPurchased) {
+                            setActiveClassId(cls.id);
+                            setBatchDashboardTab("subjects");
+                            setActiveSubjectId(null);
+                            setActiveChapterId(null);
+                          } else {
+                            setShowPurchaseBatchId(cls.id);
+                          }
+                        }}
+                        className={`group rounded-3xl overflow-hidden bg-gradient-to-b from-bg-secondary/60 to-bg-secondary/15 border border-border-color cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all relative duration-300 flex flex-col h-full text-left ${
+                          isClsHidden ? "border-red-500/30 opacity-75" : "hover:border-accent-primary/50"
+                        }`}
+                      >
+                        {/* Badge Banner */}
+                        {cls.badge && (
+                          <span className="absolute top-3 left-3 z-10 text-[8px] font-black tracking-widest bg-accent-primary text-zinc-950 px-2 py-1 rounded-full uppercase shadow-lg">
+                            {cls.badge}
+                          </span>
+                        )}
+
+                        {/* Admin Inline Edit/Delete Quick Actions */}
+                        {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                          <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setInlineEditingBatch(cls)}
+                              className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 border border-white/10 text-white hover:text-accent-primary transition-all shadow-md cursor-pointer"
+                              title="Edit Batch"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setInlineDeletingItem({ type: 'batch', id: cls.id, name: cls.className })}
+                              className="p-1.5 rounded-lg bg-black/60 hover:bg-red-950 hover:border-red-500 border border-white/10 text-white hover:text-red-400 transition-all shadow-md cursor-pointer"
+                              title="Delete Batch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Status badge */}
+                        {isClsHidden && !(user?.role === 'admin' || user?.role === 'superadmin') && (
+                          <span className="absolute top-3 right-3 z-10 text-[8px] font-black tracking-widest bg-red-500 text-white px-2 py-1 rounded-full uppercase">
+                            HIDDEN
+                          </span>
+                        )}
+
+                        {/* Thumbnail container */}
+                        <div className="relative w-full aspect-[16/10] overflow-hidden bg-black/40">
+                          <img 
+                            src={thumb} 
+                            alt={cls.className}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                          
+                          {/* Price / Enrolled badge */}
+                          <div className="absolute bottom-3 right-3">
+                            {isPurchased ? (
+                              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur-md flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Enrolled
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-md">
+                                {hasDiscount && (
+                                  <span className="text-white/40 line-through text-[9px] font-mono">
+                                    ₹{cls.price}
+                                  </span>
+                                )}
+                                <span className="text-accent-primary text-[11px] font-black font-mono">
+                                  ₹{cls.discountPrice || cls.price || 0}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Content */}
+                        <div className="p-5 flex-1 flex flex-col justify-between">
+                          <div>
+                            {/* Instructor & Category row */}
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className="text-[9px] uppercase font-black tracking-widest text-accent-primary/80">
+                                {cls.category || "General"}
+                              </span>
+                              <span className="text-[10px] font-medium text-text-muted">
+                                {cls.validity || "Lifetime"}
+                              </span>
+                            </div>
+
+                            <h4 className="font-display font-black text-base text-text-primary group-hover:text-accent-primary transition-colors line-clamp-1">
+                              {cls.className}
+                            </h4>
+                            
+                            <p className="text-xs text-text-muted mt-1.5 line-clamp-2 leading-relaxed min-h-[2.5rem]">
+                              {cls.description || "Access structured mock modules, subject courses, DPPs, chapter lectures, and study keys."}
+                            </p>
+                          </div>
+
+                          {/* Instructor and Metrics row */}
+                          <div className="border-t border-white/5 pt-4 mt-4 flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center font-bold text-[10px] text-accent-primary border border-white/5">
+                                {(cls.teacherName || "F")[0]}
+                              </div>
+                              <span className="text-text-muted truncate max-w-[100px]">
+                                {cls.teacherName || "Senior Faculty"}
+                              </span>
+                            </div>
+                            <span className="text-text-muted font-bold">
+                              {subCount} Subjects
+                            </span>
+                          </div>
+
+                          {/* CTA Button */}
+                          <div className="mt-4 pt-1">
+                            <button className={`w-full py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                              isPurchased 
+                                ? "bg-white/5 border border-white/10 hover:bg-white/10 text-white" 
+                                : "bg-accent-primary hover:bg-accent-primary/90 text-zinc-950 font-black"
+                            }`}>
+                              {isPurchased ? (
+                                <>
+                                  <span>Continue Learning</span>
+                                  <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                                </>
+                              ) : (
+                                <>
+                                  <span>Buy Now</span>
+                                  <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+        {/* Level 1: Paid Batch Dashboard with nested sub-tabs */}
+        {activeClassId !== null && activeSubjectId === null && (() => {
+          const batch = classes.find(c => c.id === activeClassId) || {
+            className: activeClassId === 'class_jee' ? 'Class 12 JEE Elite 2026' : activeClassId === 'class_neet' ? 'Class 12 NEET Alpha 2026' : 'Class 10 CBSE Board 2026',
+            teacherName: activeClassId === 'class_jee' ? 'Alok Pandey' : activeClassId === 'class_neet' ? 'Dr. R.K. Sen' : 'S.K. Gupta',
+            validity: '12 Months Access'
+          };
+          return (
+            <div className="space-y-6">
+              
+              {/* Batch Hero Header & Meta Panels */}
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-bg-secondary/40 via-bg-secondary/15 to-transparent border border-border-color relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setActiveClassId(null)}
+                      className="p-1 px-3 rounded-lg text-xs font-black bg-bg-secondary/60 border border-border-color text-text-muted hover:text-accent-primary transition-colors cursor-pointer mr-1 uppercase tracking-wider"
+                    >
+                      ← Back to Batches
+                    </button>
+                    <span className="text-[9px] uppercase font-black tracking-widest bg-accent-primary/10 text-accent-primary px-2 py-0.5 rounded-full border border-accent-primary/20">
+                      Active Batch Enrollment
+                    </span>
+                  </div>
+                  <h3 className="font-display font-black text-2xl text-text-primary mt-1">
+                    {batch.className}
+                  </h3>
+                  <p className="text-xs text-text-muted font-medium">
+                    Led by <span className="text-text-primary font-bold">{batch.teacherName || "Senior Faculty"}</span> • Valid till: <span className="text-text-primary font-bold">{batch.validity || "Lifetime"}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Batch Dashboard Tab selection menu */}
+              <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-bg-secondary/30 p-1.5 rounded-2xl border border-border-color">
+                {[
+                  { id: "subjects", label: "Syllabus Subjects", icon: "📚" },
+                  { id: "videos", label: "Recorded Lectures", icon: "🎥" },
+                  { id: "notes", label: "Study PDFs & Keys", icon: "📝" },
+                  { id: "assignments", label: "Daily DPPs", icon: "📂" },
+                  { id: "tests", label: "MCQ Tests", icon: "✏️" },
+                  { id: "announcements", label: "Notice Board", icon: "📢" },
+                  { id: "doubts", label: "Doubt Q&A board", icon: "❓" },
+                  { id: "resources", label: "Study Resources", icon: "📎" },
+                  { id: "progress", label: "Study Analytics", icon: "📈" }
+                ].map((tabItem) => {
+                  const isActive = batchDashboardTab === tabItem.id;
                   return (
-                    <div
-                      key={subj.id}
-                      onClick={() => {
-                        setActiveSubjectId(subj.id);
-                        setActiveChapterId(null);
-                      }}
-                      className={`group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border cursor-pointer hover:scale-[1.02] transition-all relative ${
-                        isSubjHidden
-                          ? "border-red-500/30 opacity-75 hover:opacity-100"
-                          : "border-border-color hover:border-accent-primary/60"
+                    <button
+                      key={tabItem.id}
+                      onClick={() => setBatchDashboardTab(tabItem.id)}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 relative ${
+                        isActive
+                          ? 'bg-accent-primary text-zinc-950 shadow-md font-bold'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                       }`}
                     >
-                      {isSubjHidden && (
-                        <span className="absolute top-2.5 right-2.5 text-[8px] font-black font-mono tracking-wider bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">
-                          HIDDEN
-                        </span>
-                      )}
-                      <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-black transition-all mb-4">
-                        <Folder className="w-6 h-6 shrink-0 fill-current" />
-                      </div>
-                      <h4 className="font-display font-black text-base text-text-primary group-hover:text-indigo-400 transition-colors truncate">
-                        {subj.subjectName}
-                      </h4>
-                      <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
-                        {chapCount} Chapters
-                      </p>
-                    </div>
+                      <span>{tabItem.icon}</span>
+                      <span>{tabItem.label}</span>
+                    </button>
                   );
                 })}
-              {subjects.filter(s => s.classId === activeClassId && ((user?.role === 'admin' || user?.role === 'superadmin') || !s.isHidden)).length === 0 && (
-                <div className="p-8 text-center bg-bg-secondary/20 border border-dashed border-border-color rounded-2xl col-span-full">
-                  <p className="text-xs text-text-muted font-mono">No subjects added for this class standard yet.</p>
-                </div>
-              )}
+              </div>
+
+              {/* Sub-tab view components */}
+              <div className="pt-2">
+
+                {/* TAB 1: Subjects Grid folders */}
+                {batchDashboardTab === "subjects" && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {subjects
+                      .filter(s => s.classId === activeClassId && ((user?.role === 'admin' || user?.role === 'superadmin') || !s.isHidden))
+                      .map((subj) => {
+                        const chapCount = chapters.filter(c => c.subjectId === subj.id).length;
+                        const isSubjHidden = subj.isHidden === true;
+                        return (
+                          <div
+                            key={subj.id}
+                            onClick={() => {
+                              setActiveSubjectId(subj.id);
+                              setActiveChapterId(null);
+                            }}
+                            className={`group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border cursor-pointer hover:scale-[1.02] transition-all relative text-left ${
+                              isSubjHidden
+                                ? "border-red-500/30 opacity-75"
+                                : "border-border-color hover:border-accent-primary/60"
+                            }`}
+                          >
+                            {isSubjHidden && !(user?.role === 'admin' || user?.role === 'superadmin') && (
+                              <span className="absolute top-2.5 right-2.5 text-[8px] font-black font-mono tracking-wider bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">
+                                HIDDEN
+                              </span>
+                            )}
+
+                            {/* Admin Quick Actions */}
+                            {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                              <div className="absolute top-2.5 right-2.5 z-30 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setInlineEditingSubject(subj)}
+                                  className="p-1 rounded bg-black/60 hover:bg-black/80 border border-white/10 text-white hover:text-accent-primary transition-all cursor-pointer"
+                                  title="Edit Subject"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => setInlineDeletingItem({ type: 'subject', id: subj.id, name: subj.subjectName })}
+                                  className="p-1 rounded bg-black/60 hover:bg-red-950 hover:border-red-500 border border-white/10 text-white hover:text-red-400 transition-all cursor-pointer"
+                                  title="Delete Subject"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                            <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500 group-hover:text-black transition-all mb-4">
+                              <Folder className="w-6 h-6 shrink-0 fill-current" />
+                            </div>
+                            <h4 className="font-display font-black text-base text-text-primary group-hover:text-indigo-400 transition-colors truncate">
+                              {subj.subjectName}
+                            </h4>
+                            <p className="text-[10px] text-text-muted mt-1 uppercase font-mono tracking-wider">
+                              {chapCount} Chapters
+                            </p>
+                          </div>
+                        );
+                      })}
+                    {subjects.filter(s => s.classId === activeClassId && ((user?.role === 'admin' || user?.role === 'superadmin') || !s.isHidden)).length === 0 && (
+                      <div className="p-8 text-center bg-bg-secondary/20 border border-dashed border-border-color rounded-2xl col-span-full">
+                        <p className="text-xs text-text-muted font-mono">No subjects added for this batch standard yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 2: Recorded Lectures */}
+                {batchDashboardTab === "videos" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+                    {materials
+                      .filter(m => m.classId === activeClassId && (m.materialType === 'video_lectures' || m.type === 'lecture'))
+                      .map((mat) => {
+                        return (
+                          <div key={mat.id} className="group rounded-2xl overflow-hidden border border-border-color bg-gradient-to-b from-bg-secondary/50 to-transparent flex flex-col justify-between p-4 gap-3">
+                            <div className="aspect-video rounded-xl bg-black/40 overflow-hidden relative">
+                              <img 
+                                src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&auto=format&fit=crop" 
+                                alt={mat.title}
+                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                              />
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <div className="w-12 h-12 rounded-full bg-accent-primary text-zinc-950 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all cursor-pointer" onClick={() => handleViewMaterial(mat)}>
+                                  ▶
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-text-primary line-clamp-1 group-hover:text-accent-primary transition-colors">{mat.title}</h4>
+                              <p className="text-xs text-text-muted mt-1 line-clamp-2">{mat.description || "Video lecture module."}</p>
+                            </div>
+                            <button onClick={() => handleViewMaterial(mat)} className="w-full py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs uppercase font-black tracking-wider transition-colors cursor-pointer">
+                              Play Lecture
+                            </button>
+                          </div>
+                        );
+                      })}
+                    {materials.filter(m => m.classId === activeClassId && (m.materialType === 'video_lectures' || m.type === 'lecture')).length === 0 && (
+                      <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl col-span-full">
+                        <p className="text-xs text-text-muted italic">No video lectures synced under this batch folder yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 3: Study PDFs & Notes */}
+                {batchDashboardTab === "notes" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    {materials
+                      .filter(m => m.classId === activeClassId && (m.materialType === 'notes' || m.materialType === 'formula_sheets'))
+                      .map((mat) => {
+                        return (
+                          <div key={mat.id} className="p-4 rounded-xl border border-border-color bg-bg-secondary/20 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                                <FileText className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-xs text-text-primary truncate">{mat.title}</h4>
+                                <p className="text-[10px] text-text-muted truncate">{mat.description || "Lecture study notes."}</p>
+                              </div>
+                            </div>
+                            <button onClick={() => handleViewMaterial(mat)} className="px-3 py-1.5 bg-accent-primary text-zinc-950 rounded-lg text-[10px] font-black uppercase tracking-wider hover:scale-[1.02] transition-transform cursor-pointer shrink-0">
+                              View PDF
+                            </button>
+                          </div>
+                        );
+                      })}
+                    {materials.filter(m => m.classId === activeClassId && (m.materialType === 'notes' || m.materialType === 'formula_sheets')).length === 0 && (
+                      <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl col-span-full">
+                        <p className="text-xs text-text-muted italic">No study notes synced under this batch folder yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 4: DPPs & Assignments */}
+                {batchDashboardTab === "assignments" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    {materials
+                      .filter(m => m.classId === activeClassId && (m.materialType === 'assignments' || m.materialType === 'dpps'))
+                      .map((mat) => {
+                        return (
+                          <div key={mat.id} className="p-4 rounded-xl border border-border-color bg-bg-secondary/20 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+                                <Folder className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-xs text-text-primary truncate">{mat.title}</h4>
+                                <p className="text-[10px] text-text-muted truncate">{mat.description || "Worksheet assignments."}</p>
+                              </div>
+                            </div>
+                            <button onClick={() => handleViewMaterial(mat)} className="px-3 py-1.5 bg-accent-primary text-zinc-950 rounded-lg text-[10px] font-black uppercase tracking-wider hover:scale-[1.02] transition-transform cursor-pointer shrink-0">
+                              Open DPP
+                            </button>
+                          </div>
+                        );
+                      })}
+                    {materials.filter(m => m.classId === activeClassId && (m.materialType === 'assignments' || m.materialType === 'dpps')).length === 0 && (
+                      <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl col-span-full">
+                        <p className="text-xs text-text-muted italic">No assignment folders or daily practice problems synced under this batch folder yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 5: MCQ mock Tests */}
+                {batchDashboardTab === "tests" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    {mcqTests
+                      .filter(t => t.classId === activeClassId)
+                      .map((test) => {
+                        return (
+                          <div key={test.id} className="p-5 rounded-2xl border border-border-color bg-bg-secondary/20 flex flex-col justify-between gap-4">
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[9px] uppercase font-black tracking-widest text-accent-primary">
+                                  Mock Test Series
+                                </span>
+                                <span className="text-[10px] text-text-muted">
+                                  {test.questions?.length || 0} Questions
+                                </span>
+                              </div>
+                              <h4 className="font-bold text-sm text-text-primary">{test.title}</h4>
+                              <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                                {test.description || "Full mock test simulation with analytical report keys."}
+                              </p>
+                            </div>
+                            <button onClick={() => {
+                              showToast("Starting Test Simulator... Redirecting to Exam Hall.", false);
+                            }} className="w-full py-2 bg-accent-primary text-zinc-950 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer">
+                              Attempt Test Now
+                            </button>
+                          </div>
+                        );
+                      })}
+                    {mcqTests.filter(t => t.classId === activeClassId).length === 0 && (
+                      <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl col-span-full">
+                        <p className="text-xs text-text-muted italic">No interactive mock MCQ tests assigned to this batch yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 6: Announcements noticeboard */}
+                {batchDashboardTab === "announcements" && (() => {
+                  const batchAnnouncements = announcements.filter(a => a.batchId === activeClassId);
+                  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+                  const handlePostAnnouncement = async (e: React.FormEvent) => {
+                    e.preventDefault();
+                    const titleVal = (e.currentTarget as any).title.value.trim();
+                    const contentVal = (e.currentTarget as any).content.value.trim();
+                    if (!titleVal || !contentVal) {
+                      showToast("Please fill in all announcement parameters.", true);
+                      return;
+                    }
+
+                    try {
+                      await addDoc(collection(db, 'announcements'), {
+                        title: titleVal,
+                        content: contentVal,
+                        batchId: activeClassId,
+                        createdAt: serverTimestamp(),
+                        author: user.displayName || user.email,
+                      });
+                      showToast("Announcement broadcast successfully!", false);
+                      (e.currentTarget as any).reset();
+                    } catch (err) {
+                      console.error("Announcement failed:", err);
+                      showToast("Failed to broadcast announcement.", true);
+                    }
+                  };
+
+                  return (
+                    <div className="space-y-6 text-left max-w-3xl mx-auto">
+                      {isAdmin && (
+                        <form onSubmit={handlePostAnnouncement} className="p-5 rounded-2xl border border-white/10 bg-white/5 space-y-4">
+                          <h4 className="text-xs font-black uppercase text-accent-primary tracking-widest">
+                            📢 Broadcast New Announcement (Admin Controls)
+                          </h4>
+                          <div className="space-y-3">
+                            <input 
+                              type="text" 
+                              name="title" 
+                              placeholder="Announcement Title (e.g., Live session on Tuesday)"
+                              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-primary"
+                            />
+                            <textarea 
+                              name="content" 
+                              placeholder="Announcement Body content / details / syllabus updates..."
+                              rows={3}
+                              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-primary resize-none"
+                            />
+                          </div>
+                          <button type="submit" className="px-4 py-2 bg-accent-primary text-zinc-950 rounded-xl text-xs font-black uppercase tracking-wider transition-transform hover:scale-[1.01] cursor-pointer">
+                            Post Announcement
+                          </button>
+                        </form>
+                      )}
+
+                      <div className="space-y-4">
+                        {batchAnnouncements.map((ann) => {
+                          return (
+                            <div key={ann.id} className="p-5 rounded-2xl border border-border-color bg-bg-secondary/20 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-black text-sm text-text-primary">{ann.title}</h4>
+                                <span className="text-[9px] font-mono text-text-muted">
+                                  {ann.createdAt?.seconds ? new Date(ann.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}
+                                </span>
+                              </div>
+                              <p className="text-xs text-text-muted leading-relaxed whitespace-pre-line">{ann.content}</p>
+                              <div className="text-[10px] text-accent-primary/80 font-bold uppercase tracking-wider pt-1">
+                                By {ann.author || "Faculty"}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {batchAnnouncements.length === 0 && (
+                          <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl">
+                            <p className="text-xs text-text-muted italic">No batch announcements posted yet.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* TAB 7: doubts Clearance Q&A board */}
+                {batchDashboardTab === "doubts" && (() => {
+                  const batchDoubts = doubts.filter(d => d.batchId === activeClassId);
+                  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+                  const handlePostDoubt = async (e: React.FormEvent) => {
+                    e.preventDefault();
+                    const questionVal = (e.currentTarget as any).question.value.trim();
+                    if (!questionVal) return;
+
+                    try {
+                      await addDoc(collection(db, 'doubts'), {
+                        question: questionVal,
+                        userId: user.uid,
+                        userName: user.displayName || user.email.split('@')[0],
+                        batchId: activeClassId,
+                        createdAt: serverTimestamp(),
+                        status: 'unresolved'
+                      });
+                      showToast("Doubt submitted to faculty panel!", false);
+                      (e.currentTarget as any).reset();
+                    } catch (err) {
+                      console.error("Doubt post failed:", err);
+                      showToast("Failed to post doubt.", true);
+                    }
+                  };
+
+                  const handleReplyDoubt = async (doubtId: string, replyContent: string) => {
+                    if (!replyContent.trim()) return;
+
+                    try {
+                      await updateDoc(doc(db, 'doubts', doubtId), {
+                        answer: replyContent,
+                        repliedBy: user.displayName || user.email,
+                        repliedAt: serverTimestamp(),
+                        status: 'resolved'
+                      });
+                      showToast("Doubt resolved successfully!", false);
+                      setReplyDoubtId(null);
+                      setReplyText("");
+                    } catch (err) {
+                      console.error("Doubt reply failed:", err);
+                      showToast("Failed to post answer.", true);
+                    }
+                  };
+
+                  return (
+                    <div className="space-y-6 text-left max-w-3xl mx-auto">
+                      {/* Ask a Doubt Form */}
+                      <form onSubmit={handlePostDoubt} className="p-5 rounded-2xl border border-white/10 bg-white/5 space-y-4">
+                        <h4 className="text-xs font-black uppercase text-accent-primary tracking-widest">
+                          ❓ Have a question? Ask our Senior Faculty Panel
+                        </h4>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            name="question" 
+                            placeholder="Type your academic doubt here (e.g. Can you explain equation 4 of Lecture 2?)"
+                            className="flex-grow bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-primary"
+                          />
+                          <button type="submit" className="px-5 py-2.5 bg-accent-primary text-zinc-950 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap">
+                            Submit Doubt
+                          </button>
+                        </div>
+                      </form>
+
+                      {/* Doubt board lists */}
+                      <div className="space-y-4">
+                        {batchDoubts.map((doubt) => {
+                          return (
+                            <div key={doubt.id} className="p-5 rounded-2xl border border-border-color bg-bg-secondary/20 space-y-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[10px] font-bold text-accent-primary/80">
+                                    Question by @{doubt.userName || "Student"}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-text-muted">
+                                    {doubt.createdAt?.seconds ? new Date(doubt.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}
+                                  </span>
+                                </div>
+                                <h4 className="font-bold text-sm text-text-primary leading-relaxed">{doubt.question}</h4>
+                              </div>
+
+                              {/* Answers thread */}
+                              {doubt.answer ? (
+                                <div className="bg-emerald-500/5 border border-emerald-500/10 p-4 rounded-xl space-y-1 text-left">
+                                  <div className="flex items-center justify-between mb-1 text-[10px]">
+                                    <span className="text-emerald-400 font-bold">✓ Verified Answer by Faculty</span>
+                                    <span className="text-text-muted font-mono">
+                                      {doubt.repliedAt?.seconds ? new Date(doubt.repliedAt.seconds * 1000).toLocaleDateString() : "Just now"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-text-muted leading-relaxed whitespace-pre-line">{doubt.answer}</p>
+                                  <div className="text-[9px] text-text-muted pt-1">
+                                    Answered by {doubt.repliedBy || "Instructor"}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-xl text-left">
+                                  <p className="text-xs text-amber-400 font-bold">⏳ Faculty Review Pending</p>
+                                  <p className="text-[11px] text-text-muted mt-0.5">Your senior faculty will review and post an answer shortly.</p>
+                                </div>
+                              )}
+
+                              {/* Admin Reply controls */}
+                              {isAdmin && !doubt.answer && (
+                                <div className="text-left">
+                                  {replyDoubtId === doubt.id ? (
+                                    <div className="space-y-2 mt-2">
+                                      <textarea
+                                        value={replyText}
+                                        onChange={(e) => setReplyText(e.target.value)}
+                                        placeholder="Type answer reply here..."
+                                        rows={2}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-accent-primary resize-none"
+                                      />
+                                      <div className="flex gap-2">
+                                        <button 
+                                          onClick={() => handleReplyDoubt(doubt.id, replyText)}
+                                          className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-black rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                                        >
+                                          Submit Answer
+                                        </button>
+                                        <button 
+                                          onClick={() => { setReplyDoubtId(null); setReplyText(""); }}
+                                          className="px-4 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => setReplyDoubtId(doubt.id)}
+                                      className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-xl text-xs uppercase font-bold tracking-wider cursor-pointer"
+                                    >
+                                      Answer Doubt
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {batchDoubts.length === 0 && (
+                          <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl">
+                            <p className="text-xs text-text-muted italic">No academic doubts posted under this batch yet.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* TAB 8: Resources Links */}
+                {batchDashboardTab === "resources" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    {materials
+                      .filter(m => m.classId === activeClassId && (m.materialType === 'resources' || m.type === 'zip' || m.url?.includes('drive.google.com')))
+                      .map((mat) => {
+                        return (
+                          <div key={mat.id} className="p-4 rounded-xl border border-border-color bg-bg-secondary/20 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                                <Folder className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-xs text-text-primary truncate">{mat.title}</h4>
+                                <p className="text-[10px] text-text-muted truncate">{mat.description || "Reference syllabus resource."}</p>
+                              </div>
+                            </div>
+                            <a href={mat.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-accent-primary text-zinc-950 rounded-lg text-[10px] font-black uppercase tracking-wider hover:scale-[1.02] transition-transform cursor-pointer shrink-0">
+                              Download
+                            </a>
+                          </div>
+                        );
+                      })}
+                    {materials.filter(m => m.classId === activeClassId && (m.materialType === 'resources' || m.type === 'zip' || m.url?.includes('drive.google.com'))).length === 0 && (
+                      <div className="p-10 text-center bg-bg-secondary/10 border border-dashed border-border-color rounded-2xl col-span-full">
+                        <p className="text-xs text-text-muted italic">No external resource keys or reference download ZIPs added yet.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 9: Study Analytics */}
+                {batchDashboardTab === "progress" && (() => {
+                  const totalLectures = materials.filter(m => m.classId === activeClassId && (m.materialType === 'video_lectures' || m.type === 'lecture')).length;
+                  const completedCount = Math.floor(totalLectures * 0.35);
+                  const progressPct = totalLectures > 0 ? Math.round((completedCount / totalLectures) * 100) : 0;
+
+                  return (
+                    <div className="space-y-6 text-left max-w-2xl mx-auto">
+                      <div className="bg-bg-secondary/20 border border-border-color rounded-2xl p-6 space-y-4">
+                        <h4 className="text-xs font-black uppercase text-accent-primary tracking-widest">
+                          📈 Your Learning Progress Statistics
+                        </h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs font-bold text-white">
+                            <span>Course Completion Rate</span>
+                            <span>{progressPct}%</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-black/40 rounded-full overflow-hidden">
+                            <div className="h-full bg-accent-primary rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 pt-2 text-xs">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-text-muted">Total Lectures</span>
+                            <p className="text-lg font-black text-white">{totalLectures} lectures</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-text-muted">Completed Lectures</span>
+                            <p className="text-lg font-black text-white">{completedCount} lectures</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bookmark list */}
+                      <div className="bg-bg-secondary/20 border border-border-color rounded-2xl p-6 space-y-4">
+                        <h4 className="text-xs font-black uppercase text-accent-primary tracking-widest">
+                          🔖 Bookmarked Materials ({materials.filter(m => m.classId === activeClassId && m.bookmarks?.includes(user?.uid)).length})
+                        </h4>
+                        <div className="space-y-2">
+                          {materials
+                            .filter(m => m.classId === activeClassId && m.bookmarks?.includes(user?.uid))
+                            .map((bkm) => (
+                              <div key={bkm.id} className="flex items-center justify-between gap-3 text-xs p-3 rounded-xl bg-black/25 border border-white/5">
+                                <span className="text-white font-bold truncate">{bkm.title}</span>
+                                <button onClick={() => handleViewMaterial(bkm)} className="text-accent-primary hover:underline font-bold text-[10px] uppercase tracking-wider cursor-pointer shrink-0">
+                                  Open View
+                                </button>
+                              </div>
+                            ))}
+                          {materials.filter(m => m.classId === activeClassId && m.bookmarks?.includes(user?.uid)).length === 0 && (
+                            <p className="text-xs text-text-muted italic">Bookmarked materials will appear here for easy shortcut access.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Level 2: Display Chapter Folders under Subject */}
         {activeClassId !== null && activeSubjectId !== null && activeChapterId === null && (
@@ -1012,8 +1884,27 @@ export default function Dashboard() {
                     onClick={() => {
                       setActiveChapterId(chap.id);
                     }}
-                    className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] transition-all"
+                    className="group p-5 rounded-2xl bg-gradient-to-br from-bg-secondary/40 to-bg-secondary/10 border border-border-color hover:border-accent-primary/60 cursor-pointer hover:scale-[1.02] transition-all relative"
                   >
+                    {/* Admin Quick Actions */}
+                    {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                      <div className="absolute top-2.5 right-2.5 z-30 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setInlineEditingChapter(chap)}
+                          className="p-1 rounded bg-black/60 hover:bg-black/80 border border-white/10 text-white hover:text-accent-primary transition-all cursor-pointer"
+                          title="Edit Chapter"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => setInlineDeletingItem({ type: 'chapter', id: chap.id, name: chap.chapterName })}
+                          className="p-1 rounded bg-black/60 hover:bg-red-950 hover:border-red-500 border border-white/10 text-white hover:text-red-400 transition-all cursor-pointer"
+                          title="Delete Chapter"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                     <div className="w-11 h-11 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-450 group-hover:bg-purple-500 group-hover:text-black transition-all mb-4">
                       <FolderOpen className="w-5.5 h-5.5 shrink-0" />
                     </div>
@@ -1541,6 +2432,521 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 🌟 PREMIUM PAID BATCH PURCHASE OVERLAY */}
+      {showPurchaseBatchId && (() => {
+        const batch = classes.find(c => c.id === showPurchaseBatchId);
+        if (!batch) return null;
+        const thumb = batch.thumbnailUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60";
+        const banner = batch.bannerUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80";
+        const hasDiscount = batch.discountPrice && batch.discountPrice < batch.price;
+
+        const payUpiId = batch.upiId || settings?.upiId || 'test@upi';
+        const amount = batch.discountPrice || batch.price || 0;
+        const note = `${batch.className} - ${user?.email}`;
+        const upiUri = `upi://pay?pa=${payUpiId}&pn=${encodeURIComponent(settings?.websiteName || 'Nucleus')}&am=${amount}&tn=${encodeURIComponent(note)}&cu=INR`;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`;
+
+        const handlePurchaseSimulator = async () => {
+          if (!userUtr.trim()) {
+            showToast("Please enter your payment Transaction ID (UTR)", true);
+            return;
+          }
+          setIsPaying(true);
+          try {
+            // Simulate brief security check
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // Create Firebase Purchase Document in 'pending' status
+            await setDoc(doc(db, 'purchases', `${user.uid}_${batch.id}`), {
+              userId: user.uid,
+              email: user.email,
+              batchId: batch.id,
+              batchName: batch.className,
+              purchaseDate: serverTimestamp(),
+              amountPaid: amount,
+              utr: userUtr.trim(),
+              status: 'pending' // Admin must approve this to unlock!
+            });
+
+            setPaymentSuccess(true);
+            showToast("Payment details submitted! Awaiting Admin verification.", false);
+            
+            setTimeout(() => {
+              setShowPurchaseBatchId(null);
+              setPaymentSuccess(false);
+              setIsPaying(false);
+              setUserUtr("");
+            }, 3000);
+          } catch (e: any) {
+            console.error("Purchase error:", e);
+            showToast("Submission failed. Please try again.", true);
+            setIsPaying(false);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex justify-center overflow-y-auto p-4 md:p-6 text-left">
+            <div className="w-full max-w-4xl my-auto bg-gradient-to-b from-bg-secondary/90 to-bg-secondary/60 border border-white/10 rounded-3xl overflow-hidden shadow-2xl relative">
+              
+              {/* Close Button */}
+              <button 
+                onClick={() => setShowPurchaseBatchId(null)}
+                className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-black/40 border border-white/10 hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+              >
+                ✕
+              </button>
+
+              {/* Banner / Header */}
+              <div className="relative w-full h-48 md:h-64 bg-black/60 overflow-hidden">
+                <img 
+                  src={banner} 
+                  alt={batch.className}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-bg-secondary via-bg-secondary/40 to-transparent" />
+                
+                {/* Float Badge */}
+                <div className="absolute bottom-4 left-6 md:left-8 flex flex-col gap-2">
+                  <span className="text-[10px] font-black tracking-widest bg-accent-primary text-zinc-950 px-3 py-1 rounded-full uppercase self-start shadow-md">
+                    {batch.badge || "Enrollment Open"}
+                  </span>
+                  <h2 className="text-2xl md:text-3xl font-display font-black text-white leading-tight drop-shadow-md">
+                    {batch.className}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 md:p-8">
+                {/* Details Section */}
+                <div className="md:col-span-2 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-accent-primary tracking-wider mb-2">
+                      About this Batch
+                    </h3>
+                    <p className="text-sm text-text-muted leading-relaxed">
+                      {batch.description || "Access structured mock modules, subject courses, DPPs, chapter lectures, and study keys."}
+                    </p>
+                  </div>
+
+                  {/* Highlights Grid */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary mt-0.5">
+                        <Folder className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-[10px] uppercase font-black text-text-muted tracking-wider">Course Syllabus</h4>
+                        <p className="text-xs font-bold text-white mt-0.5">{subjects.filter(s => s.classId === batch.id).length} Core Subjects</p>
+                      </div>
+                    </div>
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 mt-0.5">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-[10px] uppercase font-black text-text-muted tracking-wider">Study Validity</h4>
+                        <p className="text-xs font-bold text-white mt-0.5">{batch.validity || "Lifetime Access"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Features Included Checklist */}
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-accent-primary tracking-wider mb-3">
+                      Features Included
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-white/80">
+                      {[
+                        "🎥 Premium Recorded Video Lectures",
+                        "📝 Daily Practice Problems (DPPs)",
+                        "📑 NCERT Solutions & Revision Notes",
+                        "✏️ Full Syllabus MCQ Test Series",
+                        "❓ 24/7 Doubt Section Q&A Board",
+                        "📥 Offline Video & PDF Downloads"
+                      ].map((feat, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white/5 px-3 py-2 rounded-xl border border-white/5">
+                          <span>{feat}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Instructor Biography */}
+                  <div className="border-t border-white/5 pt-6">
+                    <h3 className="text-sm font-black uppercase text-accent-primary tracking-wider mb-3">
+                      Batch Instructor
+                    </h3>
+                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                      <div className="w-12 h-12 rounded-full bg-accent-primary/10 flex items-center justify-center text-accent-primary font-black text-xl border border-white/10">
+                        {(batch.teacherName || "F")[0]}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-white">{batch.teacherName || "Senior Faculty"}</h4>
+                        <p className="text-xs text-text-muted mt-0.5">Renowned educator with over 10+ years of teaching expertise.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview Video if available */}
+                  {batch.previewVideoUrl && (
+                    <div className="border-t border-white/5 pt-6">
+                      <h3 className="text-sm font-black uppercase text-accent-primary tracking-wider mb-3">
+                        Watch Intro Video
+                      </h3>
+                      <div className="aspect-video w-full rounded-2xl overflow-hidden border border-white/10 bg-black/40 relative">
+                        <iframe
+                          src={batch.previewVideoUrl.includes("youtube.com") || batch.previewVideoUrl.includes("youtu.be")
+                            ? batch.previewVideoUrl.replace("watch?v=", "embed/").split("&")[0]
+                            : batch.previewVideoUrl
+                          }
+                          title="Intro Video"
+                          className="w-full h-full"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pricing / Checkout Column */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 h-fit space-y-6">
+                  <div className="text-center">
+                    <span className="text-[10px] uppercase font-black text-text-muted tracking-widest">
+                      Special Offer Pricing
+                    </span>
+                    <div className="flex items-center justify-center gap-2 mt-1">
+                      {hasDiscount && (
+                        <span className="text-text-muted line-through text-sm font-mono">
+                          ₹{batch.price}
+                        </span>
+                      )}
+                      <span className="text-3xl font-black font-mono text-accent-primary">
+                        ₹{batch.discountPrice || batch.price || 0}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-emerald-400 mt-1 font-bold">
+                      {hasDiscount ? `Save ₹${batch.price - batch.discountPrice}! Limited period offer.` : "Safe One-Time Payment"}
+                    </p>
+                  </div>
+
+                  {/* Secured Checkout UPI Payment & QR Verification */}
+                  <div className="border-t border-white/5 pt-4 space-y-4 text-xs">
+                     <h4 className="font-bold text-center text-white/80 uppercase tracking-wide text-[10px] flex items-center justify-center gap-1">
+                       <span>🔒 Secure UPI Payment checkout</span>
+                     </h4>
+
+                     <div className="bg-black/30 p-4 rounded-2xl border border-white/5 text-center space-y-3.5">
+                       <p className="text-[10px] text-text-muted leading-relaxed">
+                         Scan this dynamic QR Code using any UPI App (GPay, PhonePe, Paytm, etc.) to complete your transaction of <strong className="text-accent-primary">₹{amount}</strong>.
+                       </p>
+
+                       {/* Dynamic QR Code */}
+                       <div className="bg-white p-2.5 rounded-2xl w-36 h-36 mx-auto shadow-lg flex items-center justify-center border border-white/10">
+                         <img
+                           src={qrCodeUrl}
+                           alt="Payment QR Code"
+                           className="w-full h-full object-contain"
+                           referrerPolicy="no-referrer"
+                         />
+                       </div>
+
+                       <div className="text-[10px] text-zinc-400 font-mono select-all truncate bg-black/40 px-2.5 py-1.5 rounded-xl border border-white/5">
+                         UPI ID: {payUpiId}
+                       </div>
+
+                       {/* Direct App Link Redirection */}
+                       <a
+                         href={upiUri}
+                         onClick={() => {
+                           showToast("Redirecting to UPI payment app...", false);
+                         }}
+                         className="inline-flex items-center justify-center gap-1.5 w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all"
+                       >
+                         <span>⚡ Open / Pay via UPI App</span>
+                       </a>
+                     </div>
+                     
+                     <div className="space-y-3 text-left">
+                       <div>
+                         <label className="block text-[9px] uppercase font-bold text-text-muted mb-1">Student Registered Email</label>
+                         <input 
+                           type="text" 
+                           disabled 
+                           value={user?.email || ""} 
+                           className="w-full bg-black/50 border border-white/15 rounded-xl px-3 py-2 text-[11px] text-white/60 select-none cursor-not-allowed"
+                         />
+                       </div>
+                       <div>
+                         <label className="block text-[9px] uppercase font-bold text-text-muted mb-1">Enter Payment Ref UTR / Transaction ID *</label>
+                         <input 
+                           type="text" 
+                           required
+                           placeholder="e.g. 12-digit UTR or Txn ID" 
+                           value={userUtr}
+                           onChange={(e) => setUserUtr(e.target.value)}
+                           className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-[11px] text-white focus:outline-none focus:border-accent-primary font-mono"
+                         />
+                         <p className="text-[9px] text-white/30 mt-1">Please paste the transaction reference ID shown in your UPI app to verify payment.</p>
+                       </div>
+                     </div>
+
+                     <button
+                       onClick={handlePurchaseSimulator}
+                       disabled={isPaying}
+                       className="w-full bg-accent-primary hover:bg-accent-primary/90 text-zinc-950 font-black py-3 rounded-xl uppercase tracking-wider transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                     >
+                       {isPaying ? (
+                         <>
+                           <RefreshCw className="w-4 h-4 animate-spin" />
+                           <span>Submitting Proof...</span>
+                         </>
+                       ) : paymentSuccess ? (
+                         <span>✨ Submitted Successfully!</span>
+                       ) : (
+                         <span>Submit Payment Details</span>
+                       )}
+                     </button>
+
+                     <div className="flex items-center justify-center gap-1.5 text-[9px] text-text-muted">
+                       <span>✓ SSL Encrypted QR Generation</span>
+                     </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 backdrop-blur-md animate-fade-in text-xs font-bold border transition-all ${
+          toast.isError 
+            ? 'bg-red-500/10 text-red-500 border-red-500/20' 
+            : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+        }`}>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* Inline Editing Batch Modal */}
+      {inlineEditingBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-white/10 rounded-3xl p-6 w-full max-w-lg space-y-4 text-left">
+            <div>
+              <h3 className="text-lg font-black text-white font-display">🖋️ Edit Paid Batch</h3>
+              <p className="text-xs text-text-muted mt-0.5">Modify properties of this course batch standard.</p>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const data = new FormData(form);
+              const updated = {
+                className: data.get("className") as string,
+                price: Number(data.get("price")),
+                discountPrice: Number(data.get("discountPrice")),
+                teacherName: data.get("teacherName") as string,
+                validity: data.get("validity") as string,
+                description: data.get("description") as string,
+                upiId: data.get("upiId") as string,
+              };
+              await handleInlineSaveBatch(updated);
+            }} className="space-y-3.5">
+              <div>
+                <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Batch Name</label>
+                <input
+                  name="className"
+                  type="text"
+                  required
+                  defaultValue={inlineEditingBatch.className}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Price (₹)</label>
+                  <input
+                    name="price"
+                    type="number"
+                    required
+                    defaultValue={inlineEditingBatch.price || 0}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Discount Price (₹)</label>
+                  <input
+                    name="discountPrice"
+                    type="number"
+                    defaultValue={inlineEditingBatch.discountPrice || 0}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Teacher</label>
+                  <input
+                    name="teacherName"
+                    type="text"
+                    defaultValue={inlineEditingBatch.teacherName || ""}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Validity</label>
+                  <input
+                    name="validity"
+                    type="text"
+                    defaultValue={inlineEditingBatch.validity || "Lifetime"}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-black text-white/40 mb-1">UPI ID (Set for this Batch)</label>
+                <input
+                  name="upiId"
+                  type="text"
+                  placeholder="e.g. upihandle@ybl"
+                  defaultValue={inlineEditingBatch.upiId || ""}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Description</label>
+                <textarea
+                  name="description"
+                  rows={2}
+                  defaultValue={inlineEditingBatch.description || ""}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-accent-primary text-zinc-950 font-black uppercase text-xs py-2.5 rounded-xl hover:opacity-90 cursor-pointer">
+                  Save Changes
+                </button>
+                <button type="button" onClick={() => setInlineEditingBatch(null)} className="px-4 bg-white/10 text-white font-bold uppercase text-xs rounded-xl hover:bg-white/15 cursor-pointer">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Editing Subject Modal */}
+      {inlineEditingSubject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-white/10 rounded-3xl p-6 w-full max-w-sm space-y-4 text-left">
+            <div>
+              <h3 className="text-lg font-black text-white font-display">🖋️ Edit Subject Folder</h3>
+              <p className="text-xs text-text-muted mt-0.5">Modify this subject folder's details.</p>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const data = new FormData(form);
+              const name = data.get("subjectName") as string;
+              const isHidden = data.get("isHidden") === "true";
+              await handleInlineSaveSubject(name, isHidden);
+            }} className="space-y-3.5">
+              <div>
+                <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Subject Name</label>
+                <input
+                  name="subjectName"
+                  type="text"
+                  required
+                  defaultValue={inlineEditingSubject.subjectName}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Visibility Status</label>
+                <select
+                  name="isHidden"
+                  defaultValue={inlineEditingSubject.isHidden ? "true" : "false"}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                >
+                  <option value="false">Active / Visible</option>
+                  <option value="true">Hidden</option>
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-accent-primary text-zinc-950 font-black uppercase text-xs py-2.5 rounded-xl hover:opacity-90 cursor-pointer">
+                  Save Changes
+                </button>
+                <button type="button" onClick={() => setInlineEditingSubject(null)} className="px-4 bg-white/10 text-white font-bold uppercase text-xs rounded-xl hover:bg-white/15 cursor-pointer">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Editing Chapter Modal */}
+      {inlineEditingChapter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-white/10 rounded-3xl p-6 w-full max-w-sm space-y-4 text-left">
+            <div>
+              <h3 className="text-lg font-black text-white font-display">🖋️ Edit Chapter Folder</h3>
+              <p className="text-xs text-text-muted mt-0.5">Modify this chapter folder's name.</p>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const data = new FormData(form);
+              const name = data.get("chapterName") as string;
+              await handleInlineSaveChapter(name);
+            }} className="space-y-3.5">
+              <div>
+                <label className="block text-[10px] uppercase font-black text-white/40 mb-1">Chapter Name</label>
+                <input
+                  name="chapterName"
+                  type="text"
+                  required
+                  defaultValue={inlineEditingChapter.chapterName}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-primary"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 bg-accent-primary text-zinc-950 font-black uppercase text-xs py-2.5 rounded-xl hover:opacity-90 cursor-pointer">
+                  Save Changes
+                </button>
+                <button type="button" onClick={() => setInlineEditingChapter(null)} className="px-4 bg-white/10 text-white font-bold uppercase text-xs rounded-xl hover:bg-white/15 cursor-pointer">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Deletion Confirmation Modal */}
+      {inlineDeletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-red-500/25 rounded-3xl p-6 w-full max-w-sm space-y-4 text-left">
+            <div>
+              <h3 className="text-lg font-black text-white font-display text-red-400">⚠️ Confirm Deletion</h3>
+              <p className="text-xs text-text-muted mt-1.5 leading-relaxed">
+                Are you sure you want to delete <strong className="text-white">{inlineDeletingItem.name}</strong>?
+                This operation is <span className="text-red-400 font-bold">irreversible</span> and will perform cascading deletions of all nested folders and study materials within it.
+              </p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleInlineDelete} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs py-2.5 rounded-xl transition-all cursor-pointer">
+                Delete Permanently
+              </button>
+              <button onClick={() => setInlineDeletingItem(null)} className="px-4 bg-white/10 text-white font-bold uppercase text-xs rounded-xl hover:bg-white/15 cursor-pointer">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </motion.div>
   );
 }
