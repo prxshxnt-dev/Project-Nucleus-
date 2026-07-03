@@ -230,7 +230,9 @@ export default function Login() {
       navigate('/verify-otp', {
         state: {
           email: targetClean.toLowerCase(),
-          type: 'login'
+          type: 'login',
+          simulated: data.simulated || false,
+          simulatedOtp: data.simulatedOtp || ""
         }
       });
     } catch (err: any) {

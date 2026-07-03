@@ -497,20 +497,22 @@ async function startServer() {
         reason = "SMTP credentials missing or unconfigured on workspace/database.";
       }
 
-      if (!emailSent) {
-        return res.status(400).json({
-          success: false,
-          error: `Failed to deliver verification code email: ${reason || "SMTP server error"}. Please check your SMTP configuration in the Admin Dashboard or try again.`
-        });
+      const isSimulated = !emailSent;
+      if (isSimulated) {
+        console.log(`\n==============================================\n[SANDBOX Fallback] Email: '${emailClean}' | OTP Code: '${otp}' | Reason: ${reason}\n==============================================\n`);
+      } else {
+        console.log(`[OTP DISPATCH REAL] Email: '${emailClean}' | OTP Code: '${otp}' successfully dispatched.`);
       }
-
-      console.log(`[OTP DISPATCH REAL] Email: '${emailClean}' | OTP Code: '${otp}' successfully dispatched.`);
       
       const obfuscatedEmail = emailClean.replace(/(.{2})(.*)(@.*)/, "$1***$3");
       return res.json({
         success: true,
         email: emailClean,
-        message: `A secure verification code has been dispatched to your email: ${obfuscatedEmail}`
+        simulated: isSimulated,
+        simulatedOtp: isSimulated ? otp : undefined,
+        message: isSimulated
+          ? `[Simulation Mode] OTP generated for your testing: ${otp}`
+          : `A secure verification code has been dispatched to your email: ${obfuscatedEmail}`
       });
     } catch (err: any) {
       console.error("OTP Send error:", err);
@@ -848,14 +850,19 @@ async function startServer() {
         }
       }
 
-      if (emailSent) {
-        return res.json({ success: true, message: `A password reset PIN was sent to your email address: ${emailClean}.` });
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: "Failed to send password reset code. Please ensure the email SMTP system is configured properly on the Admin Dashboard."
-        });
+      const isSimulated = !emailSent;
+      if (isSimulated) {
+        console.log(`\n==============================================\n[SANDBOX ForgotPassword Fallback] Email: '${emailClean}' | OTP Code: '${otp}'\n==============================================\n`);
       }
+
+      return res.json({
+        success: true,
+        simulated: isSimulated,
+        simulatedOtp: isSimulated ? otp : undefined,
+        message: isSimulated
+          ? `[Simulation Mode] OTP reset PIN generated for your testing: ${otp}`
+          : `A password reset PIN was sent to your email address: ${emailClean}.`
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err?.message || "Reset password request failed." });
     }

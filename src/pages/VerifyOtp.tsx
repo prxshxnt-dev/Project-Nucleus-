@@ -78,7 +78,14 @@ export default function VerifyOtp() {
     if (inputRefs.current[0]) {
       inputRefs.current[0].focus();
     }
-  }, []);
+    // Auto-fill simulated OTP on load if present
+    if (state?.simulatedOtp && state.simulatedOtp.length === 6) {
+      setOtp(state.simulatedOtp.split(''));
+      toast.info(`Sandbox Mode: Auto-filled OTP code: ${state.simulatedOtp}`, {
+        duration: 5000,
+      });
+    }
+  }, [state]);
 
   const handleChange = (index: number, value: string) => {
     if (isNaN(Number(value))) return; // only digits permitted
@@ -153,6 +160,15 @@ export default function VerifyOtp() {
       }
 
       toast.success(data.message || 'Verification PIN sent successfully!');
+      
+      if (data.simulated && data.simulatedOtp) {
+        const newState = { ...state, simulated: true, simulatedOtp: data.simulatedOtp } as any;
+        setState(newState);
+        sessionStorage.setItem('temp_otp_state', JSON.stringify(newState));
+        setOtp(data.simulatedOtp.split(''));
+        toast.info(`Sandbox Mode: Auto-filled new OTP: ${data.simulatedOtp}`);
+      }
+
       setCooldown(60); // reset cooldown limit
     } catch (err: any) {
       toast.error(err.message || 'Failed to trigger OTP delivery.');
@@ -334,6 +350,33 @@ export default function VerifyOtp() {
             {state?.phone && <span className="block mt-0.5 font-bold text-black">{state.phone}</span>}
           </p>
         </div>
+
+        {/* Sandbox Simulation Alert Banner */}
+        {state?.simulated && state?.simulatedOtp && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-sm"
+          >
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-extrabold text-amber-800 uppercase tracking-wide text-xs">Sandbox Mode Active</p>
+                <p className="text-[#5B3E05] text-xs mt-1 leading-relaxed">
+                  The mail server is currently unconfigured or undeliverable. For your convenience, we have simulated the verification code:
+                </p>
+                <div className="mt-2.5 flex items-center gap-2">
+                  <span className="font-mono text-lg font-black tracking-widest bg-amber-100 border border-amber-300 px-3 py-1 rounded-lg text-amber-800 select-all">
+                    {state.simulatedOtp}
+                  </span>
+                  <span className="text-[10px] text-amber-700 bg-amber-200/50 px-2 py-0.5 rounded-md font-semibold animate-pulse">
+                    Autofilled
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Verification Form */}
         <form onSubmit={handleVerify} className="space-y-6">

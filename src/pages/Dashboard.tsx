@@ -1078,27 +1078,39 @@ export default function Dashboard() {
                     // If user has no classGroup set yet, or 'all', show all
                     if (!user?.classGroup || user.classGroup === 'all') return true;
 
-                    const userClass = user.classGroup.toLowerCase();
-                    const className = cls.className.toLowerCase();
-                    const classId = cls.id.toLowerCase();
-                    const classGroupField = (cls.classGroup || '').toLowerCase();
+                    const userClass = user.classGroup.toLowerCase().trim();
+                    const className = (cls.className || '').toLowerCase();
+                    const classId = (cls.id || '').toLowerCase();
+                    const classGroupField = (cls.classGroup || '').toLowerCase().trim();
 
-                    // Check if class information matches user's classGroup
-                    const matchesName = className.includes(userClass);
-                    const matchesId = classId.includes(userClass) || classId.replace('class_', '') === userClass;
-                    const matchesGroup = classGroupField === userClass || classGroupField.includes(userClass);
-
-                    // Add robust synonyms for common classes/exams
-                    let matchesSynonym = false;
-                    if (userClass === 'dropper') {
-                      matchesSynonym = className.includes('drop') || className.includes('repeat') || classId.includes('drop');
-                    } else if (userClass === 'jee') {
-                      matchesSynonym = className.includes('jee') || className.includes('iit') || classId.includes('jee');
-                    } else if (userClass === 'neet') {
-                      matchesSynonym = className.includes('neet') || className.includes('medical') || classId.includes('neet');
+                    // 1. Direct match on classGroup field if specified
+                    if (classGroupField && (classGroupField === userClass || classGroupField.includes(userClass))) {
+                      return true;
                     }
 
-                    return matchesName || matchesId || matchesGroup || matchesSynonym;
+                    // 2. Add robust synonyms for common classes/exams
+                    if (userClass === 'dropper') {
+                      return className.includes('drop') || className.includes('repeat') || classId.includes('drop');
+                    } else if (userClass === 'jee') {
+                      return className.includes('jee') || className.includes('iit') || classId.includes('jee');
+                    } else if (userClass === 'neet') {
+                      return className.includes('neet') || className.includes('medical') || classId.includes('neet');
+                    }
+
+                    // 3. Precise numeric standard matches (preventing "2026" or "12" matching "2" or "6")
+                    if (/^\d+$/.test(userClass)) {
+                      const classNum = parseInt(userClass, 10);
+                      const patterns = [
+                        new RegExp(`\\bclass\\s*${classNum}\\b`, 'i'),
+                        new RegExp(`\\b${classNum}th\\b`, 'i'),
+                        new RegExp(`\\b${classNum}(st|nd|rd|th)?\\s+grade\\b`, 'i'),
+                        new RegExp(`\\b${classNum}\\b`, 'i')
+                      ];
+                      return patterns.some(pattern => pattern.test(className) || pattern.test(classId));
+                    }
+
+                    // Fallback to simple inclusion if it's a non-numeric custom group (just in case)
+                    return className.includes(userClass) || classId.includes(userClass);
                   })
                   .map((cls) => {
                     const subCount = subjects.filter(s => s.classId === cls.id).length;

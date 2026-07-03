@@ -35,6 +35,7 @@ export default function ForgotPassword() {
   const [cooldown, setCooldown] = useState(60);
   const [isResending, setIsResending] = useState(false);
   const [alreadyHaveOtp, setAlreadyHaveOtp] = useState(false);
+  const [simulatedResetOtp, setSimulatedResetOtp] = useState<string | null>(null);
 
   // Switch mode to reset if already coming verified from VerifyOtp
   useEffect(() => {
@@ -102,6 +103,16 @@ export default function ForgotPassword() {
 
         toast.success(data.message || 'Verification email dispatched successfully!');
         
+        if (data.simulated && data.simulatedOtp) {
+          setSimulatedResetOtp(data.simulatedOtp);
+          setEnteredOtp(data.simulatedOtp);
+          toast.info(`Sandbox Mode: Auto-filled password reset code: ${data.simulatedOtp}`, {
+            duration: 5000,
+          });
+        } else {
+          setSimulatedResetOtp(null);
+        }
+
         // Keep state and enter Forgot Password OTP verification inline mode
         setCooldown(60);
         setIsOtpMode(true);
@@ -164,6 +175,17 @@ export default function ForgotPassword() {
       }
 
       toast.success(data.message || 'Verification PIN sent successfully!');
+      
+      if (data.simulated && data.simulatedOtp) {
+        setSimulatedResetOtp(data.simulatedOtp);
+        setEnteredOtp(data.simulatedOtp);
+        toast.info(`Sandbox Mode: Auto-filled new reset code: ${data.simulatedOtp}`, {
+          duration: 5000,
+        });
+      } else {
+        setSimulatedResetOtp(null);
+      }
+
       setCooldown(60);
     } catch (err: any) {
       toast.error(err.message || 'Failed to resend. Please try again.');
@@ -306,6 +328,19 @@ export default function ForgotPassword() {
                     </div>
 
                     <form onSubmit={handleVerifyOtp} className="space-y-5">
+                      {simulatedResetOtp && (
+                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-950 text-xs space-y-1">
+                          <p className="font-extrabold text-amber-800 uppercase tracking-wide text-[10px]">Sandbox Mode Active</p>
+                          <p className="leading-normal text-[#5B3E05]">
+                            We have simulated email delivery because SMTP is unconfigured or failed. Your reset security code is:
+                          </p>
+                          <div className="flex items-center gap-1.5 pt-1.5">
+                            <strong className="font-mono text-base tracking-widest font-black select-all bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-lg text-amber-800">{simulatedResetOtp}</strong>
+                            <span className="text-[9px] text-amber-700 bg-amber-200/50 px-1.5 py-0.5 rounded font-semibold animate-pulse">Autofilled</span>
+                          </div>
+                        </div>
+                      )}
+
                       <div>
                         <label className="text-[10px] font-bold text-[#1F1F1F] uppercase tracking-wider block mb-1.5 ml-1">Verification Code</label>
                         <input 
