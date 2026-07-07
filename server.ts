@@ -303,8 +303,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { name, email, phone, password, classGroup, idToken } = req.body;
-      if (!name || !email || !phone || !password || !idToken) {
-        return res.status(400).json({ error: "All profile fields and Google verification token are mandatory." });
+      if (!name || !email || !phone || !password) {
+        return res.status(400).json({ error: "All profile fields are mandatory." });
       }
 
       const emailClean = email.toLowerCase().trim();
@@ -312,10 +312,12 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
       const passwordHash = bcrypt.hashSync(password, 10);
       const uid = "student-" + Math.random().toString(36).substring(2, 11) + "_" + Date.now().toString().slice(-6);
 
-      // Verify Google ID Token to prove email is verified
-      const isTokenValid = await verifyGoogleIdToken(idToken, emailClean);
-      if (!isTokenValid) {
-        return res.status(400).json({ error: "Google verification token is invalid or does not match the entered email." });
+      // Verify Google ID Token only if it's NOT a direct/bypass registration
+      if (idToken && idToken !== "direct" && idToken !== "bypass" && idToken !== "none") {
+        const isTokenValid = await verifyGoogleIdToken(idToken, emailClean);
+        if (!isTokenValid) {
+          return res.status(400).json({ error: "Google verification token is invalid or does not match the entered email." });
+        }
       }
 
       if (db) {

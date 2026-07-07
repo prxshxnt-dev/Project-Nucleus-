@@ -108,8 +108,17 @@ export default function Signup() {
   };
 
   const validateForm = (): boolean => {
+    if (!email.trim()) {
+      toast.error('Please enter your email address.');
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.toLowerCase().trim())) {
+      toast.error('Please enter a valid email address.');
+      return false;
+    }
     if (!isVerified || !verificationToken) {
-      toast.error('Please verify your email address with Google first.');
+      toast.error('Please verify your email address or click "Register Directly with Password" first.');
       return false;
     }
     if (!name.trim()) {
@@ -165,7 +174,7 @@ export default function Signup() {
           name: name.trim(),
           phone: phone.trim(),
           password,
-          idToken: verificationToken,
+          idToken: verificationToken || 'direct',
           classGroup
         }),
       });
@@ -220,10 +229,10 @@ export default function Signup() {
               type="email"
               value={email}
               onChange={(e) => {
-                if (!isVerified) setEmail(e.target.value);
+                if (!isVerified || verificationToken === "direct") setEmail(e.target.value);
               }}
               required
-              disabled={isVerified}
+              disabled={isVerified && verificationToken !== "direct"}
               id="register-email-field"
             />
             {isVerified && (
@@ -236,26 +245,59 @@ export default function Signup() {
 
           <AnimatePresence mode="wait">
             {!isVerified ? (
-              <motion.button
+              <div className="space-y-3">
+                <motion.button
+                  type="button"
+                  onClick={handleVerifyWithGoogle}
+                  disabled={isVerifying || !email}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className={`w-full py-3.5 bg-white hover:bg-black/5 border border-black/15 text-[#1F1F1F] rounded-2xl font-bold flex items-center justify-center gap-2.5 transition-all duration-200 ${(!email || isVerifying) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  {isVerifying ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+                      <span>Verifying with Google...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Chrome className="w-5 h-5 text-red-500 fill-current" />
+                      <span>Verify with Google</span>
+                    </>
+                  )}
+                </motion.button>
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-black/10"></div>
+                  <span className="flex-shrink mx-4 text-[10px] text-black/40 font-bold uppercase tracking-wider">Or</span>
+                  <div className="flex-grow border-t border-black/10"></div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.toLowerCase().trim())) {
+                      toast.error("Please enter a valid Student Email Address above first.");
+                      return;
+                    }
+                    setIsVerified(true);
+                    setVerificationToken("direct");
+                    toast.success("Standard Registration unlocked. Please fill in your profile details below.");
+                  }}
+                  className="w-full py-3.5 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 rounded-2xl font-bold text-sm transition-all text-center border border-indigo-100"
+                >
+                  Register Directly with Password
+                </button>
+              </div>
+            ) : verificationToken === "direct" ? (
+              <button
                 type="button"
-                onClick={handleVerifyWithGoogle}
-                disabled={isVerifying || !email}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className={`w-full py-3.5 bg-white hover:bg-black/5 border border-black/15 text-[#1F1F1F] rounded-2xl font-bold flex items-center justify-center gap-2.5 transition-all duration-200 ${(!email || isVerifying) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  setIsVerified(false);
+                  setVerificationToken(null);
+                }}
+                className="w-full text-center py-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
               >
-                {isVerifying ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin text-primary" />
-                    <span>Verifying with Google...</span>
-                  </>
-                ) : (
-                  <>
-                    <Chrome className="w-5 h-5 text-red-500 fill-current" />
-                    <span>Verify with Google</span>
-                  </>
-                )}
-              </motion.button>
+                ← Switch back to Google Verification
+              </button>
             ) : null}
           </AnimatePresence>
         </div>
