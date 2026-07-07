@@ -144,9 +144,42 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
   // Initialize secure Firestore client
   let db: FirestoreWrapper | null = null;
   try {
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const possiblePaths = [
+      path.join(process.cwd(), "firebase-applet-config.json"),
+      path.join(__dirname, "firebase-applet-config.json"),
+      path.join(__dirname, "..", "firebase-applet-config.json"),
+      path.join(__dirname, "../..", "firebase-applet-config.json"),
+      path.join(process.cwd(), "dist", "firebase-applet-config.json")
+    ];
+
+    let config: any = null;
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        try {
+          config = JSON.parse(fs.readFileSync(p, 'utf8'));
+          console.log(`Backend loaded Firebase config from file: ${p}`);
+          break;
+        } catch (readErr) {
+          console.warn(`Failed to read/parse Firebase config at ${p}:`, readErr);
+        }
+      }
+    }
+
+    if (!config) {
+      console.warn("Backend Firebase config file not found in any path, falling back to hardcoded client config.");
+      config = {
+        "projectId": "gen-lang-client-0268518418",
+        "appId": "1:575632888280:web:af3cbb32b07f4f91c962ad",
+        "apiKey": "AIzaSyAl4kPDOcGsgbObiOww5TdHwJhtZBHCITk",
+        "authDomain": "gen-lang-client-0268518418.firebaseapp.com",
+        "firestoreDatabaseId": "ai-studio-b3006ee5-d70a-4b0c-9e94-290a05023131",
+        "storageBucket": "gen-lang-client-0268518418.firebasestorage.app",
+        "messagingSenderId": "575632888280",
+        "measurementId": ""
+      };
+    }
+
+    if (config) {
       const firebaseApp = initializeApp(config);
       
       let rawDb: any = null;
@@ -171,8 +204,6 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
       } else {
         console.error("Backend Firestore Client SDK initialization yielded null database reference.");
       }
-    } else {
-      console.warn("Backend Firebase config file not found.");
     }
   } catch (error) {
     console.error("Error initializing backend Firestore client:", error);
@@ -320,24 +351,26 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
         }
       }
 
-      if (db) {
-        // Check for duplicate Email
-        const emailSnap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
-        if (!emailSnap.empty) {
-          return res.status(400).json({ error: "An account is already linked with this email address." });
-        }
+      if (!db) {
+        console.error("Critical: Firestore database client is not initialized on the backend.");
+        return res.status(500).json({ error: "Firestore database is not initialized on the backend. Please check server configuration." });
+      }
 
-        // Check for duplicate Phone
-        const phoneSnap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
-        if (!phoneSnap.empty) {
-          return res.status(400).json({ error: "An account is already linked with this phone number." });
-        }
+      // Check for duplicate Email
+      const emailSnap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
+      if (!emailSnap.empty) {
+        return res.status(400).json({ error: "An account is already linked with this email address." });
+      }
+
+      // Check for duplicate Phone
+      const phoneSnap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
+      if (!phoneSnap.empty) {
+        return res.status(400).json({ error: "An account is already linked with this phone number." });
       }
 
       // Store credentials in credentials subcollection (hiding password from standard client rules)
-      if (db) {
-        try {
-          await db.collection("credentials").doc(emailClean).set({
+      try {
+        await db.collection("credentials").doc(emailClean).set({
             email: emailClean,
             passwordHash,
             uid,
@@ -363,7 +396,6 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
           console.error("Firestore database write failed during register:", dbErr);
           return res.status(500).json({ error: "Failed to persist student record in Firestore DB." });
         }
-      }
 
       // Create JWT session token
       const token = jwt.sign({ uid, email: emailClean, role: "user" }, JWT_SECRET, { expiresIn: "7d" });

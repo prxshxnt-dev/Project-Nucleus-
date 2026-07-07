@@ -162,9 +162,24 @@ export default function Signup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      console.warn("[REGISTRATION VALIDATION FAILED] Please check all form fields.");
+      return;
+    }
 
     setIsSubmitting(true);
+    const payload = {
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+      phone: phone.trim(),
+      password: "●●●●●●●●", // Mask password in logs for privacy/security
+      idToken: verificationToken || 'direct',
+      classGroup
+    };
+
+    console.log("[REGISTRATION PROCESS START] Submitting student profile details...");
+    console.log("[REGISTRATION PAYLOAD LOG]", JSON.stringify(payload, null, 2));
+
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -179,10 +194,25 @@ export default function Signup() {
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to complete registration.');
+      console.log(`[REGISTRATION NETWORK RESPONSE] HTTP Status: ${response.status} ${response.statusText}`);
+
+      const responseText = await response.text();
+      console.log(`[REGISTRATION RESPONSE BODY]`, responseText);
+
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonErr) {
+        console.error("[REGISTRATION JSON PARSING ERROR] Server response was not valid JSON:", jsonErr);
+        throw new Error(`Server returned non-JSON response (Status: ${response.status}). Details: ${responseText.slice(0, 200)}`);
       }
+
+      if (!response.ok) {
+        console.error("[REGISTRATION SERVER ERROR]", data.error || 'Failed to complete registration.');
+        throw new Error(data.error || `Server registration endpoint failed with Status ${response.status}`);
+      }
+
+      console.log("[REGISTRATION DATABASE PERSISTENCE VERIFIED] Student user created:", data.user);
 
       // Save credentials locally
       localStorage.setItem('currentUser', JSON.stringify(data.user));
@@ -193,10 +223,15 @@ export default function Signup() {
       setUser(data.user);
       setLoading(false);
 
+      console.log("[REGISTRATION COMPLETED SUCCESSFULLY] Redirecting to Dashboard...");
       toast.success(`Welcome to Nucleus Coaching Centre, ${data.user.displayName}!`);
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      toast.error(err.message || 'An error occurred during registration.');
+      console.error("[REGISTRATION FAILED CRITICALLY] Error Trace:", err);
+      if (err.stack) {
+        console.error(err.stack);
+      }
+      toast.error(err.message || 'An error occurred during registration. Please check the browser console.');
     } finally {
       setIsSubmitting(false);
     }
