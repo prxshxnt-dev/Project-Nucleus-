@@ -110,48 +110,51 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// Startup Environment Validation
+function validateEnvironment() {
+  const requiredVars = ["GEMINI_API_KEY", "JWT_SECRET", "SMTP_USER", "SMTP_PASS"];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    console.warn(`\n⚠️ [STARTUP VALIDATION WARNING] The following environment variables are missing: ${missingVars.join(", ")}`);
+    console.warn("Please ensure they are set in your deployment environment (Vercel or local .env file).\n");
+  } else {
+    console.log("✅ [STARTUP VALIDATION SUCCESS] All required environment variables are present.");
+  }
+}
+
+validateEnvironment();
+
 const app = express();
 const PORT = 3000;
 
-async function startServer() {
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // Ensure uploads folder exists
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+// Ensure uploads folder exists (handled gracefully for Vercel's read-only file system)
+const uploadsDir = path.join(process.cwd(), "public", "uploads");
+try {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
-  app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
+} catch (e) {
+  console.warn("Could not create uploads directory (might be read-only filesystem on Vercel):", e);
+}
+app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
   // Initialize secure Firestore client
   let db: FirestoreWrapper | null = null;
   try {
-    let config: any = null;
     const configPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    } else if (process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID) {
-      config = {
-        apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
-        authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
-        storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID,
-        measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID,
-        firestoreDatabaseId: process.env.FIRESTORE_DB_ID || process.env.VITE_FIRESTORE_DB_ID || "(default)"
-      };
-      console.log("Backend Firebase config successfully loaded from Environment Variables fallback.");
-    }
-
-    if (config) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       const firebaseApp = initializeApp(config);
+      
       let rawDb: any = null;
       try {
         rawDb = initializeFirestore(firebaseApp, {
           experimentalForceLongPolling: true
-        }, config.firestoreDatabaseId || config.databaseId);
+        }, config.firestoreDatabaseId);
       } catch (e1) {
         console.warn("Backend failed to initialize custom Firestore database, falling back to default database ID:", e1);
         try {
@@ -170,7 +173,7 @@ async function startServer() {
         console.error("Backend Firestore Client SDK initialization yielded null database reference.");
       }
     } else {
-      console.warn("Backend Firebase config file not found, and no environment variable fallback was available.");
+      console.warn("Backend Firebase config file not found.");
     }
   } catch (error) {
     console.error("Error initializing backend Firestore client:", error);
@@ -251,20 +254,17 @@ async function startServer() {
   const JWT_SECRET = process.env.JWT_SECRET || "nucleus_cc_auth_jwt_super_secret_key_987!";
 
   let smtpConfig = {
-    host: process.env.SMTP_HOST || process.env.MAIL_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || process.env.MAIL_PORT || "587"),
-    secure: (process.env.SMTP_SECURE || process.env.MAIL_SECURE) === "true", // Default false for 587, true for 465
-    user: process.env.SMTP_USER || process.env.SMTP_USERNAME || process.env.MAIL_USER || process.env.SMTP_EMAIL || "",
-    pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD || process.env.MAIL_PASS || "",
-    from: process.env.SMTP_FROM || process.env.MAIL_FROM || ""
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.SMTP_PORT || "587"),
+    secure: process.env.SMTP_SECURE === "true", // Default false for 587, true for 465
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || ""
   };
 
   // If port is 465, direct secure SSL is typically true
-  const actualPort = process.env.SMTP_PORT || process.env.MAIL_PORT;
-  const actualSecure = process.env.SMTP_SECURE || process.env.MAIL_SECURE;
-  if (actualPort === "465" && !actualSecure) {
+  if (process.env.SMTP_PORT === "465" && !process.env.SMTP_SECURE) {
     smtpConfig.secure = true;
-  } else if (actualPort === "587" && !actualSecure) {
+  } else if (process.env.SMTP_PORT === "587" && !process.env.SMTP_SECURE) {
     smtpConfig.secure = false;
   }
 
@@ -281,7 +281,6 @@ async function startServer() {
              if (data.secure !== undefined) smtpConfig.secure = data.secure === true;
              if (data.user) smtpConfig.user = data.user;
              if (data.pass) smtpConfig.pass = data.pass;
-             if (data.from) smtpConfig.from = data.from;
              console.log("Successfully synchronized active SMTP settings from settings/smtp_config document in firestore.");
            }
          }
@@ -291,14 +290,13 @@ async function startServer() {
     }
   };
 
-  // Seed configuration immediately during server setup
-  await syncSmtpFromDb();
+  // Seed configuration immediately during server setup (non-blocking for fast serverless startup)
+  syncSmtpFromDb().catch(err => {
+    console.error("⚠️ [SMTP SYNC ERROR] Failed to perform initial SMTP sync:", err);
+  });
 
-  // Helper to get current active transporter
-  const getTransporter = async () => {
-    // Dynamic on-demand synchronization ensures stateless environments (Vercel) always have the latest settings
-    await syncSmtpFromDb();
-
+  // Helper helper to get current active transporter
+  const getTransporter = () => {
     if (!smtpConfig.user || !smtpConfig.pass) {
       return null;
     }
@@ -392,6 +390,9 @@ async function startServer() {
   // Endpoint: Send OTP (OTP strictly delivered via Email)
   app.post("/api/auth/send-otp", async (req, res) => {
     try {
+      // Always ensure SMTP config is dynamically synchronized from Firestore before sending
+      await syncSmtpFromDb();
+
       const { email, phone, type } = req.body; // type: 'register' | 'login' | 'reset'
       if (!email && !phone) {
         return res.status(400).json({ error: "Email address or Mobile Phone Number is required to send OTP." });
@@ -481,27 +482,11 @@ async function startServer() {
       let emailSent = false;
       let reason = "";
 
-      const activeTransporter = await getTransporter();
+      const activeTransporter = getTransporter();
       if (activeTransporter) {
         try {
-          console.log(`[SMTP LOG] Starting SMTP OTP verification process.`);
-          console.log(`[SMTP LOG] Recipient email: ${emailClean}`);
-          console.log(`[SMTP LOG] Generated OTP code: ${otp}`);
-          console.log(`[SMTP LOG] SMTP Host: ${smtpConfig.host}, Port: ${smtpConfig.port}, Secure: ${smtpConfig.secure}`);
-          console.log(`[SMTP LOG] SMTP User: ${smtpConfig.user}`);
-
-          // Test SMTP connection and auth
-          console.log(`[SMTP LOG] Testing SMTP connection using transporter.verify()...`);
-          await activeTransporter.verify();
-          console.log(`[SMTP LOG] SMTP Connection Status: VERIFIED`);
-          console.log(`[SMTP LOG] SMTP Authentication Result: SUCCESS`);
-
-          const fromHeader = smtpConfig.from 
-            ? (smtpConfig.from.includes("<") ? smtpConfig.from : `"${smtpConfig.from}" <${smtpConfig.user}>`) 
-            : `"Nucleus.CC" <${smtpConfig.user}>`;
-
           const mailOptions = {
-            from: fromHeader,
+            from: `"Nucleus.CC" <${smtpConfig.user}>`,
             to: emailClean,
             subject: `📚 Nucleus.CC Verification Code - ${otp}`,
             html: `
@@ -524,20 +509,14 @@ async function startServer() {
               </div>
             `
           };
-          console.log(`[SMTP LOG] Dispatching mail via sendMail()...`);
-          const info = await activeTransporter.sendMail(mailOptions);
+          await activeTransporter.sendMail(mailOptions);
           emailSent = true;
-          console.log(`[SMTP LOG] sendMail() Response:`, JSON.stringify(info));
-          console.log(`[SMTP LOG] Email OTP successfully sent to ${emailClean}`);
+          console.log(`Email OTP successfully sent to ${emailClean}`);
         } catch (mailErr: any) {
-          console.error(`[SMTP LOG] Nodemailer SMTP dispatch failed! Error Message: ${mailErr.message}`);
-          console.error(`[SMTP LOG] Error Name: ${mailErr.name}`);
-          console.error(`[SMTP LOG] Error Code: ${mailErr.code}`);
-          console.error(`[SMTP LOG] Error Stack:`, mailErr.stack);
+          console.error("Nodemailer SMTP dispatch failed:", mailErr);
           reason = mailErr?.message || "SMTP server rejected transaction.";
         }
       } else {
-        console.warn(`[SMTP LOG] No transporter created. Check your environment variables or Firestore smtp_config.`);
         reason = "SMTP credentials missing or unconfigured on workspace/database.";
       }
 
@@ -847,6 +826,9 @@ async function startServer() {
   // Endpoint: Forgot Password Trigger
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
+      // Always ensure SMTP config is dynamically synchronized from Firestore before sending
+      await syncSmtpFromDb();
+
       const { email } = req.body;
       if (!email) {
         return res.status(400).json({ error: "Email is required." });
@@ -867,27 +849,11 @@ async function startServer() {
       await storeOtpCode(emailClean, otp, "reset");
 
       let emailSent = false;
-      const activeTransporter = await getTransporter();
+      const activeTransporter = getTransporter();
       if (activeTransporter) {
         try {
-          console.log(`[SMTP LOG - Forgot Password] Starting SMTP reset process.`);
-          console.log(`[SMTP LOG - Forgot Password] Recipient email: ${emailClean}`);
-          console.log(`[SMTP LOG - Forgot Password] Generated reset OTP code: ${otp}`);
-          console.log(`[SMTP LOG - Forgot Password] SMTP Host: ${smtpConfig.host}, Port: ${smtpConfig.port}, Secure: ${smtpConfig.secure}`);
-          console.log(`[SMTP LOG - Forgot Password] SMTP User: ${smtpConfig.user}`);
-
-          // Test SMTP connection and auth
-          console.log(`[SMTP LOG - Forgot Password] Testing SMTP connection using transporter.verify()...`);
-          await activeTransporter.verify();
-          console.log(`[SMTP LOG - Forgot Password] SMTP Connection Status: VERIFIED`);
-          console.log(`[SMTP LOG - Forgot Password] SMTP Authentication Result: SUCCESS`);
-
-          const fromHeader = smtpConfig.from 
-            ? (smtpConfig.from.includes("<") ? smtpConfig.from : `"${smtpConfig.from}" <${smtpConfig.user}>`) 
-            : `"Nucleus.CC Support" <${smtpConfig.user}>`;
-
           const mailOptions = {
-            from: fromHeader,
+            from: `"Nucleus.CC Support" <${smtpConfig.user}>`,
             to: emailClean,
             subject: `📚 Reset security credentials - Nucleus.CC`,
             html: `
@@ -903,19 +869,11 @@ async function startServer() {
               </div>
             `
           };
-          console.log(`[SMTP LOG - Forgot Password] Dispatching reset mail via sendMail()...`);
-          const info = await activeTransporter.sendMail(mailOptions);
+          await activeTransporter.sendMail(mailOptions);
           emailSent = true;
-          console.log(`[SMTP LOG - Forgot Password] sendMail() Response:`, JSON.stringify(info));
-          console.log(`[SMTP LOG - Forgot Password] Reset email OTP successfully sent to ${emailClean}`);
-        } catch (mailErr: any) {
-          console.error(`[SMTP LOG - Forgot Password] Nodemailer SMTP dispatch failed! Error Message: ${mailErr.message}`);
-          console.error(`[SMTP LOG - Forgot Password] Error Name: ${mailErr.name}`);
-          console.error(`[SMTP LOG - Forgot Password] Error Code: ${mailErr.code}`);
-          console.error(`[SMTP LOG - Forgot Password] Error Stack:`, mailErr.stack);
+        } catch (mailErr) {
+          console.error("Nodemailer Forgot Password SMTP failed:", mailErr);
         }
-      } else {
-        console.warn(`[SMTP LOG - Forgot Password] No transporter created. Check your environment variables or Firestore smtp_config.`);
       }
 
       const isSimulated = !emailSent;
@@ -1604,30 +1562,54 @@ Please type out your subject-specific question, and I will formulate a clean, co
     }
   });
 
-  // Vite middleware for development or Static Assets for Production
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+  // Express Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(`💥 [API ERROR] ${req.method} ${req.url}:`, err);
+    res.status(500).json({
+      error: err?.message || "Internal Server Error",
+      stack: process.env.NODE_ENV === "development" ? err?.stack : undefined
     });
-    app.use(vite.middlewares);
-    console.log("Vite development middleware integrated.");
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-    console.log("Production static build routing active.");
-  }
+  });
 
-  if (process.env.VERCEL !== "1") {
+  // Process Level Error Catching
+  process.on("unhandledRejection", (reason, promise) => {
+    console.error("💥 [UNHANDLED REJECTION] Unhandled Rejection at:", promise, "reason:", reason);
+  });
+
+  process.on("uncaughtException", (err) => {
+    console.error("💥 [UNCAUGHT EXCEPTION] Uncaught Exception thrown:", err);
+  });
+
+  // Helper to check if we are on Vercel
+  const isVercel = !!process.env.VERCEL;
+
+  async function startLocalServer() {
+    // Vite middleware for development or Static Assets for Production
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("Vite development middleware integrated.");
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+      console.log("Production static build routing active.");
+    }
+
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
   }
-}
 
-startServer();
+  if (!isVercel) {
+    startLocalServer().catch(err => {
+      console.error("💥 [STARTUP ERROR] Failed to start local Express server:", err);
+    });
+  }
 
-export default app;
+  export default app;
