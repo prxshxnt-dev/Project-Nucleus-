@@ -9,8 +9,7 @@ import {
   EyeOff, 
   BookOpen, 
   Chrome, 
-  RefreshCw,
-  ArrowLeft
+  RefreshCw
 } from 'lucide-react';
 import { signInWithGoogle, signInWithGoogleToken } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
@@ -21,9 +20,6 @@ export default function Login() {
   const { user, setUser, setLoading, loading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Switch between 'password' and 'otp' login method
-  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
   
   // Password Login State
   const [email, setEmail] = useState('');
@@ -31,22 +27,17 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // OTP Login identifier - Email
-  const [otpEmail, setOtpEmail] = useState('');
-
   // Pre-fill email identifier if passed from Signup or password resets
   useEffect(() => {
     if (location.state && (location.state as any).email) {
-      const stateEmail = (location.state as any).email;
-      setEmail(stateEmail);
-      setOtpEmail(stateEmail);
+      setEmail((location.state as any).email);
     }
   }, [location.state]);
 
   // Google Identity Services (GIS) Callback
   const handleCredentialResponse = async (response: any) => {
     if (!response || !response.credential) {
-      toast.error('Google portal credentials not received.');
+      toast.error('Google credentials not received.');
       return;
     }
     try {
@@ -185,63 +176,6 @@ export default function Login() {
     }
   };
 
-  const handleOtpLoginRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetClean = otpEmail.trim();
-    if (!targetClean) {
-      toast.error('Please enter your registered email address.');
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(targetClean)) {
-      toast.error('Please provide a valid email address structure.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'login', email: targetClean.toLowerCase() }),
-      });
-
-      let data: any = {};
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonErr) {
-          console.warn("Failed to parse login OTP response JSON:", jsonErr);
-        }
-      } else {
-        const textResponse = await response.text();
-        console.warn("Non-JSON login OTP response received:", textResponse);
-      }
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send verification code.');
-      }
-
-      toast.success(data.message || 'Verification login PIN dispatched!');
-      
-      // Standalone redirect to `/verify-otp` with state
-      navigate('/verify-otp', {
-        state: {
-          email: targetClean.toLowerCase(),
-          type: 'login',
-          simulated: data.simulated || false,
-          simulatedOtp: data.simulatedOtp || ""
-        }
-      });
-    } catch (err: any) {
-      toast.error(err.message || 'An error occurred during OTP request.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleGoogleLogin = async () => {
     try {
       await signInWithGoogle();
@@ -284,132 +218,70 @@ export default function Login() {
           </Link>
         </div>
 
-        {/* Login Method Toggle Tabs */}
-        <div className="flex gap-2 mb-6 bg-[#F8FAFC] p-1 rounded-2xl border border-black/10">
-          <button
-            type="button"
-            onClick={() => setLoginMethod('password')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${loginMethod === 'password' ? 'bg-primary text-white shadow-sm font-black' : 'text-[#7A7A7A] hover:text-[#1F1F1F]'}`}
-          >
-            Password Login
-          </button>
-          <button
-            type="button"
-            onClick={() => setLoginMethod('otp')}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${loginMethod === 'otp' ? 'bg-primary text-white shadow-sm font-black' : 'text-[#7A7A7A] hover:text-[#1F1F1F]'}`}
-          >
-            Email OTP Login
-          </button>
-        </div>
-
         {/* Logins Container */}
         <div className="space-y-4">
-          {loginMethod === 'password' ? (
-            /* Email / Password Form */
-            <form onSubmit={handleEmailLogin} className="space-y-4">
-              {/* Email Input */}
-              <FloatingLabelInput 
-                id="login-email-field"
-                label="Student Email"
-                icon={<Mail className="w-5 h-5" />}
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setOtpEmail(e.target.value); // keep in sync
-                }}
-                required
-              />
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            {/* Email Input */}
+            <FloatingLabelInput 
+              id="login-email-field"
+              label="Student Email"
+              icon={<Mail className="w-5 h-5" />}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
 
-              {/* Password Input with Forgot link & Show Button */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center px-1">
-                  <Link to="/forgot-password" className="text-xs text-primary font-bold hover:underline ml-auto">
-                    Forgot Password?
-                  </Link>
-                </div>
-                
-                <div className="relative">
-                  <FloatingLabelInput 
-                    id="login-password-field"
-                    label="Account Password"
-                    icon={<Lock className="w-5 h-5" />}
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 mt-1 text-[#7A7A7A] hover:text-[#1F1F1F] transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
+            {/* Password Input with Forgot link & Show Button */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center px-1">
+                <Link to="/forgot-password" className="text-xs text-primary font-bold hover:underline ml-auto">
+                  Forgot Password?
+                </Link>
               </div>
+              
+              <div className="relative">
+                <FloatingLabelInput 
+                  id="login-password-field"
+                  label="Account Password"
+                  icon={<Lock className="w-5 h-5" />}
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 mt-1 text-[#7A7A7A] hover:text-[#1F1F1F] transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
 
-              {/* Submit Button */}
-              <motion.button 
-                type="submit" 
-                disabled={isSubmitting}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
-                id="login-submit-btn"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    <span>Verifying...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Enter Classroom Portal</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </motion.button>
-            </form>
-          ) : (
-            /* Email OTP Request Form */
-            <form onSubmit={handleOtpLoginRequest} className="space-y-4">
-              <FloatingLabelInput 
-                id="login-otp-email-field"
-                label="Student Email Address"
-                icon={<Mail className="w-5 h-5" />}
-                type="email"
-                value={otpEmail}
-                onChange={(e) => {
-                  setOtpEmail(e.target.value);
-                  setEmail(e.target.value); // keep in sync
-                }}
-                required
-              />
-
-              {/* Submit Button */}
-              <motion.button 
-                type="submit" 
-                disabled={isSubmitting}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
-                id="login-otp-request-btn"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    <span>Sending Verification code...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Send Login OTP Code</span>
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </motion.button>
-            </form>
-          )}
+            {/* Submit Button */}
+            <motion.button 
+              type="submit" 
+              disabled={isSubmitting}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              id="login-submit-btn"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <span>Enter Classroom Portal</span>
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
+            </motion.button>
+          </form>
         </div>
 
         {/* Third Party Divider */}

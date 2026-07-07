@@ -158,7 +158,7 @@ export default function Home() {
   const [mentors1, setMentors1] = useState<any[]>([]);
   const [mentors2, setMentors2] = useState<any[]>([]);
   const [selectedClassGroup, setSelectedClassGroup] = useState<string>('all');
-  const [pricingClassGroup, setPricingClassGroup] = useState<string>('11');
+  const [pricingClassGroup, setPricingClassGroup] = useState<string>('12');
   const [activeStickerId, setActiveStickerId] = useState<string | null>(null);
   const [activePricingCard, setActivePricingCard] = useState<string | null>('lectures');
   const [showTeacherBox, setShowTeacherBox] = useState(false);
@@ -842,7 +842,7 @@ export default function Home() {
           {/* Bento Group selection grid */}
           <div className="flex justify-center mb-8 md:mb-16 relative z-20">
              <div className="bg-glass-bg border border-border-color backdrop-blur-md rounded-2xl p-1.5 inline-flex flex-wrap justify-center gap-1 shadow-sm">
-                {['6', '7', '8', '9', '10', '11', '12', 'dropper'].map(cls => (
+                {['6', '7', '8', '9', '10', '12', 'dropper'].map(cls => (
                   <button 
                     key={cls} 
                     onClick={() => setPricingClassGroup(cls)} 

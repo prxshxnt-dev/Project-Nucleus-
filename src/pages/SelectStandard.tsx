@@ -90,16 +90,6 @@ const standardData: StandardItem[] = [
     highlights: ['Full Mock Board Series', 'Conceptual Biology & Geometry']
   },
   { 
-    name: '11th Grade', 
-    code: '11', 
-    enrollment: 4500, 
-    avgStudy: 7.5, 
-    color: '#EC4899',
-    description: 'Beginning of IIT-JEE / NEET Advanced Competitive preparation loops.',
-    focus: 'JEE Main/Adv & NEET Foundation',
-    highlights: ['Mechanics & Calculus introduction', 'Organic Chemistry Basics']
-  },
-  { 
     name: '12th Grade', 
     code: '12', 
     enrollment: 4800, 
@@ -124,7 +114,7 @@ const standardData: StandardItem[] = [
 export default function SelectStandard() {
   const { user, setUser } = useAuthStore();
   const navigate = useNavigate();
-  const [selectedIdx, setSelectedIdx] = useState<number>(5); // Default is 11th Grade representation
+  const [selectedIdx, setSelectedIdx] = useState<number>(5); // Default is 12th Grade representation
   const [isSaving, setIsSaving] = useState(false);
 
   // Auto-redirect if user not logged in at all

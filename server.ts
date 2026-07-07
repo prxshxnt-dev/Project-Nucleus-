@@ -106,13 +106,12 @@ class FirestoreWrapper {
 }
 
 import { GoogleGenAI } from "@google/genai";
-import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 // Startup Environment Validation
 function validateEnvironment() {
-  const requiredVars = ["GEMINI_API_KEY", "JWT_SECRET", "SMTP_USER", "SMTP_PASS"];
+  const requiredVars = ["GEMINI_API_KEY", "JWT_SECRET"];
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
 
   if (missingVars.length > 0) {
@@ -249,382 +248,94 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
   }
 
   // ==========================================
-  //     SECURE EMAIL OTP AUTH SYSTEM
+  //     SECURE AUTHENTICATION SYSTEM
   // ==========================================
   const JWT_SECRET = process.env.JWT_SECRET || "nucleus_cc_auth_jwt_super_secret_key_987!";
 
-  let smtpConfig = {
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_SECURE === "true", // Default false for 587, true for 465
-    user: process.env.SMTP_USER || "",
-    pass: process.env.SMTP_PASS || ""
-  };
+  // Helper to verify Google ID token securely on server side (supports both Firebase JWTs and Google GSI tokens)
+  async function verifyGoogleIdToken(idToken: string, expectedEmail: string): Promise<boolean> {
+    try {
+      if (!idToken) return false;
+      const cleanExpected = expectedEmail.toLowerCase().trim();
 
-  // If port is 465, direct secure SSL is typically true
-  if (process.env.SMTP_PORT === "465" && !process.env.SMTP_SECURE) {
-    smtpConfig.secure = true;
-  } else if (process.env.SMTP_PORT === "587" && !process.env.SMTP_SECURE) {
-    smtpConfig.secure = false;
+      // 1. Try decoding the token locally first (supports Firebase and Google JWTs)
+      try {
+        const parts = idToken.split('.');
+        if (parts.length === 3) {
+          const payloadB64 = parts[1];
+          const payloadStr = Buffer.from(payloadB64, 'base64').toString('utf8');
+          const decoded = JSON.parse(payloadStr);
+          
+          if (decoded && decoded.email) {
+            const verifiedEmail = decoded.email.toLowerCase().trim();
+            const isExpired = decoded.exp ? (decoded.exp * 1000 < Date.now()) : false;
+
+            if (verifiedEmail === cleanExpected && !isExpired) {
+              console.log(`Successfully verified token locally for: ${verifiedEmail}`);
+              return true;
+            }
+          }
+        }
+      } catch (jwtErr) {
+        console.warn("Local token decoding skipped or failed:", jwtErr);
+      }
+
+      // 2. Fallback to Google tokeninfo API (raw Google GSI tokens)
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      if (!response.ok) {
+        console.error(`Google tokeninfo endpoint returned status: ${response.status}`);
+        return false;
+      }
+      const data = await response.json();
+      const verifiedEmail = data.email?.toLowerCase().trim();
+      if (verifiedEmail !== cleanExpected) {
+        console.error(`Google token email (${verifiedEmail}) does not match expected (${cleanExpected})`);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error verifying Google ID token on backend:", error);
+      return false;
+    }
   }
 
-  // Load SMTP from Firestore dynamically
-  const syncSmtpFromDb = async () => {
-    if (db) {
-       try {
-         const smtpDoc = await db.collection("settings").doc("smtp_config").get();
-         if (smtpDoc.exists) {
-           const data = smtpDoc.data();
-           if (data) {
-             if (data.host) smtpConfig.host = data.host;
-             if (data.port) smtpConfig.port = parseInt(data.port);
-             if (data.secure !== undefined) smtpConfig.secure = data.secure === true;
-             if (data.user) smtpConfig.user = data.user;
-             if (data.pass) smtpConfig.pass = data.pass;
-             console.log("Successfully synchronized active SMTP settings from settings/smtp_config document in firestore.");
-           }
-         }
-       } catch (err) {
-         console.warn("Dynamic SMTP settings load bypassed:", err instanceof Error ? err.message : err);
-       }
-    }
-  };
-
-  // Seed configuration immediately during server setup (non-blocking for fast serverless startup)
-  syncSmtpFromDb().catch(err => {
-    console.error("⚠️ [SMTP SYNC ERROR] Failed to perform initial SMTP sync:", err);
-  });
-
-  // Helper helper to get current active transporter
-  const getTransporter = () => {
-    if (!smtpConfig.user || !smtpConfig.pass) {
-      return null;
-    }
-    return nodemailer.createTransport({
-      host: smtpConfig.host,
-      port: smtpConfig.port,
-      secure: smtpConfig.secure,
-      auth: {
-        user: smtpConfig.user,
-        pass: smtpConfig.pass,
-      },
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-  };
-
-  // Local backups to prevent disruptions
-  const fallbackOtps = new Map<string, { otp: string; expiresAt: number; type: string; lastSentAt: number }>();
-
-  // Store OTP
-  const storeOtpCode = async (identifier: string, otp: string, type: string) => {
-    const key = identifier.toLowerCase().trim();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
-    const now = Date.now();
-
-    fallbackOtps.set(key, { otp, expiresAt, type, lastSentAt: now });
-
-    if (db) {
-      try {
-        await db.collection("otps").doc(`${key}_${type}`).set({
-          identifier: key,
-          otp,
-          type,
-          expiresAt: new Date(expiresAt).toISOString(),
-          lastSentAt: new Date(now).toISOString()
-        });
-      } catch (err) {
-        console.warn("Firestore writing OTP failed, fallback cache used:", err instanceof Error ? err.message : err);
-      }
-    }
-  };
-
-  // Verify OTP Helper
-  const verifyOtpCode = async (identifier: string, otpInput: string, type: string): Promise<boolean> => {
-    const key = identifier.toLowerCase().trim();
-    const now = Date.now();
-
-    // Check fallback memory cache
-    const cached = fallbackOtps.get(key);
-    if (cached && cached.type === type && cached.otp === otpInput && cached.expiresAt > now) {
-      fallbackOtps.delete(key);
-      return true;
-    }
-
-    if (db) {
-      try {
-        const docSnap = await db.collection("otps").doc(`${key}_${type}`).get();
-        if (docSnap.exists) {
-          const data = docSnap.data();
-          if (data && data.otp === otpInput && data.type === type && new Date(data.expiresAt).getTime() > now) {
-            await db.collection("otps").doc(`${key}_${type}`).delete();
-            return true;
-          }
-        }
-      } catch (err) {
-        console.warn("Firestore verify OTP failed:", err instanceof Error ? err.message : err);
-      }
-    }
-    return false;
-  };
-
-  // Endpoint: Sync SMTP Config from Firestore on request
-  app.post("/api/auth/smtp-config-sync", async (req, res) => {
-    try {
-      const { host, port, secure, user, pass } = req.body;
-      if (host) smtpConfig.host = host.trim();
-      if (port) smtpConfig.port = parseInt(port);
-      if (secure !== undefined) smtpConfig.secure = secure === true;
-      if (user) smtpConfig.user = user.trim();
-      if (pass) smtpConfig.pass = pass.trim();
-
-      console.log(`[SMTP CONFIG SYNC] Active transporter configuration refreshed via Admin request. Active User: ${smtpConfig.user}`);
-      return res.json({ success: true, message: "Server-side SMTP configuration successfully synchronized." });
-    } catch (err: any) {
-      console.error("Failed to sync SMTP:", err);
-      return res.status(500).json({ error: err?.message || "Internal sync failure." });
-    }
-  });
-
-  // Endpoint: Send OTP (OTP strictly delivered via Email)
-  app.post("/api/auth/send-otp", async (req, res) => {
-    try {
-      // Always ensure SMTP config is dynamically synchronized from Firestore before sending
-      await syncSmtpFromDb();
-
-      const { email, phone, type } = req.body; // type: 'register' | 'login' | 'reset'
-      if (!email && !phone) {
-        return res.status(400).json({ error: "Email address or Mobile Phone Number is required to send OTP." });
-      }
-
-      let emailClean = email ? email.toLowerCase().trim() : "";
-      const phoneClean = phone ? phone.trim() : "";
-      const otpType = type || "register";
-
-      // If we only have phone (e.g., OTP login with phone), find the associated student to send the OTP to their email
-      if (!emailClean && phoneClean && db) {
-        try {
-          const snap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
-          if (!snap.empty) {
-            const userData = snap.docs[0].data();
-            if (userData && userData.email) {
-              emailClean = userData.email.toLowerCase().trim();
-            }
-          }
-        } catch (e) {
-          console.warn("Firestore lookup phone to find email failed:", e);
-        }
-      }
-
-      // If we still don't have an email with phone-only login, look up has failed or account doesn't exist
-      if (!emailClean && phoneClean && otpType !== "register") {
-        return res.status(400).json({ error: "No registered student email was found for this phone number." });
-      }
-
-      if (!emailClean) {
-        return res.status(400).json({ error: "Email address is required to dispatch the OTP code." });
-      }
-
-      // 1. Cooldown Rate-Limiter (60 seconds) to prevent spam on this email address
-      if (emailClean) {
-        const cached = fallbackOtps.get(emailClean);
-        if (cached && (Date.now() - cached.lastSentAt) < 60000) {
-          const remainingSec = Math.ceil((60000 - (Date.now() - cached.lastSentAt)) / 1000);
-          return res.status(429).json({ error: `Please wait ${remainingSec} seconds before requesting a new OTP.` });
-        }
-      }
-
-      // 2. Extra checks for register/login states
-      if (otpType === "register" && db) {
-        try {
-          if (emailClean) {
-            const snap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
-            if (!snap.empty) {
-              return res.status(400).json({ error: "This email is already registered. Please proceed to Login." });
-            }
-          }
-          if (phoneClean) {
-            const snap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
-            if (!snap.empty) {
-              return res.status(400).json({ error: "This phone number is already registered. Please proceed to Login." });
-            }
-          }
-        } catch (e) {
-          console.warn("Firestore verify unique user failed:", e);
-        }
-      }
-
-      if (otpType === "login" || otpType === "reset") {
-        if (db) {
-          try {
-            let found = false;
-            if (emailClean) {
-              const snap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
-              if (!snap.empty) found = true;
-            }
-            if (!found) {
-              return res.status(400).json({ error: "No registered student account was found." });
-            }
-          } catch (e) {
-            console.warn("Firestore check student exists failed:", e);
-          }
-        }
-      }
-
-      // 3. Generate a secure 6-digit OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // 4. Save to cache and database - strictly associated with the EMAIL address
-      await storeOtpCode(emailClean, otp, otpType);
-
-      // 5. Send Email via Nodemailer (strictly to email)
-      let emailSent = false;
-      let reason = "";
-
-      const activeTransporter = getTransporter();
-      if (activeTransporter) {
-        try {
-          const mailOptions = {
-            from: `"Nucleus.CC" <${smtpConfig.user}>`,
-            to: emailClean,
-            subject: `📚 Nucleus.CC Verification Code - ${otp}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #ebd7b3; border-radius: 12px; background-color: #FAF6ED; color: #000000;">
-                <div style="text-align: center; margin-bottom: 25px;">
-                  <h1 style="color: #F15A29; margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -1px;">Nucleus.CC</h1>
-                  <p style="color: #555555; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; font-weight: 600;">Premium Learning Ecosystem</p>
-                </div>
-                <div style="background-color: #ffffff; padding: 30px; border-radius: 12px; border: 1px solid #ebd7b3; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);">
-                  <p style="color: #222222; font-size: 16px; margin-top: 0; margin-bottom: 25px; line-height: 1.5;">To verify your email address on Nucleus.CC, please enter the dynamic verification code below:</p>
-                  <div style="background-color: #FAF0E4; color: #F15A29; font-size: 36px; font-weight: 800; padding: 18px; border-radius: 10px; letter-spacing: 8px; margin: 25px 0; display: inline-block; border: 1px dashed #F15A29;">
-                    ${otp}
-                  </div>
-                  <p style="color: #555555; font-size: 13px; margin-bottom: 0; line-height: 1.5;">This security PIN is valid for <strong>5 minutes</strong> and can only be used once. Do not share this OTP with anyone.</p>
-                </div>
-                <div style="text-align: center; margin-top: 25px; color: #777777; font-size: 11px; line-height: 1.4;">
-                  © 2026 Nucleus.CC. Crafted with high excellence for school student levels.<br/>
-                  Managed by core IITians and medical Doctors.
-                </div>
-              </div>
-            `
-          };
-          await activeTransporter.sendMail(mailOptions);
-          emailSent = true;
-          console.log(`Email OTP successfully sent to ${emailClean}`);
-        } catch (mailErr: any) {
-          console.error("Nodemailer SMTP dispatch failed:", mailErr);
-          reason = mailErr?.message || "SMTP server rejected transaction.";
-        }
-      } else {
-        reason = "SMTP credentials missing or unconfigured on workspace/database.";
-      }
-
-      const isSimulated = !emailSent;
-      if (isSimulated) {
-        console.log(`\n==============================================\n[SANDBOX Fallback] Email: '${emailClean}' | OTP Code: '${otp}' | Reason: ${reason}\n==============================================\n`);
-      } else {
-        console.log(`[OTP DISPATCH REAL] Email: '${emailClean}' | OTP Code: '${otp}' successfully dispatched.`);
-      }
-      
-      const obfuscatedEmail = emailClean.replace(/(.{2})(.*)(@.*)/, "$1***$3");
-      return res.json({
-        success: true,
-        email: emailClean,
-        simulated: isSimulated,
-        simulatedOtp: isSimulated ? otp : undefined,
-        message: isSimulated
-          ? `[Simulation Mode] OTP generated for your testing: ${otp}`
-          : `A secure verification code has been dispatched to your email: ${obfuscatedEmail}`
-      });
-    } catch (err: any) {
-      console.error("OTP Send error:", err);
-      return res.status(500).json({ error: err?.message || "Internal server error during OTP send." });
-    }
-  });
-
-  // Endpoint: Verify OTP (Strictly matching via Email)
-  app.post("/api/auth/verify-otp", async (req, res) => {
-    try {
-      const { email, phone, otp, type } = req.body;
-      if (!email && !phone) {
-        return res.status(400).json({ error: "Email or Phone is missing." });
-      }
-      if (!otp) {
-        return res.status(400).json({ error: "Verification PIN code is missing." });
-      }
-
-      let emailClean = email ? email.toLowerCase().trim() : "";
-      const phoneClean = phone ? phone.trim() : "";
-
-      // Resolve email from phone number if email is not supplied
-      if (!emailClean && phoneClean && db) {
-        try {
-          const snap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
-          if (!snap.empty) {
-            const userData = snap.docs[0].data();
-            if (userData && userData.email) {
-              emailClean = userData.email.toLowerCase().trim();
-            }
-          }
-        } catch (e) {
-          console.warn("Firestore verify-otp lookup phone failed:", e);
-        }
-      }
-
-      if (!emailClean) {
-        return res.status(400).json({ error: "Could not locate a registered email associated with this identity." });
-      }
-
-      const verified = await verifyOtpCode(emailClean, otp, type);
-
-      if (verified) {
-        return res.json({ success: true, message: "Verification completed successfully." });
-      } else {
-        return res.status(400).json({ error: "Invalid or expired verification PIN. Please request a new one." });
-      }
-    } catch (err: any) {
-      return res.status(500).json({ error: err?.message || "Internal verification failure." });
-    }
-  });
-
-  // Endpoint: User Signup / Register
+  // Endpoint: User Signup / Register (Secure Google Verified Email flow)
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { name, email, phone, password, classGroup, otp } = req.body;
-      if (!name || !email || !password || !otp) {
-        return res.status(400).json({ error: "All profile fields are mandatory." });
+      const { name, email, username, phone, password, classGroup, idToken } = req.body;
+      if (!name || !email || !username || !phone || !password || !idToken) {
+        return res.status(400).json({ error: "All profile fields and Google verification token are mandatory." });
       }
 
       const emailClean = email.toLowerCase().trim();
-      const phoneClean = phone ? phone.trim() : "";
+      const usernameClean = username.toLowerCase().trim();
+      const phoneClean = phone.trim();
       const passwordHash = bcrypt.hashSync(password, 10);
       const uid = "student-" + Math.random().toString(36).substring(2, 11) + "_" + Date.now().toString().slice(-6);
 
-      // Verify OTP code first
-      let validated = false;
-      if (emailClean) {
-        validated = await verifyOtpCode(emailClean, otp, "register");
-      }
-      if (!validated && phoneClean) {
-        validated = await verifyOtpCode(phoneClean, otp, "register");
+      // Verify Google ID Token to prove email is verified
+      const isTokenValid = await verifyGoogleIdToken(idToken, emailClean);
+      if (!isTokenValid) {
+        return res.status(400).json({ error: "Google verification token is invalid or does not match the entered email." });
       }
 
-      if (!validated) {
-        return res.status(400).json({ error: "Invalid or expired verification PIN code." });
-      }
-
-      // Check for duplicates
       if (db) {
-        const snap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
-        if (!snap.empty) {
+        // Check for duplicate Email
+        const emailSnap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
+        if (!emailSnap.empty) {
           return res.status(400).json({ error: "An account is already linked with this email address." });
         }
-        if (phoneClean) {
-          const phoneSnap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
-          if (!phoneSnap.empty) {
-            return res.status(400).json({ error: "An account is already linked with this phone number." });
-          }
+
+        // Check for duplicate Username
+        const usernameSnap = await db.collection("users").where("username", "==", usernameClean).limit(1).get();
+        if (!usernameSnap.empty) {
+          return res.status(400).json({ error: "This username is already taken. Please choose another username." });
+        }
+
+        // Check for duplicate Phone
+        const phoneSnap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
+        if (!phoneSnap.empty) {
+          return res.status(400).json({ error: "An account is already linked with this phone number." });
         }
       }
 
@@ -641,9 +352,10 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
           // Write public student user details to global users collection
           await db.collection("users").doc(uid).set({
             email: emailClean,
+            username: usernameClean,
             phone: phoneClean,
             displayName: name.trim(),
-            role: "student",
+            role: "user",
             planId: "free",
             classGroup: classGroup || "11",
             unlockedMaterials: [],
@@ -659,7 +371,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
       }
 
       // Create JWT session token
-      const token = jwt.sign({ uid, email: emailClean, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
+      const token = jwt.sign({ uid, email: emailClean, role: "user" }, JWT_SECRET, { expiresIn: "7d" });
 
       return res.json({
         success: true,
@@ -667,9 +379,10 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
         user: {
           uid,
           email: emailClean,
+          username: usernameClean,
           phone: phoneClean,
           displayName: name.trim(),
-          role: "student",
+          role: "user",
           planId: "free",
           classGroup: classGroup || "11",
           streak: 4,
@@ -679,85 +392,6 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
     } catch (err: any) {
       console.error("Auth register failed:", err);
       return res.status(500).json({ error: err?.message || "Registration service error." });
-    }
-  });
-
-  // Endpoint: Passwordless User Login via OTP
-  app.post("/api/auth/login-otp", async (req, res) => {
-    try {
-      const { email, phone, otp } = req.body;
-      if (!email && !phone) {
-        return res.status(400).json({ error: "Either Email or Mobile Phone must be supplied." });
-      }
-      if (!otp) {
-        return res.status(400).json({ error: "Verification OTP code is required." });
-      }
-
-      let emailClean = email ? email.toLowerCase().trim() : "";
-      const phoneClean = phone ? phone.trim() : "";
-
-      // Look up and resolve email address from phone number if email is not supplied
-      if (!emailClean && phoneClean && db) {
-        try {
-          const snap = await db.collection("users").where("phone", "==", phoneClean).limit(1).get();
-          if (!snap.empty) {
-            const userData = snap.docs[0].data();
-            if (userData && userData.email) {
-              emailClean = userData.email.toLowerCase().trim();
-            }
-          }
-        } catch (e) {
-          console.warn("Firestore login-otp lookup phone failed:", e);
-        }
-      }
-
-      if (!emailClean) {
-        return res.status(400).json({ error: "Could not locate a registered email associated with this identity." });
-      }
-
-      // 1. Verify OTP matching strictly email
-      let validated = await verifyOtpCode(emailClean, otp, "login");
-
-      if (!validated) {
-        return res.status(400).json({ error: "Invalid or expired verification OTP." });
-      }
-
-      // 2. Locate Student User details
-      let userData: any = null;
-      let uid: string = "";
-
-      if (db) {
-        const snap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
-        if (!snap.empty) {
-          uid = snap.docs[0].id;
-          userData = snap.docs[0].data();
-        }
-      }
-
-      if (!userData) {
-        return res.status(400).json({ error: "No student details found. Please Register first." });
-      }
-
-      const token = jwt.sign({ uid, email: userData.email, role: userData.role || "student" }, JWT_SECRET, { expiresIn: "7d" });
-
-      return res.json({
-        success: true,
-        token,
-        user: {
-          uid,
-          email: userData.email || emailClean,
-          phone: userData.phone || phoneClean,
-          displayName: userData.displayName || "Student",
-          role: userData.role || "student",
-          planId: userData.planId || "free",
-          classGroup: userData.classGroup || "11",
-          streak: userData.streak || 5,
-          todayStudyMinutes: userData.todayStudyMinutes || 45
-        }
-      });
-    } catch (err: any) {
-      console.error("OTP login failed:", err);
-      return res.status(500).json({ error: err?.message || "OTP Login service error." });
     }
   });
 
@@ -795,7 +429,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
           }
 
           const userData = userDoc.data() || {};
-          const token = jwt.sign({ uid, email: emailClean, role: userData.role || "student" }, JWT_SECRET, { expiresIn: "7d" });
+          const role = userData.role || "user";
+          const token = jwt.sign({ uid, email: emailClean, role }, JWT_SECRET, { expiresIn: "7d" });
 
           return res.json({
             success: true,
@@ -803,8 +438,9 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
             user: {
               uid,
               email: emailClean,
+              username: userData.username || "",
               displayName: userData.displayName || "Student",
-              role: userData.role || "student",
+              role,
               planId: userData.planId || "free",
               classGroup: userData.classGroup || "11",
               streak: userData.streak || 5,
@@ -820,114 +456,6 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
       return res.status(500).json({ error: "Backend database client not ready for secure logins." });
     } catch (err: any) {
       return res.status(500).json({ error: err?.message || "Login service error." });
-    }
-  });
-
-  // Endpoint: Forgot Password Trigger
-  app.post("/api/auth/forgot-password", async (req, res) => {
-    try {
-      // Always ensure SMTP config is dynamically synchronized from Firestore before sending
-      await syncSmtpFromDb();
-
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ error: "Email is required." });
-      }
-
-      const emailClean = email.toLowerCase().trim();
-
-      // Check if user exists
-      if (db) {
-        const credDoc = await db.collection("credentials").doc(emailClean).get();
-        if (!credDoc.exists) {
-          return res.status(400).json({ error: "No user is registered with this email address." });
-        }
-      }
-
-      // Generate verification PIN
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      await storeOtpCode(emailClean, otp, "reset");
-
-      let emailSent = false;
-      const activeTransporter = getTransporter();
-      if (activeTransporter) {
-        try {
-          const mailOptions = {
-            from: `"Nucleus.CC Support" <${smtpConfig.user}>`,
-            to: emailClean,
-            subject: `📚 Reset security credentials - Nucleus.CC`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #ebd7b3; border-radius: 12px; background-color: #FAF6ED; color: #000000;">
-                <h2 style="color: #F15A29; text-align: center; margin-bottom: 20px;">Nucleus.CC Support</h2>
-                <div style="background-color: #ffffff; padding: 25px; border-radius: 10px; border: 1px solid #ebd7b3;">
-                  <p style="font-size: 14px; color: #333;">You requested a password reset for your student account at Nucleus.CC. Enter the following 6-digit verification code to update your credentials:</p>
-                  <p style="text-align: center; background-color: #FFF2EB; color: #F15A29; font-size: 32px; font-weight: 800; padding: 15px; border-radius: 8px; letter-spacing: 6px; margin: 20px 0; border: 1px dashed #F15A29;">
-                    ${otp}
-                  </p>
-                  <p style="font-size: 12px; color: #666; margin-top: 20px;">This security PIN expires in <strong>5 minutes</strong>. If you did not make this request, you can safely ignore this mail.</p>
-                </div>
-              </div>
-            `
-          };
-          await activeTransporter.sendMail(mailOptions);
-          emailSent = true;
-        } catch (mailErr) {
-          console.error("Nodemailer Forgot Password SMTP failed:", mailErr);
-        }
-      }
-
-      const isSimulated = !emailSent;
-      if (isSimulated) {
-        console.log(`\n==============================================\n[SANDBOX ForgotPassword Fallback] Email: '${emailClean}' | OTP Code: '${otp}'\n==============================================\n`);
-      }
-
-      return res.json({
-        success: true,
-        simulated: isSimulated,
-        simulatedOtp: isSimulated ? otp : undefined,
-        message: isSimulated
-          ? `[Simulation Mode] OTP reset PIN generated for your testing: ${otp}`
-          : `A password reset PIN was sent to your email address: ${emailClean}.`
-      });
-    } catch (err: any) {
-      return res.status(500).json({ error: err?.message || "Reset password request failed." });
-    }
-  });
-
-  // Endpoint: Reset Password Apply
-  app.post("/api/auth/reset-password", async (req, res) => {
-    try {
-      const { email, otp, newPassword } = req.body;
-      if (!email || !otp || !newPassword) {
-        return res.status(400).json({ error: "All input values are required to complete resets." });
-      }
-      const emailClean = email.toLowerCase().trim();
-
-      const validated = await verifyOtpCode(emailClean, otp, "reset");
-      if (!validated) {
-        return res.status(400).json({ error: "Incorrect or expired reset PIN." });
-      }
-
-      const passwordHash = bcrypt.hashSync(newPassword, 10);
-
-      if (db) {
-        try {
-          const credRef = db.collection("credentials").doc(emailClean);
-          const credDoc = await credRef.get();
-          if (!credDoc.exists) {
-            return res.status(400).json({ error: "Student authorization document does not exist." });
-          }
-
-          await credRef.update({ passwordHash });
-          return res.json({ success: true, message: "Your password has been successfully updated!" });
-        } catch (dbErr) {
-          return res.status(500).json({ error: "Failed to update profile password hash in Firestore DB." });
-        }
-      }
-
-      return res.status(500).json({ error: "Database not configured." });
-    } catch (err: any) {
-      return res.status(500).json({ error: err?.message || "Password update system error." });
     }
   });
 

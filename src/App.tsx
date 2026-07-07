@@ -15,7 +15,6 @@ const Learn = lazy(() => import('./pages/Learn'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
-const VerifyOtp = lazy(() => import('./pages/VerifyOtp'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const SelectStandard = lazy(() => import('./pages/SelectStandard'));
 const Library = lazy(() => import('./pages/Library'));
@@ -209,7 +208,6 @@ function AppContent() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-              <Route path="/verify-otp" element={<VerifyOtp />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/select-standard" element={<SelectStandard />} />
