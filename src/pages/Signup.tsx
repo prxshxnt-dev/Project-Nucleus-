@@ -36,7 +36,6 @@ export default function Signup() {
 
   // Form Registration States
   const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -117,18 +116,6 @@ export default function Signup() {
       toast.error('Please enter your full name.');
       return false;
     }
-    if (!username.trim()) {
-      toast.error('Please choose a username.');
-      return false;
-    }
-    if (username.trim().length < 3) {
-      toast.error('Username must be at least 3 characters long.');
-      return false;
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
-      toast.error('Username can only contain alphanumeric characters and underscores.');
-      return false;
-    }
     if (!phone.trim()) {
       toast.error('Mobile Phone Number is required.');
       return false;
@@ -176,7 +163,6 @@ export default function Signup() {
         body: JSON.stringify({
           email: email.toLowerCase().trim(),
           name: name.trim(),
-          username: username.toLowerCase().trim(),
           phone: phone.trim(),
           password,
           idToken: verificationToken,
@@ -299,16 +285,6 @@ export default function Signup() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 id="register-name-field"
-              />
-
-              {/* Username Field */}
-              <FloatingLabelInput
-                label="Choose Unique Username"
-                icon={<User className="w-5 h-5 text-indigo-500" />}
-                value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                required
-                id="register-username-field"
               />
 
               {/* Phone Field */}

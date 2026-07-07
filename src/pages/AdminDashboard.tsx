@@ -201,6 +201,8 @@ export default function AdminDashboard() {
   const [localUploadProgress, setLocalUploadProgress] = useState(0);
 
   const [users, setUsers] = useState<any[]>([]);
+  const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
+  const [editingPhoneVal, setEditingPhoneVal] = useState("");
   const [materials, setMaterials] = useState<any[]>([]);
   const [mentors, setMentors] = useState<any[]>([]);
 
@@ -7399,10 +7401,20 @@ export default function AdminDashboard() {
 
       {activeTab === "users" && (
         <div className="overflow-x-auto">
+          <div className="mb-4 bg-zinc-900/40 p-4 border border-white/10 rounded-2xl flex justify-between items-center text-left">
+            <div>
+              <h3 className="text-sm font-bold text-[#E5D2A5] uppercase tracking-wider">Student Mobile Directory</h3>
+              <p className="text-xs text-white/50 mt-1">This panel securely lists the full names, email addresses, and registered phone/mobile numbers of all active students.</p>
+            </div>
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-extrabold px-2.5 py-1 rounded-full border border-emerald-500/20 uppercase font-mono tracking-wider">
+              {users.length} Active Records
+            </span>
+          </div>
           <table className="w-full text-left bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
             <thead className="border-b border-white/10 bg-white/5">
               <tr>
                 <th className="p-4 font-medium text-white/60">Name</th>
+                <th className="p-4 font-medium text-white/60">Mobile Number</th>
                 <th className="p-4 font-medium text-white/60">Email</th>
                 <th className="p-4 font-medium text-white/60">Streak</th>
                 <th className="p-4 font-medium text-white/60">Role</th>
@@ -7413,7 +7425,63 @@ export default function AdminDashboard() {
             <tbody className="divide-y divide-white/10">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                  <td className="p-4">{u.displayName}</td>
+                  <td className="p-4 font-medium text-white">{u.displayName}</td>
+                  <td className="p-4 font-mono text-emerald-400 text-sm">
+                    {editingPhoneUserId === u.id ? (
+                      <div className="flex items-center gap-1.5" id={`editing-phone-${u.id}`}>
+                        <input
+                          type="text"
+                          className="bg-black/80 border border-emerald-500/50 rounded-lg px-2.5 py-1 text-emerald-400 text-xs font-mono focus:outline-none focus:border-emerald-500 w-36"
+                          value={editingPhoneVal}
+                          onChange={(e) => setEditingPhoneVal(e.target.value)}
+                          placeholder="Enter number..."
+                          autoFocus
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              const val = editingPhoneVal.trim();
+                              await updateDoc(doc(db, "users", u.id), {
+                                phone: val,
+                                mobile: val,
+                                updatedAt: serverTimestamp()
+                              });
+                              setUsers(prev => prev.map(userItem => userItem.id === u.id ? { ...userItem, phone: val, mobile: val } : userItem));
+                              setEditingPhoneUserId(null);
+                            } catch (err) {
+                              console.error("Failed to update mobile number:", err);
+                              alert("Failed to update: " + String(err));
+                            }
+                          }}
+                          className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-md transition-colors"
+                          title="Save"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setEditingPhoneUserId(null)}
+                          className="p-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-md transition-colors"
+                          title="Cancel"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group justify-between md:justify-start">
+                        <span>{u.phone || u.mobile || "—"}</span>
+                        <button
+                          onClick={() => {
+                            setEditingPhoneUserId(u.id);
+                            setEditingPhoneVal(u.phone || u.mobile || "");
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-opacity"
+                          title="Edit Mobile Number"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                   <td className="p-4 text-white/60">{u.email}</td>
                   <td className="p-4">
                     <div className="flex items-center gap-1.5 text-amber-500">

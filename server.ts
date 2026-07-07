@@ -302,13 +302,12 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
   // Endpoint: User Signup / Register (Secure Google Verified Email flow)
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { name, email, username, phone, password, classGroup, idToken } = req.body;
-      if (!name || !email || !username || !phone || !password || !idToken) {
+      const { name, email, phone, password, classGroup, idToken } = req.body;
+      if (!name || !email || !phone || !password || !idToken) {
         return res.status(400).json({ error: "All profile fields and Google verification token are mandatory." });
       }
 
       const emailClean = email.toLowerCase().trim();
-      const usernameClean = username.toLowerCase().trim();
       const phoneClean = phone.trim();
       const passwordHash = bcrypt.hashSync(password, 10);
       const uid = "student-" + Math.random().toString(36).substring(2, 11) + "_" + Date.now().toString().slice(-6);
@@ -324,12 +323,6 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
         const emailSnap = await db.collection("users").where("email", "==", emailClean).limit(1).get();
         if (!emailSnap.empty) {
           return res.status(400).json({ error: "An account is already linked with this email address." });
-        }
-
-        // Check for duplicate Username
-        const usernameSnap = await db.collection("users").where("username", "==", usernameClean).limit(1).get();
-        if (!usernameSnap.empty) {
-          return res.status(400).json({ error: "This username is already taken. Please choose another username." });
         }
 
         // Check for duplicate Phone
@@ -352,7 +345,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
           // Write public student user details to global users collection
           await db.collection("users").doc(uid).set({
             email: emailClean,
-            username: usernameClean,
+            username: "",
             phone: phoneClean,
             displayName: name.trim(),
             role: "user",
@@ -379,7 +372,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
         user: {
           uid,
           email: emailClean,
-          username: usernameClean,
+          username: "",
           phone: phoneClean,
           displayName: name.trim(),
           role: "user",
