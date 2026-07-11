@@ -54,17 +54,6 @@ export default function Signup() {
   }, [user, loading, navigate]);
 
   const handleVerifyWithGoogle = async () => {
-    const emailClean = email.toLowerCase().trim();
-    if (!emailClean) {
-      toast.error('Please enter your email address first before verifying.');
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailClean)) {
-      toast.error('Please enter a valid email address structure.');
-      return;
-    }
-
     setIsVerifying(true);
     try {
       // Use signInWithPopup from Firebase for the most robust iframe authentication
@@ -72,27 +61,70 @@ export default function Signup() {
       const googleUser = result.user;
       const googleEmail = googleUser.email?.toLowerCase().trim();
 
-      if (googleEmail !== emailClean) {
-        toast.error(`Verification Mismatch: The selected Google account (${googleEmail || 'unknown'}) does not match your entered email (${emailClean}).`, {
-          duration: 6000
-        });
-        setIsVerified(false);
-        setVerificationToken(null);
+      if (!googleEmail) {
+        throw new Error('Could not retrieve email address from your Google Account.');
+      }
+
+      // Securely check with backend if the user is already registered or new
+      const idToken = await googleUser.getIdToken();
+      
+      console.log("[GOOGLE VERIFY] Communicating Google Auth token to backend...", googleEmail);
+      const response = await fetch('/api/auth/google-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      });
+
+      const responseText = await response.text();
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch (jsonErr) {
+        console.error("[GOOGLE VERIFY] JSON Parse Error:", jsonErr);
+        throw new Error(`Server returned non-JSON response: ${responseText.slice(0, 150)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Backend verification failed.');
+      }
+
+      // Check if user is already registered
+      if (data.registered) {
+        console.log("[GOOGLE VERIFY] Existing user found. Logging in immediately.");
+        
+        // Save session locally
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        localStorage.setItem('accessToken', data.token);
+        localStorage.setItem('isLoggedIn', 'true');
+
+        // Update auth state
+        setUser(data.user);
+        setLoading(false);
+
+        toast.success(`Welcome back, ${data.user.displayName}! Automatically signed in via Google.`);
+        
+        // Asynchronously sign out from Firebase client SDK to keep state clean
         await auth.signOut();
+        navigate('/dashboard', { replace: true });
       } else {
-        const idToken = await googleUser.getIdToken();
+        console.log("[GOOGLE VERIFY] New student found. Opening registration setup wizard.");
+        
+        // Populate form with Google verified details
+        setEmail(googleEmail);
         setVerificationToken(idToken);
         setIsVerified(true);
         setPhotoURL(googleUser.photoURL || null);
         if (!name) {
           setName(googleUser.displayName || '');
         }
-        // Sign out from Firebase Auth so it doesn't conflict with custom password credentials session
+
+        toast.success('Google account verified successfully! Please complete your registration details below.');
+        
+        // Asynchronously sign out from Firebase client SDK to keep state clean
         await auth.signOut();
-        toast.success('Email successfully verified with Google!');
       }
     } catch (err: any) {
-      console.error('Google verification popup error:', err);
+      console.error('Google verification popup/api error:', err);
       if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
         toast.error('Google verification window closed. Please try again.');
       } else if (err.code === 'auth/network-request-failed' || err.message?.includes('network-request-failed')) {
@@ -102,6 +134,11 @@ export default function Signup() {
       }
       setIsVerified(false);
       setVerificationToken(null);
+      try {
+        await auth.signOut();
+      } catch (signOutErr) {
+        console.warn("Client signOut failed:", signOutErr);
+      }
     } finally {
       setIsVerifying(false);
     }

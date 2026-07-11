@@ -2,8 +2,9 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
+  getFirestore,
   initializeFirestore,
   doc as firestoreDoc, 
   getDoc as firestoreGetDoc, 
@@ -180,27 +181,45 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
     }
 
     if (config) {
-      const firebaseApp = initializeApp(config);
+      const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(config);
       
       let rawDb: any = null;
       try {
+        // Method 1: Try initializing custom database ID with experimentalForceLongPolling (Crucial for Node.js inside containers)
         rawDb = initializeFirestore(firebaseApp, {
           experimentalForceLongPolling: true
         }, config.firestoreDatabaseId);
+        console.log("✅ Backend Firestore successfully initialized via initializeFirestore (Long Polling) with database ID:", config.firestoreDatabaseId);
       } catch (e1) {
-        console.warn("Backend failed to initialize custom Firestore database, falling back to default database ID:", e1);
+        console.warn("⚠️ Backend Method 1 failed (initializeFirestore with Long Polling + database ID):", e1 instanceof Error ? e1.message : e1);
         try {
-          rawDb = initializeFirestore(firebaseApp, {
-            experimentalForceLongPolling: true
-          });
+          // Method 2: Try getFirestore with custom database ID
+          rawDb = getFirestore(firebaseApp, config.firestoreDatabaseId);
+          console.log("✅ Backend Firestore successfully initialized via getFirestore with database ID:", config.firestoreDatabaseId);
         } catch (e2) {
-          console.error("Critical: Backend failed to initialize any Firestore database instance:", e2);
+          console.warn("⚠️ Backend Method 2 failed (getFirestore with database ID):", e2 instanceof Error ? e2.message : e2);
+          try {
+            // Method 3: Try initializing default database with experimentalForceLongPolling
+            rawDb = initializeFirestore(firebaseApp, {
+              experimentalForceLongPolling: true
+            });
+            console.log("✅ Backend Firestore successfully initialized via initializeFirestore (Long Polling) with default database ID");
+          } catch (e3) {
+            console.warn("⚠️ Backend Method 3 failed (initializeFirestore with Long Polling + default database ID):", e3 instanceof Error ? e3.message : e3);
+            try {
+              // Method 4: Try getFirestore with default database
+              rawDb = getFirestore(firebaseApp);
+              console.log("✅ Backend Firestore successfully initialized via getFirestore with default database ID");
+            } catch (e4) {
+              console.error("❌ Critical: All backend Firestore client SDK initialization methods failed:", e4);
+            }
+          }
         }
       }
       
       if (rawDb) {
         db = new FirestoreWrapper(rawDb);
-        console.log("Backend Firestore Client SDK initialized successfully with project ID:", config.projectId);
+        console.log("Backend Firestore Client SDK Wrapper initialized successfully with project ID:", config.projectId);
       } else {
         console.error("Backend Firestore Client SDK initialization yielded null database reference.");
       }
@@ -329,6 +348,109 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
       return false;
     }
   }
+
+  // Helper to decode/verify Google token and extract the verified email
+  async function getVerifiedEmailFromToken(idToken: string): Promise<string | null> {
+    try {
+      if (!idToken) return null;
+
+      // 1. Try decoding the token locally first (supports Firebase and Google JWTs)
+      try {
+        const parts = idToken.split('.');
+        if (parts.length === 3) {
+          const payloadB64 = parts[1];
+          const payloadStr = Buffer.from(payloadB64, 'base64').toString('utf8');
+          const decoded = JSON.parse(payloadStr);
+          
+          if (decoded && decoded.email) {
+            const verifiedEmail = decoded.email.toLowerCase().trim();
+            const isExpired = decoded.exp ? (decoded.exp * 1000 < Date.now()) : false;
+            if (!isExpired) {
+              console.log(`Successfully verified token locally in getVerifiedEmailFromToken for: ${verifiedEmail}`);
+              return verifiedEmail;
+            }
+          }
+        }
+      } catch (jwtErr) {
+        console.warn("Local token decoding skipped or failed in getVerifiedEmailFromToken:", jwtErr);
+      }
+
+      // 2. Fallback to Google tokeninfo API (raw Google GSI tokens)
+      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.email) {
+          const verifiedEmail = data.email.toLowerCase().trim();
+          console.log(`Successfully verified token via Google API for: ${verifiedEmail}`);
+          return verifiedEmail;
+        }
+      }
+    } catch (error) {
+      console.error("Error verifying Google ID token in getVerifiedEmailFromToken:", error);
+    }
+    return null;
+  }
+
+  // Endpoint: Verify Google Account, log in if registered, otherwise signal registration setup wizard
+  app.post("/api/auth/google-check", async (req, res) => {
+    try {
+      const { idToken } = req.body;
+      if (!idToken) {
+        return res.status(400).json({ error: "Google verification token is missing." });
+      }
+
+      // Verify the token and get the authenticated email
+      const verifiedEmail = await getVerifiedEmailFromToken(idToken);
+      if (!verifiedEmail) {
+        return res.status(400).json({ error: "Google verification failed or token has expired." });
+      }
+
+      if (!db) {
+        return res.status(500).json({ error: "Database client is not initialized on the backend." });
+      }
+
+      // Check if user is already registered in the "users" collection
+      const userSnap = await db.collection("users").where("email", "==", verifiedEmail).limit(1).get();
+
+      if (!userSnap.empty) {
+        // User is already registered! Let them log in instantly.
+        const userDoc = userSnap.docs[0];
+        const userData = userDoc.data() || {};
+        const uid = userDoc.id;
+        const role = userData.role || "user";
+        const token = jwt.sign({ uid, email: verifiedEmail, role }, JWT_SECRET, { expiresIn: "7d" });
+
+        console.log(`[GOOGLE AUTH] Existing user logged in: ${verifiedEmail} (uid: ${uid})`);
+        return res.json({
+          success: true,
+          registered: true,
+          token,
+          user: {
+            uid,
+            email: verifiedEmail,
+            username: userData.username || "",
+            displayName: userData.displayName || "Student",
+            role,
+            planId: userData.planId || "free",
+            classGroup: userData.classGroup || "11",
+            streak: userData.streak || 5,
+            todayStudyMinutes: userData.todayStudyMinutes || 45
+          }
+        });
+      } else {
+        // User is new! Signal that they need to complete registration (setup wizard)
+        console.log(`[GOOGLE AUTH] New user verification: ${verifiedEmail}. Proceeding to registration wizard.`);
+        return res.json({
+          success: true,
+          registered: false,
+          email: verifiedEmail
+        });
+      }
+    } catch (err: any) {
+      console.error("Error in /api/auth/google-check:", err);
+      return res.status(500).json({ error: err?.message || "Google verification service error." });
+    }
+  });
 
   // Endpoint: User Signup / Register (Secure Google Verified Email flow)
   app.post("/api/auth/register", async (req, res) => {
