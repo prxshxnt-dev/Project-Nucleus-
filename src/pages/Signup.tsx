@@ -24,15 +24,15 @@ import { toast } from 'sonner';
 import FloatingLabelInput from '../components/FloatingLabelInput';
 
 export default function Signup() {
-  const { user, setUser, loading, setLoading } = useAuthStore();
+  const { user, setUser, loading, setLoading, verifiedGoogleAccount, setVerifiedGoogleAccount } = useAuthStore();
   const navigate = useNavigate();
 
   // Verification States
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(useAuthStore.getState().verifiedGoogleAccount?.email || '');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  const [verificationToken, setVerificationToken] = useState<string | null>(null);
-  const [photoURL, setPhotoURL] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState(!!useAuthStore.getState().verifiedGoogleAccount);
+  const [verificationToken, setVerificationToken] = useState<string | null>(useAuthStore.getState().verifiedGoogleAccount?.idToken || null);
+  const [photoURL, setPhotoURL] = useState<string | null>(useAuthStore.getState().verifiedGoogleAccount?.photoURL || null);
 
   // Form Registration States
   const [name, setName] = useState('');
@@ -45,6 +45,16 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync with global auth state if verifiedGoogleAccount changes
+  useEffect(() => {
+    if (verifiedGoogleAccount) {
+      setEmail(verifiedGoogleAccount.email);
+      setVerificationToken(verifiedGoogleAccount.idToken);
+      setIsVerified(true);
+      setPhotoURL(verifiedGoogleAccount.photoURL || null);
+    }
+  }, [verifiedGoogleAccount]);
 
   // Redirect if logged in
   useEffect(() => {
@@ -110,6 +120,14 @@ export default function Signup() {
         console.log("[GOOGLE VERIFY] New student found. Opening registration setup wizard.");
         
         // Populate form with Google verified details
+        const verifiedDetails = {
+          email: googleEmail,
+          uid: googleUser.uid,
+          idToken,
+          photoURL: googleUser.photoURL || null
+        };
+        setVerifiedGoogleAccount(verifiedDetails);
+
         setEmail(googleEmail);
         setVerificationToken(idToken);
         setIsVerified(true);
@@ -134,6 +152,7 @@ export default function Signup() {
       }
       setIsVerified(false);
       setVerificationToken(null);
+      setVerifiedGoogleAccount(null);
       try {
         await auth.signOut();
       } catch (signOutErr) {
@@ -257,6 +276,7 @@ export default function Signup() {
       localStorage.setItem('isLoggedIn', 'true');
 
       // Update state store
+      setVerifiedGoogleAccount(null);
       setUser(data.user);
       setLoading(false);
 
@@ -266,7 +286,7 @@ export default function Signup() {
     } catch (err: any) {
       console.error("[REGISTRATION FAILED CRITICALLY] Error Trace:", err);
       if (err.stack) {
-        console.error(err.stack);
+        console.error("Stack trace:", err.stack);
       }
       toast.error(err.message || 'An error occurred during registration. Please check the browser console.');
     } finally {

@@ -19,16 +19,27 @@ interface User {
   acceptedAt?: string | null;
 }
 
+interface VerifiedGoogleAccount {
+  email: string;
+  uid: string;
+  idToken: string;
+  photoURL?: string | null;
+}
+
 interface AuthState {
   user: User | null;
   loading: boolean;
+  verifiedGoogleAccount: VerifiedGoogleAccount | null;
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
+  setVerifiedGoogleAccount: (account: VerifiedGoogleAccount | null) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   loading: true,
+  verifiedGoogleAccount: null,
   setUser: (user) => set({ user }),
   setLoading: (loading) => set({ loading }),
+  setVerifiedGoogleAccount: (verifiedGoogleAccount) => set({ verifiedGoogleAccount }),
 }));
