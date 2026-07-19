@@ -146,6 +146,15 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
+    function isValidNotification(data) {
+      return data.userId is string && data.userId.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && data.message is string && data.message.size() <= 2000
+        && data.category is string && data.category.size() <= 100
+        && data.readStatus is bool
+        && data.createdAt == request.time;
+    }
+
     match /users/{userId} {
       allow get: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || userId.matches('^student-.*');
       allow list: if isAdmin();
@@ -173,8 +182,8 @@ service cloud.firestore {
           && isValidId(userId) 
           && isValidUserUpdate(incoming()) 
           && (
-            (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'classGroup', 'onboardingCompleted', 'privacyAccepted', 'termsAccepted', 'acceptedAt']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
-            (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'classGroup', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'onboardingCompleted', 'privacyAccepted', 'termsAccepted', 'acceptedAt']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
+            (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'classGroup', 'onboardingCompleted', 'privacyAccepted', 'termsAccepted', 'acceptedAt', 'themePreference', 'notificationPreferences']) && incoming().role == existing().role && incoming().planId == existing().planId) ||
+            (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'planId', 'unlockedMaterials', 'classGroup', 'updatedAt', 'streak', 'todayStudyMinutes', 'lastStudyDate', 'lastStreakDate', 'onboardingCompleted', 'privacyAccepted', 'termsAccepted', 'acceptedAt', 'themePreference', 'notificationPreferences']) && (request.auth.uid != userId || incoming().role == existing().role)) ||
             (request.auth.token.email == 'meinkxun@gmail.com' && request.auth.uid == userId)
           )
         ) || (
@@ -280,6 +289,19 @@ service cloud.firestore {
       allow create: if isSignedIn() && isValidId(noteId) && isValidNote(incoming());
       allow update: if isSignedIn() && isValidId(noteId) && isValidNoteUpdate(incoming()) && (existing().userId == request.auth.uid || isAdmin());
       allow delete: if isSignedIn() && isValidId(noteId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /notifications/{notificationId} {
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming()) && (incoming().userId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && isValidId(notificationId) && (existing().userId == request.auth.uid || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['readStatus']);
+      allow delete: if isSignedIn() && isValidId(notificationId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow read, list: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

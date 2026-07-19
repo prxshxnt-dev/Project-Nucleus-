@@ -4,8 +4,10 @@ import { useSettingsStore, THEME_PRESETS } from '../store/settingsStore';
 import { signInWithGoogle, logout } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
-import { Menu, X, Home as HomeIcon, BookOpen, Sliders, LogIn, LogOut, Sparkles, User, LayoutDashboard, Smartphone, Heart } from 'lucide-react';
+import { Menu, X, Home as HomeIcon, BookOpen, Sliders, LogIn, LogOut, Sparkles, User, LayoutDashboard, Smartphone, Heart, Sun, Moon, Monitor } from 'lucide-react';
 import { NucleusLogo } from './NucleusLogo';
+import { useTheme } from './ThemeProvider';
+import NotificationCenter from './NotificationCenter';
 
 // Parse site's active theme or custom primary color to decimal values
 const parseHexToRgbDecimals = (hex?: string) => {
@@ -37,6 +39,7 @@ const parseHexToRgbDecimals = (hex?: string) => {
 export default function Navbar() {
   const { user, loading } = useAuthStore();
   const { settings } = useSettingsStore();
+  const { themeMode, setThemeMode } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -148,6 +151,44 @@ export default function Navbar() {
               <span>Donate / Support</span>
             </button>
           )}
+
+          {/* Theme Selector Dropdown */}
+          <div className="relative group shrink-0">
+            <button className="p-2 rounded-xl bg-secondary hover:bg-border/40 text-text-secondary hover:text-[#FF8C42] transition-colors cursor-pointer flex items-center justify-center border border-border-color h-8 w-8">
+              {themeMode === 'warm' && <Sun className="w-4 h-4 text-[#FF8C42]" />}
+              {themeMode === 'dark' && <Moon className="w-4 h-4 text-amber-400" />}
+              {themeMode === 'system' && <Monitor className="w-4 h-4" />}
+            </button>
+            <div className="absolute right-0 top-full pt-2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 z-50">
+              <div className="bg-card border border-border rounded-2xl p-2 shadow-xl min-w-[140px] space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setThemeMode('warm')}
+                  className={`w-full py-1.5 px-3 text-xs font-semibold rounded-xl text-left flex items-center gap-2 cursor-pointer transition-colors ${themeMode === 'warm' ? 'bg-[#FF8C42]/10 text-[#FF8C42]' : 'hover:bg-secondary text-text-secondary'}`}
+                >
+                  <Sun className="w-3.5 h-3.5 text-[#FF8C42]" />
+                  <span>Warm Light</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeMode('dark')}
+                  className={`w-full py-1.5 px-3 text-xs font-semibold rounded-xl text-left flex items-center gap-2 cursor-pointer transition-colors ${themeMode === 'dark' ? 'bg-[#FF8C42]/10 text-[#FF8C42]' : 'hover:bg-secondary text-text-secondary'}`}
+                >
+                  <Moon className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Dark</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeMode('system')}
+                  className={`w-full py-1.5 px-3 text-xs font-semibold rounded-xl text-left flex items-center gap-2 cursor-pointer transition-colors ${themeMode === 'system' ? 'bg-[#FF8C42]/10 text-[#FF8C42]' : 'hover:bg-secondary text-text-secondary'}`}
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span>System</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {!loading && (
             user ? (
               <>
@@ -186,6 +227,8 @@ export default function Navbar() {
                     <span>Control Panel</span>
                   </Link>
                 )}
+                
+                <NotificationCenter />
                 
                 {/* User avatar or logout */}
                 <div className="relative group">
@@ -230,19 +273,22 @@ export default function Navbar() {
         </div>
   
         {/* Mobile menu trigger */}
-        <button 
-          className="lg:hidden p-2 text-text-secondary hover:text-text-primary rounded-xl hover:bg-white/5 active:scale-95 transition-all"
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <motion.div
-            initial={{ rotate: 0 }}
-            whileHover={{ scale: 1.1, rotate: 180 }}
-            whileTap={{ scale: 0.9, rotate: -45 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
+        <div className="lg:hidden flex items-center gap-1">
+          {user && <NotificationCenter />}
+          <button 
+            className="p-2 text-text-secondary hover:text-text-primary rounded-xl hover:bg-white/5 active:scale-95 transition-all"
+            onClick={() => setMobileMenuOpen(true)}
           >
-            <Menu className="w-6 h-6" />
-          </motion.div>
-        </button>
+            <motion.div
+              initial={{ rotate: 0 }}
+              whileHover={{ scale: 1.1, rotate: 180 }}
+              whileTap={{ scale: 0.9, rotate: -45 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+            >
+              <Menu className="w-6 h-6" />
+            </motion.div>
+          </button>
+        </div>
       </motion.nav>
 
       {/* Floating Bottom Navigation Bar for Mobile */}
@@ -443,6 +489,38 @@ export default function Navbar() {
                   </Link>
                 )
               )}
+
+              {/* Mobile Theme Selector */}
+              <div className="h-px bg-border-color w-full my-4"></div>
+              <div className="flex flex-col gap-2 pt-2">
+                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">Theme Mode</span>
+                <div className="grid grid-cols-3 gap-2 bg-secondary p-1 rounded-2xl border border-border-color">
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('warm')}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${themeMode === 'warm' ? 'bg-[#FF8C42] text-black' : 'text-text-secondary'}`}
+                  >
+                    <Sun className="w-3.5 h-3.5" />
+                    <span>Warm</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('dark')}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${themeMode === 'dark' ? 'bg-[#FF8C42] text-black' : 'text-text-secondary'}`}
+                  >
+                    <Moon className="w-3.5 h-3.5" />
+                    <span>Dark</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('system')}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${themeMode === 'system' ? 'bg-[#FF8C42] text-black' : 'text-text-secondary'}`}
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    <span>System</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}

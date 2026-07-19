@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "../store/authStore";
 import { db } from "../lib/firebase";
+import { NotificationService } from "../lib/notificationService";
 import { apiGateway, APITelemetryLog } from "../lib/apiGateway";
 import {
   collection,
@@ -18,8 +19,9 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { motion } from "motion/react";
-import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare, Upload, FileUp, X, Paperclip } from "lucide-react";
+import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare, Upload, FileUp, X, Paperclip, Sun, Moon, Monitor } from "lucide-react";
 import Markdown from "react-markdown";
+import { useTheme } from "../components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -129,6 +131,7 @@ function calculateContrastRatio(hex1: string, hex2: string): number {
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuthStore();
+  const { themeMode, resolvedTheme, setThemeMode } = useTheme();
   const navigate = useNavigate();
   const isMountedRef = useRef(true);
 
@@ -1557,6 +1560,19 @@ export default function AdminDashboard() {
       } else {
         const docRef = await addDoc(collection(db, "materials"), data);
         matId = docRef.id;
+
+        let notifType = 'note';
+        if (mType === 'lecture' || mType === 'video') notifType = 'video';
+        else if (mType === 'assignment') notifType = 'assignment';
+        else if (mType === 'test') notifType = 'test';
+        else if (mType === 'live' || mType === 'liveClass') notifType = 'live_class';
+
+        NotificationService.triggerNewContentNotification({
+          title: mTitle,
+          type: notifType,
+          classGroup: data.classGroup || 'all'
+        });
+
         showToast("Published file successfully to folder directory!");
       }
 
@@ -2293,6 +2309,18 @@ export default function AdminDashboard() {
           updatedAt: serverTimestamp(),
         });
         await setDoc(doc(db, "materials_secure", docRef.id), { url: finalUrl });
+
+        let notifType = 'note';
+        if (type === 'lecture' || type === 'video') notifType = 'video';
+        else if (type === 'assignment') notifType = 'assignment';
+        else if (type === 'test') notifType = 'test';
+        else if (type === 'live' || type === 'liveClass') notifType = 'live_class';
+
+        NotificationService.triggerNewContentNotification({
+          title: title,
+          type: notifType,
+          classGroup: classGroup || 'all'
+        });
       }
 
       setTitle("");
@@ -2589,7 +2617,40 @@ export default function AdminDashboard() {
         <span>Back to Dashboard</span>
       </button>
 
-      <h1 className="text-4xl font-display font-medium mb-8">Admin Control</h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <h1 className="text-4xl font-display font-medium">Admin Control</h1>
+        
+        {/* Admin Header Theme Selector */}
+        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-2xl border border-white/10 w-fit self-start md:self-auto shadow-inner">
+          <button
+            type="button"
+            onClick={() => setThemeMode('warm')}
+            className={`p-1.5 px-3 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${themeMode === 'warm' ? 'bg-primary text-black shadow-md' : 'text-white/60 hover:text-white'}`}
+            title="Warm Light"
+          >
+            <Sun className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Warm</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setThemeMode('dark')}
+            className={`p-1.5 px-3 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${themeMode === 'dark' ? 'bg-primary text-black shadow-md' : 'text-white/60 hover:text-white'}`}
+            title="Dark"
+          >
+            <Moon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Dark</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setThemeMode('system')}
+            className={`p-1.5 px-3 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${themeMode === 'system' ? 'bg-primary text-black shadow-md' : 'text-white/60 hover:text-white'}`}
+            title="System Default"
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">System</span>
+          </button>
+        </div>
+      </div>
 
       {/* iOS-Style Solid Translucent Navigation Bar */}
       <div 
@@ -4039,6 +4100,45 @@ export default function AdminDashboard() {
 
             {settingsSubTab === "appearance" && (
               <div className="space-y-6">
+                {/* Admin/User Theme Preference Selector Card */}
+                <div className="p-5 rounded-2xl bg-black/40 border border-white/10 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-1 uppercase tracking-wider">
+                      Viewport Design & Mode (Personal Preference)
+                    </h4>
+                    <p className="text-xs text-white/50">
+                      Toggle your own theme display mode. Changes take effect instantly and sync to your Firestore user preference profile.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 bg-zinc-950 p-1.5 rounded-xl border border-white/5 max-w-md">
+                    <button
+                      type="button"
+                      onClick={() => setThemeMode('warm')}
+                      className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${themeMode === 'warm' ? 'bg-primary text-black font-black' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    >
+                      <Sun className="w-4 h-4" />
+                      <span>Warm Light</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThemeMode('dark')}
+                      className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${themeMode === 'dark' ? 'bg-primary text-black font-black' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    >
+                      <Moon className="w-4 h-4" />
+                      <span>Dark Mode</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setThemeMode('system')}
+                      className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${themeMode === 'system' ? 'bg-primary text-black font-black' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    >
+                      <Monitor className="w-4 h-4" />
+                      <span>System Mode</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Hero Section settings */}
             <div>
               <h4 className="text-sm font-medium text-[var(--primary-custom, #4F46E5)] mb-4 uppercase tracking-wide">

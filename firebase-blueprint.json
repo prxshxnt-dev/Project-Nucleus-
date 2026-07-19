@@ -41,6 +41,15 @@
           "type": "boolean",
           "description": "Indicates whether the user has completed the onboarding wizard."
         },
+        "themePreference": {
+          "type": "string",
+          "enum": ["warm", "dark", "system"],
+          "description": "The user's preferred viewport design theme."
+        },
+        "notificationPreferences": {
+          "type": "object",
+          "description": "The user's toggles for notification channels and categories."
+        },
         "privacyAccepted": {
           "type": "boolean",
           "description": "Indicates if the user accepted the Privacy Policy."
@@ -299,9 +308,51 @@
         "authorId": { "type": "string" }
       },
       "required": ["title", "classId", "questions", "createdAt", "updatedAt", "authorId"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "An in-app notification delivered to a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "readStatus": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "actionUrl": { "type": "string" }
+      },
+      "required": ["userId", "title", "message", "category", "readStatus", "createdAt"]
+    },
+    "Broadcast": {
+      "title": "Broadcast",
+      "description": "An admin broadcast configuration containing targeted groups and analytics.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "targetType": { "type": "string" },
+        "targetValue": { "type": "any" },
+        "channels": { "type": "array" },
+        "status": { "type": "string" },
+        "scheduledFor": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "analytics": { "type": "object" }
+      },
+      "required": ["title", "message", "category", "targetType", "channels", "status", "createdAt"]
     }
   },
   "firestore": {
+    "notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Stores user notifications and their read status."
+    },
+    "broadcasts/{broadcastId}": {
+      "schema": { "$ref": "#/entities/Broadcast" },
+      "description": "Stores admin broadcast and communication campaigns."
+    },
     "mcq_tests/{testId}": {
       "schema": { "$ref": "#/entities/McqTest" },
       "description": "Stores MCQ test modules with questions and options."

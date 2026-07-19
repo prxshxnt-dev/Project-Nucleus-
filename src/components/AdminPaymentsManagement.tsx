@@ -11,6 +11,7 @@ import {
   updateDoc
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { NotificationService } from "../lib/notificationService";
 import { useAuthStore } from "../store/authStore";
 import { 
   ResponsiveContainer, 
@@ -145,6 +146,78 @@ export function AdminPaymentsManagement({
     setSubTab(newTab);
     if (onSubTabChange) {
       onSubTabChange(newTab);
+    }
+  };
+
+  // Admin Broadcast Panel States
+  const [batches, setBatches] = useState<any[]>([]);
+  const [broadcastTarget, setBroadcastTarget] = useState<"all" | "class" | "batch" | "teachers" | "admins">("all");
+  const [broadcastClass, setBroadcastClass] = useState<string>("10");
+  const [broadcastBatchId, setBroadcastBatchId] = useState<string>("");
+  const [broadcastTitle, setBroadcastTitle] = useState<string>("");
+  const [broadcastMessage, setBroadcastMessage] = useState<string>("");
+  const [broadcastUrl, setBroadcastUrl] = useState<string>("");
+  const [broadcastCategory, setBroadcastCategory] = useState<string>("announcements");
+  const [broadcastChannels, setBroadcastChannels] = useState({ inApp: true, email: true, push: false });
+  const [broadcastIsScheduled, setBroadcastIsScheduled] = useState(false);
+  const [broadcastScheduleTime, setBroadcastScheduleTime] = useState("");
+  const [broadcastIsSending, setBroadcastIsSending] = useState(false);
+
+  // Load classes/batches for target selection
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "classes"), (snap) => {
+      const list = snap.docs.map(gdoc => ({ id: gdoc.id, ...gdoc.data() as any }));
+      setBatches(list);
+      if (list.length > 0) setBroadcastBatchId(list[0].id);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleLaunchBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
+      alert("Please provide a Title and Message for your broadcast!");
+      return;
+    }
+
+    setBroadcastIsSending(true);
+    try {
+      const selectedChannels: ("email" | "push" | "inApp")[] = [];
+      if (broadcastChannels.inApp) selectedChannels.push("inApp");
+      if (broadcastChannels.email) selectedChannels.push("email");
+      if (broadcastChannels.push) selectedChannels.push("push");
+
+      const payload = {
+        title: broadcastTitle.trim(),
+        message: broadcastMessage.trim(),
+        category: broadcastCategory,
+        targetType: broadcastTarget as "all" | "class" | "batch" | "students" | "teachers" | "admins",
+        targetValue: broadcastTarget === "class" 
+          ? broadcastClass 
+          : broadcastTarget === "batch" 
+            ? broadcastBatchId 
+            : undefined,
+        channels: selectedChannels,
+        scheduledFor: broadcastIsScheduled && broadcastScheduleTime 
+          ? new Date(broadcastScheduleTime).toISOString() 
+          : undefined
+      };
+
+      await NotificationService.triggerAdminBroadcast(payload);
+      
+      alert(broadcastIsScheduled ? "✨ Broadcast scheduled successfully!" : "🚀 Broadcast dispatched successfully in real-time!");
+      
+      // Reset form
+      setBroadcastTitle("");
+      setBroadcastMessage("");
+      setBroadcastUrl("");
+      setBroadcastIsScheduled(false);
+      setBroadcastScheduleTime("");
+    } catch (err) {
+      console.error("Failed to launch broadcast:", err);
+      alert("Error dispatching broadcast commands. Please verify inputs.");
+    } finally {
+      setBroadcastIsSending(false);
     }
   };
 
@@ -2492,73 +2565,291 @@ export function AdminPaymentsManagement({
             </div>
           )}
 
-          {/* 10. NOTIFICATION CUSTOMIZER */}
+          {/* 10. NOTIFICATION CUSTOMIZER & BROADCAST CENTER */}
           {subTab === "notifications" && (
-            <div className="max-w-2xl bg-zinc-900/40 border border-white/10 rounded-3xl p-6 space-y-5 animate-fade-in text-left mx-auto">
-              <h3 className="text-sm font-black uppercase text-primary tracking-wider">Configure Automated Event Communications</h3>
-              <p className="text-xs text-white/50">
-                Setup email and dashboard alerts when transactions change. You can use dynamic variables like <code>{`{BATCH_NAME}`}</code>, <code>{`{STUDENT_NAME}`}</code>, <code>{`{AMOUNT}`}</code>, and <code>{`{TRANSACTION_ID}`}</code>.
-              </p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start max-w-7xl mx-auto animate-fade-in text-left">
+              {/* Left Column: Automated Alerts */}
+              <div className="lg:col-span-5 bg-zinc-900/40 border border-white/10 rounded-3xl p-6 space-y-5">
+                <h3 className="text-sm font-black uppercase text-primary tracking-wider">Configure Automated Event Communications</h3>
+                <p className="text-xs text-white/50">
+                  Setup email and dashboard alerts when transactions change. You can use dynamic variables like <code>{`{BATCH_NAME}`}</code>, <code>{`{STUDENT_NAME}`}</code>, <code>{`{AMOUNT}`}</code>, and <code>{`{TRANSACTION_ID}`}</code>.
+                </p>
 
-              <div className="space-y-4 pt-3 border-t border-white/5">
-                {/* Event 1 */}
-                <div className="space-y-2.5">
-                  <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider">1. Payment Approvals & Success</h4>
-                  <div>
-                    <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Email Subject Header</label>
-                    <input
-                      type="text"
-                      disabled={!isSuperAdmin}
-                      value={notificationConfig.successSubject}
-                      onChange={(e) => setNotificationConfig({ ...notificationConfig, successSubject: e.target.value })}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-sans"
-                    />
+                <div className="space-y-4 pt-3 border-t border-white/5">
+                  {/* Event 1 */}
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider">1. Payment Approvals & Success</h4>
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Email Subject Header</label>
+                      <input
+                        type="text"
+                        disabled={!isSuperAdmin}
+                        value={notificationConfig.successSubject}
+                        onChange={(e) => setNotificationConfig({ ...notificationConfig, successSubject: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-sans"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Alert Message Template</label>
+                      <textarea
+                        rows={3}
+                        disabled={!isSuperAdmin}
+                        value={notificationConfig.successBody}
+                        onChange={(e) => setNotificationConfig({ ...notificationConfig, successBody: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white font-mono leading-relaxed resize-none"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Alert Message Template</label>
-                    <textarea
-                      rows={3}
-                      disabled={!isSuperAdmin}
-                      value={notificationConfig.successBody}
-                      onChange={(e) => setNotificationConfig({ ...notificationConfig, successBody: e.target.value })}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white font-mono leading-relaxed resize-none"
-                    />
+
+                  {/* Event 2 */}
+                  <div className="space-y-2.5 pt-4 border-t border-white/5">
+                    <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">2. Payment Failures & Rejections</h4>
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Email Subject Header</label>
+                      <input
+                        type="text"
+                        disabled={!isSuperAdmin}
+                        value={notificationConfig.failedSubject}
+                        onChange={(e) => setNotificationConfig({ ...notificationConfig, failedSubject: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-sans"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Alert Message Template</label>
+                      <textarea
+                        rows={3}
+                        disabled={!isSuperAdmin}
+                        value={notificationConfig.failedBody}
+                        onChange={(e) => setNotificationConfig({ ...notificationConfig, failedBody: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white font-mono leading-relaxed resize-none"
+                      />
+                    </div>
                   </div>
+
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => handleSaveConfig("notifications_config", notificationConfig, "Automated Alert Templates")}
+                      className="w-full py-2.5 bg-primary text-zinc-950 font-black uppercase text-[10px] rounded-xl hover:scale-[1.01] transition-all cursor-pointer"
+                    >
+                      Deploy Alert Templates
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Broadcast Center */}
+              <div className="lg:col-span-7 bg-zinc-900/40 border border-white/10 rounded-3xl p-6 space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-primary tracking-wider">Platform Broadcast Command Center</h3>
+                    <p className="text-xs text-white/50 mt-1">
+                      Dispatch immediate or scheduled notifications, HTML emails, and push alerts to segmented user cohorts.
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] font-mono uppercase font-bold animate-pulse">
+                    Broadcast Mode
+                  </span>
                 </div>
 
-                {/* Event 2 */}
-                <div className="space-y-2.5 pt-4 border-t border-white/5">
-                  <h4 className="text-xs font-black text-red-400 uppercase tracking-wider">2. Payment Failures & Rejections</h4>
-                  <div>
-                    <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Email Subject Header</label>
-                    <input
-                      type="text"
-                      disabled={!isSuperAdmin}
-                      value={notificationConfig.failedSubject}
-                      onChange={(e) => setNotificationConfig({ ...notificationConfig, failedSubject: e.target.value })}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Alert Message Template</label>
-                    <textarea
-                      rows={3}
-                      disabled={!isSuperAdmin}
-                      value={notificationConfig.failedBody}
-                      onChange={(e) => setNotificationConfig({ ...notificationConfig, failedBody: e.target.value })}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white font-mono leading-relaxed resize-none"
-                    />
-                  </div>
-                </div>
+                <form onSubmit={handleLaunchBroadcast} className="space-y-4 pt-3 border-t border-white/5">
+                  {/* Select Target Group */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1.5">Target Cohort Segment</label>
+                      <select
+                        value={broadcastTarget}
+                        onChange={(e: any) => setBroadcastTarget(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                      >
+                        <option value="all">📢 All Users (Global)</option>
+                        <option value="class">🎓 Specific Class Group</option>
+                        <option value="batch">📦 Specific Academic Batch</option>
+                        <option value="teachers">👨‍🏫 Teachers Only</option>
+                        <option value="admins">🛠️ Administrators Only</option>
+                      </select>
+                    </div>
 
-                {isSuperAdmin && (
+                    {/* Conditional sub-selectors */}
+                    {broadcastTarget === "class" && (
+                      <div>
+                        <label className="block text-[9px] uppercase font-bold text-white/40 mb-1.5">Select Class</label>
+                        <select
+                          value={broadcastClass}
+                          onChange={(e) => setBroadcastClass(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                        >
+                          <option value="9">Class 9 Students</option>
+                          <option value="10">Class 10 Students</option>
+                          <option value="11">Class 11 Students</option>
+                          <option value="12">Class 12 Students</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {broadcastTarget === "batch" && (
+                      <div>
+                        <label className="block text-[9px] uppercase font-bold text-white/40 mb-1.5">Select Target Batch</label>
+                        <select
+                          value={broadcastBatchId}
+                          onChange={(e) => setBroadcastBatchId(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                        >
+                          {batches.map(b => (
+                            <option key={b.id} value={b.id}>{b.className} ({b.batchCode || 'Premium'})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Category, Title & Action URL */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1.5">Broadcast Category</label>
+                      <select
+                        value={broadcastCategory}
+                        onChange={(e) => setBroadcastCategory(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                      >
+                        <option value="announcements">📢 Announcements / Alerts</option>
+                        <option value="offers">🎁 Special Offers & Packages</option>
+                        <option value="liveClasses">📅 Live Class Reschedule</option>
+                        <option value="payments">💳 Billing & Renewals</option>
+                        <option value="achievements">🏆 Academic Achievements</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1.5">Action Link URL (Optional)</label>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/syllabus"
+                        value={broadcastUrl}
+                        onChange={(e) => setBroadcastUrl(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Title & message */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Broadcast Title</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Urgent Academic Update regarding Batch Syllabus"
+                        value={broadcastTitle}
+                        onChange={(e) => setBroadcastTitle(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Message Content (Text & Basic HTML Support)</label>
+                      <textarea
+                        rows={4}
+                        required
+                        placeholder="Enter your announcement details here. Dynamic updates will notify targeted students instantly on their dashboard and via selected delivery channels."
+                        value={broadcastMessage}
+                        onChange={(e) => setBroadcastMessage(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white font-sans leading-relaxed resize-none focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Delivery Channels (Checkboxes) */}
+                  <div>
+                    <label className="block text-[9px] uppercase font-bold text-white/40 mb-2">Targeted Communication Channels</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-black/40 border border-white/5 cursor-pointer hover:bg-white/5 transition-all">
+                        <input
+                          type="checkbox"
+                          checked={broadcastChannels.inApp}
+                          onChange={(e) => setBroadcastChannels({ ...broadcastChannels, inApp: e.target.checked })}
+                          className="rounded border-white/10 text-primary focus:ring-0 bg-zinc-800"
+                        />
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-white/80">🔔 In-App</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-black/40 border border-white/5 cursor-pointer hover:bg-white/5 transition-all">
+                        <input
+                          type="checkbox"
+                          checked={broadcastChannels.email}
+                          onChange={(e) => setBroadcastChannels({ ...broadcastChannels, email: e.target.checked })}
+                          className="rounded border-white/10 text-primary focus:ring-0 bg-zinc-800"
+                        />
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-white/80">📧 Email</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-black/40 border border-white/5 cursor-pointer hover:bg-white/5 transition-all">
+                        <input
+                          type="checkbox"
+                          checked={broadcastChannels.push}
+                          onChange={(e) => setBroadcastChannels({ ...broadcastChannels, push: e.target.checked })}
+                          className="rounded border-white/10 text-primary focus:ring-0 bg-zinc-800"
+                        />
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-white/80">📱 Web Push</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Scheduling System */}
+                  <div className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-white/80">📅 Schedule Broadcast</span>
+                      <button
+                        type="button"
+                        onClick={() => setBroadcastIsScheduled(!broadcastIsScheduled)}
+                        className={`text-[9px] px-2.5 py-1 rounded-md font-black uppercase transition-all tracking-wider ${broadcastIsScheduled ? 'bg-primary text-zinc-950' : 'bg-white/5 text-white/60 hover:text-white'}`}
+                      >
+                        {broadcastIsScheduled ? 'Scheduled Mode' : 'Instant Delivery'}
+                      </button>
+                    </div>
+                    {broadcastIsScheduled && (
+                      <div className="animate-fade-in">
+                        <label className="block text-[9px] uppercase font-bold text-white/40 mb-1">Target Dispatched Date & Time</label>
+                        <input
+                          type="datetime-local"
+                          required
+                          value={broadcastScheduleTime}
+                          onChange={(e) => setBroadcastScheduleTime(e.target.value)}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-sans focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Live Notification Card Feed Mockup Preview! */}
+                  <div className="p-4 rounded-2xl bg-zinc-950 border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between text-[8px] font-mono uppercase text-white/30 tracking-wider">
+                      <span>Real-time Cohort Notification Mockup Preview</span>
+                      <span>Category: {broadcastCategory.toUpperCase()}</span>
+                    </div>
+                    <div className="flex gap-3 items-start bg-white/[0.02] p-3 rounded-xl border border-white/5">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 font-bold text-sm">
+                        📢
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-bold text-xs text-white truncate">
+                            {broadcastTitle || "Preview Title Placeholder..."}
+                          </h5>
+                          <span className="text-[9px] text-zinc-500 font-mono">Just Now</span>
+                        </div>
+                        <p className="text-[10px] text-white/60 leading-relaxed mt-0.5 line-clamp-2">
+                          {broadcastMessage || "Enter a broadcast message to view the interactive live notification feed layout preview..."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <button
-                    onClick={() => handleSaveConfig("notifications_config", notificationConfig, "Automated Alert Templates")}
-                    className="w-full py-2.5 bg-primary text-zinc-950 font-black uppercase text-[10px] rounded-xl hover:scale-[1.01] transition-all cursor-pointer"
+                    type="submit"
+                    disabled={broadcastIsSending}
+                    className="w-full py-3 bg-indigo-500 text-white hover:bg-indigo-600 disabled:bg-indigo-500/50 font-black uppercase text-xs tracking-wider rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
-                    Deploy Alert Templates
+                    <span>{broadcastIsSending ? "Executing Broadcast..." : broadcastIsScheduled ? "🚀 Program Scheduled Broadcast" : "⚡ Dispatch Real-Time Broadcast"}</span>
                   </button>
-                )}
+                </form>
               </div>
             </div>
           )}

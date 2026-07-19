@@ -1,9 +1,12 @@
 import { motion } from 'motion/react';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
-import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw, Folder, FolderOpen, Search, Download, Bookmark, FileText, Pencil, Trash2 } from 'lucide-react';
+import { Lock, BookOpen, Video, Trophy, Flame, ArrowLeft, Clock, Check, Sparkles, ChevronRight, GraduationCap, PlayCircle, Loader, RefreshCw, Folder, FolderOpen, Search, Download, Bookmark, FileText, Pencil, Trash2, Sun, Moon, Monitor, Sliders } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
+import { useTheme } from '../components/ThemeProvider';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { NotificationService, DEFAULT_PREFERENCES } from '../lib/notificationService';
+import { Smartphone, Mail, Bell } from 'lucide-react';
 import { collection, query, getDocs, doc, updateDoc, setDoc, getDoc, serverTimestamp, addDoc, where, onSnapshot, increment, deleteDoc } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useNavigate, Link } from 'react-router-dom';
@@ -46,9 +49,26 @@ const getEmbedUrl = (url: string) => {
   return url;
 };
 
+const CustomToggle = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
+  <button
+    type="button"
+    onClick={onChange}
+    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+      checked ? 'bg-[#FF8C42]' : 'bg-[#bg-secondary] border border-border-color'
+    }`}
+  >
+    <span
+      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+        checked ? 'translate-x-4' : 'translate-x-0'
+      }`}
+    />
+  </button>
+);
+
 export default function Dashboard() {
   const { user, loading: authLoading, setUser } = useAuthStore();
   const { settings } = useSettingsStore();
+  const { themeMode, resolvedTheme, setThemeMode } = useTheme();
   const navigate = useNavigate();
 
   const [toast, setToast] = useState<{ message: string; isError?: boolean } | null>(null);
@@ -171,6 +191,10 @@ export default function Dashboard() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [mcqTests, setMcqTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Notification and Recommendation States
+  const [notifPrefs, setNotifPrefs] = useState<any>(null);
+  const [recommendedBatch, setRecommendedBatch] = useState<any | null>(null);
 
   // Paid Batch states
   const [purchasedBatchIds, setPurchasedBatchIds] = useState<string[]>([]);
@@ -629,6 +653,48 @@ export default function Dashboard() {
     };
   }, [user?.uid]);
 
+  // Load notification preferences
+  useEffect(() => {
+    if (user?.uid) {
+      NotificationService.getUserPreferences(user.uid).then((prefs) => {
+        setNotifPrefs(prefs);
+      });
+    }
+  }, [user?.uid]);
+
+  const handleTogglePref = async (key: string) => {
+    if (!user?.uid || !notifPrefs) return;
+    const updated = { ...notifPrefs, [key]: !notifPrefs[key] };
+    setNotifPrefs(updated);
+    await NotificationService.saveUserPreferences(user.uid, updated);
+    showToast("Preferences updated!", false);
+  };
+
+  // Trigger Batch Recommendation once everything is loaded
+  useEffect(() => {
+    if (!user || classes.length === 0 || loading) return;
+    
+    let isMounted = true;
+    const triggerRec = async () => {
+      // Small timeout to let UI stabilize and not shock the user immediately
+      const timer = setTimeout(async () => {
+        if (!isMounted) return;
+        const recommended = await NotificationService.triggerBatchRecommendation(
+          user,
+          classes,
+          purchasedBatchIds
+        );
+        if (recommended && isMounted) {
+          setRecommendedBatch(recommended);
+        }
+      }, 4000);
+      return () => clearTimeout(timer);
+    };
+    
+    triggerRec();
+    return () => { isMounted = false; };
+  }, [user, classes, purchasedBatchIds, loading]);
+
   useEffect(() => {
     if (!user || user.role === 'guest') return;
 
@@ -878,6 +944,37 @@ export default function Dashboard() {
                   ? 'Your student authorization is pending admin review.' 
                   : 'Ready to master your chapters today? Let\'s dive in!'}
               </p>
+              
+              {/* Profile Theme Quick Toggle */}
+              <div className="flex items-center gap-1 mt-3 bg-secondary/80 border border-border-color p-1 rounded-2xl w-fit shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setThemeMode('warm')}
+                  className={`p-1.5 px-3 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${themeMode === 'warm' ? 'bg-[#FF8C42] text-black shadow-md scale-[1.02]' : 'text-text-secondary hover:text-text-primary'}`}
+                  title="Warm Light Mode"
+                >
+                  <Sun className="w-3.5 h-3.5" />
+                  <span>Warm</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeMode('dark')}
+                  className={`p-1.5 px-3 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${themeMode === 'dark' ? 'bg-[#FF8C42] text-black shadow-md scale-[1.02]' : 'text-text-secondary hover:text-text-primary'}`}
+                  title="Dark Mode"
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>Dark</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setThemeMode('system')}
+                  className={`p-1.5 px-3 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all duration-300 ${themeMode === 'system' ? 'bg-[#FF8C42] text-black shadow-md scale-[1.02]' : 'text-text-secondary hover:text-text-primary'}`}
+                  title="System Default"
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span>System</span>
+                </button>
+              </div>
             </div>
           </div>
           
@@ -1552,13 +1649,20 @@ export default function Dashboard() {
                     }
 
                     try {
-                      await addDoc(collection(db, 'announcements'), {
+                      const docRef = await addDoc(collection(db, 'announcements'), {
                         title: titleVal,
                         content: contentVal,
                         batchId: activeClassId,
                         createdAt: serverTimestamp(),
                         author: user.displayName || user.email,
                       });
+                      
+                      NotificationService.triggerNewContentNotification({
+                        title: titleVal,
+                        type: 'announcement',
+                        classGroup: 'all'
+                      });
+                      
                       showToast("Announcement broadcast successfully!", false);
                       (e.currentTarget as any).reset();
                     } catch (err) {
@@ -2118,64 +2222,323 @@ export default function Dashboard() {
       </div>
 
       {/* Sidebar and Promo Widgets Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left shrink-0 mt-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-left shrink-0 mt-8">
            
-           {/* Widget 1: Elite premium subscription upgrade banner */}
-           <div 
-             className="p-6 bg-gradient-to-br from-accent-primary/15 via-amber-400/[0.02] to-transparent border border-accent-primary/30 relative overflow-hidden shadow-sm"
-             style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
-           >
-             <div className="absolute -top-3 -right-3 w-28 h-28 bg-accent-primary/10 rounded-full blur-2xl pointer-events-none" />
-             
-             <div className="flex items-center gap-2 text-accent-primary font-black text-xs uppercase tracking-wider mb-3">
-               <Sparkles className="w-4 h-4 text-accent-primary animate-pulse" />
-               <span>PREMIUM ADVANTAGE</span>
-             </div>
-             
-             <h3 className="font-display text-xl font-black text-text-primary mb-2">Acquire Academic Elite</h3>
-             <p className="text-xs font-semibold text-text-secondary mb-6 leading-relaxed">
-               Gain instant classroom clearance for video lectures, syllabus note compilations, 1-on-1 counselor guidance, and high mock test setups.
-             </p>
-             
-             <button 
-               onClick={() => setViewingPlans(true)} 
-               className="theme-btn-themed w-full py-3.5 bg-accent-primary text-button-text font-bold uppercase tracking-wider text-xs shadow-md hover:scale-[1.02] transition-transform cursor-pointer"
-               style={{ borderRadius: 'var(--theme-btn-radius, 9999px)' }}
-             >
-               Explore Term Plans
-             </button>
+           {/* Column 1: Progress, Streak & Upgrades */}
+           <div className="space-y-6">
+                {/* Widget 1: Elite premium subscription upgrade banner */}
+                <div 
+                  className="p-6 bg-gradient-to-br from-accent-primary/15 via-amber-400/[0.02] to-transparent border border-accent-primary/30 relative overflow-hidden shadow-sm flex flex-col justify-between"
+                  style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+                >
+                  <div className="absolute -top-3 -right-3 w-28 h-28 bg-accent-primary/10 rounded-full blur-2xl pointer-events-none" />
+                  
+                  <div>
+                    <div className="flex items-center gap-2 text-accent-primary font-black text-xs uppercase tracking-wider mb-3">
+                      <Sparkles className="w-4 h-4 text-accent-primary animate-pulse" />
+                      <span>PREMIUM ADVANTAGE</span>
+                    </div>
+                    
+                    <h3 className="font-display text-xl font-black text-text-primary mb-2">Acquire Academic Elite</h3>
+                    <p className="text-xs font-semibold text-text-secondary mb-6 leading-relaxed">
+                      Gain instant classroom clearance for video lectures, syllabus note compilations, 1-on-1 counselor guidance, and high mock test setups.
+                    </p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setViewingPlans(true)} 
+                    className="theme-btn-themed w-full py-3.5 bg-accent-primary text-button-text font-bold uppercase tracking-wider text-xs shadow-md hover:scale-[1.02] transition-transform cursor-pointer mt-auto"
+                    style={{ borderRadius: 'var(--theme-btn-radius, 9999px)' }}
+                  >
+                    Explore Term Plans
+                  </button>
+                </div>
+
+                {/* Widget 2: Continuous Live Goal Assist tracker */}
+                <div 
+                  className="p-6 bg-glass-bg border border-border-color flex flex-col justify-between"
+                  style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+                >
+                  <div>
+                    <h4 className="font-display font-black text-base text-text-primary mb-4 flex items-center gap-2">
+                      <Flame className="w-4 h-4 text-[#ff8a9e]" />
+                      <span>Today's Learning Target</span>
+                    </h4>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-text-secondary font-semibold">Active Minutes Logged</span>
+                        <span className="text-accent-primary font-bold">{studyMinutes} mins</span>
+                      </div>
+                      
+                      {/* Progress circular bar line simulated */}
+                      <div className="h-3.5 rounded-full bg-bg-secondary border border-border-color overflow-hidden p-0.5">
+                         <div 
+                           className="h-full bg-gradient-to-r from-[#ff839a] to-accent-primary rounded-full transition-all duration-300" 
+                           style={{ width: `${Math.min(100, (studyMinutes / 60) * 100)}%` }}
+                         />
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-text-muted font-medium italic leading-relaxed text-left mt-4 border-t border-border-color/30 pt-4">
+                    TIP: Simulating study progress live. Opening any lessons secures automatic timers incrementing streak days when 60 minutes are met.
+                  </p>
+                </div>
            </div>
 
-           {/* Widget 2: Continuous Live Goal Assist tracker */}
-           <div 
-             className="p-6 bg-glass-bg border border-border-color"
-             style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
-           >
-             <h4 className="font-display font-black text-base text-text-primary mb-4 flex items-center gap-2">
-               <Flame className="w-4 h-4 text-[#ff8a9e]" />
-               <span>Today's Learning Target</span>
-             </h4>
+           {/* Column 2: Appearance & Notification Preferences */}
+           <div className="space-y-6">
+                {/* Widget 3: Live Theme & Workspace Settings Panel */}
+                <div 
+                  className="p-6 bg-glass-bg border border-border-color flex flex-col justify-between"
+                  style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+                >
+                  <div>
+                    <h4 className="font-display font-black text-base text-text-primary mb-3 flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-accent-primary" />
+                      <span>Workspace Settings</span>
+                    </h4>
+                    <p className="text-xs text-text-secondary mb-4 leading-relaxed">
+                      Select your preferred viewport design. Preference is cached and synchronized with your profile.
+                    </p>
 
-             <div className="space-y-4">
-               <div className="flex justify-between items-center text-xs">
-                 <span className="text-text-secondary font-semibold">Active Minutes Logged</span>
-                 <span className="text-accent-primary font-bold">{studyMinutes} mins</span>
-               </div>
-               
-               {/* Progress circular bar line simulated */}
-               <div className="h-3.5 rounded-full bg-bg-secondary border border-border-color overflow-hidden p-0.5">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#ff839a] to-accent-primary rounded-full transition-all duration-300" 
-                    style={{ width: `${Math.min(100, (studyMinutes / 60) * 100)}%` }}
-                  />
-               </div>
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Theme Mode</span>
+                      <div className="grid grid-cols-3 gap-1.5 bg-bg-secondary p-1 rounded-2xl border border-border-color shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => setThemeMode('warm')}
+                          className={`py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all duration-200 ${themeMode === 'warm' ? 'bg-[#FF8C42] text-black shadow-md scale-[1.02]' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'}`}
+                        >
+                          <Sun className="w-4 h-4" />
+                          <span>Warm</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setThemeMode('dark')}
+                          className={`py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all duration-200 ${themeMode === 'dark' ? 'bg-[#FF8C42] text-black shadow-md scale-[1.02]' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'}`}
+                        >
+                          <Moon className="w-4 h-4" />
+                          <span>Dark</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setThemeMode('system')}
+                          className={`py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all duration-200 ${themeMode === 'system' ? 'bg-[#FF8C42] text-black shadow-md scale-[1.02]' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'}`}
+                        >
+                          <Monitor className="w-4 h-4" />
+                          <span>System</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-               <p className="text-[10px] text-text-muted font-medium italic leading-relaxed text-left">
-                 TIP: Simulating study progress live. Opening any lessons secures automatic timers incrementing streak days when 60 minutes are met.
-               </p>
-             </div>
+                  <div className="border-t border-border-color mt-4 pt-4 flex items-center justify-between text-[10px] text-text-muted font-mono">
+                    <span>Mode: {themeMode.toUpperCase()}</span>
+                    <span>Active: {resolvedTheme.toUpperCase()}</span>
+                  </div>
+                </div>
+
+                {/* Widget 4: Premium Notification Preferences Settings Panel */}
+                <div 
+                  className="p-6 bg-glass-bg border border-border-color flex flex-col space-y-4"
+                  style={{ borderRadius: 'var(--theme-card-radius, 28px)' }}
+                >
+                  <div>
+                    <h4 className="font-display font-black text-base text-text-primary mb-1 flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-accent-primary" />
+                      <span>Notification Preferences</span>
+                    </h4>
+                    <p className="text-xs text-text-secondary leading-relaxed">
+                      Customise how you receive course updates, mock tests, announcements, and recommendations.
+                    </p>
+                  </div>
+
+                  {notifPrefs ? (
+                    <div className="space-y-4 text-xs divide-y divide-border-color/40">
+                      {/* Delivery Channels */}
+                      <div className="space-y-2.5 pt-1">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">DELIVERY CHANNELS</span>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-primary font-medium flex items-center gap-2">
+                            <Bell className="w-3.5 h-3.5 text-accent-primary" />
+                            In-App Notifications
+                          </span>
+                          <CustomToggle checked={notifPrefs.inApp} onChange={() => handleTogglePref('inApp')} />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-primary font-medium flex items-center gap-2">
+                            <Mail className="w-3.5 h-3.5 text-[#FF8C42]" />
+                            Email Notifications
+                          </span>
+                          <CustomToggle checked={notifPrefs.email} onChange={() => handleTogglePref('email')} />
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-primary font-medium flex items-center gap-2">
+                            <Smartphone className="w-3.5 h-3.5 text-[#FF8C42]" />
+                            Web Push Alerts
+                          </span>
+                          <CustomToggle checked={notifPrefs.push} onChange={() => handleTogglePref('push')} />
+                        </div>
+                      </div>
+
+                      {/* Content Categories */}
+                      <div className="space-y-2.5 pt-4">
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">CONTENT CATEGORIES</span>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">📚 Video Lectures</span>
+                            <CustomToggle checked={notifPrefs.newVideos} onChange={() => handleTogglePref('newVideos')} />
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">📄 Study Notes</span>
+                            <CustomToggle checked={notifPrefs.notes} onChange={() => handleTogglePref('notes')} />
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">📝 Assignments</span>
+                            <CustomToggle checked={notifPrefs.assignments} onChange={() => handleTogglePref('assignments')} />
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">🎯 Interactive Tests</span>
+                            <CustomToggle checked={notifPrefs.tests} onChange={() => handleTogglePref('tests')} />
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">📢 Announcements</span>
+                            <CustomToggle checked={notifPrefs.announcements} onChange={() => handleTogglePref('announcements')} />
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">📅 Live Classes</span>
+                            <CustomToggle checked={notifPrefs.liveClasses} onChange={() => handleTogglePref('liveClasses')} />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">💳 Payments / Receipts</span>
+                            <CustomToggle checked={notifPrefs.payments} onChange={() => handleTogglePref('payments')} />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-text-secondary font-medium">🎁 Exclusive Offers</span>
+                            <CustomToggle checked={notifPrefs.offers} onChange={() => handleTogglePref('offers')} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Recommendations */}
+                      <div className="space-y-2.5 pt-4 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">RECOMMENDATIONS</span>
+                          <span className="text-[10px] text-text-secondary">Weekly course suggestions matching your standard</span>
+                        </div>
+                        <CustomToggle checked={notifPrefs.batchRecommendations} onChange={() => handleTogglePref('batchRecommendations')} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-text-muted font-mono text-[10px]">
+                      Loading settings...
+                    </div>
+                  )}
+                </div>
            </div>
       </div>
+
+      {/* 🎯 SPECIAL ACADEMY RECOMMENDATION DIALOG */}
+      <Dialog open={!!recommendedBatch} onOpenChange={(open) => { if (!open) setRecommendedBatch(null); }}>
+        <DialogContent className="sm:max-w-[480px] bg-bg-primary border border-border-color text-text-primary p-6 rounded-[24px] shadow-2xl relative overflow-hidden">
+          {/* Subtle Background Glow */}
+          <div className="absolute -top-12 -right-12 w-40 h-40 bg-accent-primary/15 rounded-full blur-3xl pointer-events-none" />
+          
+          <DialogHeader className="space-y-2">
+            <div className="flex items-center gap-2 text-accent-primary font-black text-xs uppercase tracking-wider">
+              <Sparkles className="w-4 h-4 text-accent-primary animate-pulse" />
+              <span>Personalised Batch Recommendation</span>
+            </div>
+            
+            <DialogTitle className="text-xl font-display font-black text-text-primary text-left">
+              Boost Your Prep for {user?.class ? `Class ${user.class}` : 'Your Exam'}
+            </DialogTitle>
+            <DialogDescription className="text-text-secondary text-xs font-semibold text-left">
+              Our academic directors recommend enrolling in this batch based on your current academic cohort.
+            </DialogDescription>
+          </DialogHeader>
+
+          {recommendedBatch && (
+            <div className="mt-4 space-y-4">
+              {/* Batch Card Preview */}
+              <div className="p-4 rounded-2xl bg-bg-secondary border border-border-color flex gap-3.5 items-center">
+                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-border-color/80 shadow-inner">
+                  <img 
+                    src={recommendedBatch.thumbnailUrl || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=300&auto=format&fit=crop&q=80"} 
+                    alt={recommendedBatch.className}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary font-mono text-[9px] font-black uppercase tracking-wider">
+                    TARGET BATCH
+                  </span>
+                  <h4 className="font-display font-black text-sm text-text-primary mt-1 truncate">
+                    {recommendedBatch.className}
+                  </h4>
+                  <p className="text-xs text-text-muted font-mono mt-0.5">
+                    {recommendedBatch.batchCode || 'PREMIUM'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Offer Pricing Details */}
+              <div className="flex justify-between items-center bg-accent-primary/[0.02] p-3 rounded-xl border border-accent-primary/10">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-text-muted font-mono uppercase font-bold">Enrollment Fee</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-lg font-black text-text-primary font-mono">
+                      ₹{recommendedBatch.discountPrice || recommendedBatch.price}
+                    </span>
+                    {recommendedBatch.discountPrice && recommendedBatch.discountPrice < recommendedBatch.price && (
+                      <span className="text-xs text-text-muted line-through font-mono">
+                        ₹{recommendedBatch.price}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {recommendedBatch.discountPrice && recommendedBatch.discountPrice < recommendedBatch.price && (
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-black">
+                    SAVE {Math.round(((recommendedBatch.price - recommendedBatch.discountPrice) / recommendedBatch.price) * 100)}% NOW
+                  </span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={() => setRecommendedBatch(null)}
+                  className="flex-1 py-3 bg-bg-secondary border border-border-color hover:bg-secondary text-text-secondary hover:text-text-primary font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                >
+                  Later
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPurchaseBatchId(recommendedBatch.id);
+                    setRecommendedBatch(null);
+                  }}
+                  className="flex-1 py-3 bg-accent-primary text-button-text font-bold text-xs uppercase tracking-wider rounded-xl shadow-md hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+                >
+                  Enroll Now
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Upgrades Plan Modal Dialog */}
       <Dialog open={viewingPlans} onOpenChange={setViewingPlans}>
