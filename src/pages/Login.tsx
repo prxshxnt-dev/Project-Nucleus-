@@ -1,38 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
-  ArrowRight, 
-  Lock, 
-  Mail, 
-  Eye, 
-  EyeOff, 
   BookOpen, 
-  Chrome, 
-  RefreshCw
+  Chrome 
 } from 'lucide-react';
-import { signInWithGoogle, signInWithGoogleToken, loginWithEmailAndPassword, logDetailedAuthError } from '../lib/firebase';
+import { signInWithGoogle, signInWithGoogleToken } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
-import FloatingLabelInput from '../components/FloatingLabelInput';
 
 export default function Login() {
   const { user, setUser, setLoading, loading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  
-  // Password Login State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Pre-fill email identifier if passed from Signup or password resets
-  useEffect(() => {
-    if (location.state && (location.state as any).email) {
-      setEmail((location.state as any).email);
-    }
-  }, [location.state]);
 
   // Google Identity Services (GIS) Callback
   const handleCredentialResponse = async (response: any) => {
@@ -117,46 +97,6 @@ export default function Login() {
     }
   }, [user, loading, navigate, location]);
 
-  const validatePasswordMode = (): boolean => {
-    const emailClean = email.trim();
-    if (!emailClean) {
-      toast.error('Email address is required.');
-      return false;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailClean)) {
-      toast.error('Please provide a valid email structure.');
-      return false;
-    }
-    if (!password) {
-      toast.error('Password is required.');
-      return false;
-    }
-    return true;
-  };
-
-  const handleEmailLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validatePasswordMode()) return;
-
-    setIsSubmitting(true);
-    try {
-      const cleanEmail = email.toLowerCase().trim();
-      const firebaseUser = await loginWithEmailAndPassword(cleanEmail, password);
-      
-      toast.success(`Welcome back, ${firebaseUser.displayName || 'Student'}!`);
-      
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-
-    } catch (err: any) {
-      logDetailedAuthError(err, "Login.handleEmailLogin");
-      toast.error(err.message || 'Incorrect credentials or connectivity issue.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleGoogleLogin = async () => {
     try {
       await signInWithGoogle();
@@ -167,7 +107,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#F8FAFC]">
-      
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -175,7 +114,7 @@ export default function Login() {
         className="w-full max-w-md p-8 bg-[#FFFDF9] rounded-3xl border border-black/10 shadow-xl text-[#1F1F1F]"
       >
         {/* Academic branding card header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full text-primary text-xs font-semibold mb-3">
             <BookOpen className="w-3.5 h-3.5" />
             <span>Nucleus Era IIT & Medical</span>
@@ -184,118 +123,41 @@ export default function Login() {
           <p className="text-[#7A7A7A] text-sm mt-1">Managed and taught by elite IITians & Doctors</p>
         </div>
 
-        {/* First Create Account CTA */}
-        <div className="mb-6 p-4 bg-[#4F46E5]/5 border border-[#4F46E5]/15 rounded-2xl text-center space-y-2">
-          <p className="text-xs text-[#7A7A7A] font-medium leading-[1.4]">
-            Don't have a student account yet? Get instant access to online live modules.
-          </p>
-          <Link
-            to="/signup"
-            className="inline-flex items-center justify-center gap-2 w-full py-2.5 bg-[#4F46E5]/10 hover:bg-[#4F46E5]/20 text-[#4F46E5] font-extrabold text-[11px] uppercase tracking-wider rounded-xl border border-[#4F46E5]/20 transition-all"
+        {/* Large Continue with Google Button */}
+        <div className="mb-6">
+          <motion.button 
+            type="button"
+            onClick={handleGoogleLogin}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            className="relative w-full py-4 px-4 bg-primary hover:bg-[#3730A3] text-white font-bold rounded-2xl flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer shadow-md overflow-hidden"
+            id="google-continue-btn"
           >
-            <span>First Create Account</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {/* Logins Container */}
-        <div className="space-y-4">
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            {/* Email Input */}
-            <FloatingLabelInput 
-              id="login-email-field"
-              label="Student Email"
-              icon={<Mail className="w-5 h-5" />}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+            <Chrome className="w-5 h-5 text-white fill-current" />
+            <span>Continue with Google</span>
+            <div 
+              id="google-gsi-button" 
+              className="absolute inset-0 opacity-0 cursor-pointer z-10 [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:!absolute [&_iframe]:!top-0 [&_iframe]:!left-0"
             />
-
-            {/* Password Input with Forgot link & Show Button */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center px-1">
-                <Link to="/forgot-password" className="text-xs text-primary font-bold hover:underline ml-auto">
-                  Forgot Password?
-                </Link>
-              </div>
-              
-              <div className="relative">
-                <FloatingLabelInput 
-                  id="login-password-field"
-                  label="Account Password"
-                  icon={<Lock className="w-5 h-5" />}
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 mt-1 text-[#7A7A7A] hover:text-[#1F1F1F] transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <motion.button 
-              type="submit" 
-              disabled={isSubmitting}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              className={`w-full py-4 bg-primary text-[#F8FAFC] rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#3730A3] transition-colors shadow-md ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
-              id="login-submit-btn"
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  <span>Verifying...</span>
-                </>
-              ) : (
-                <>
-                  <span>Enter Classroom Portal</span>
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </motion.button>
-          </form>
+          </motion.button>
+          <p className="text-[10px] text-center text-muted-foreground mt-2">
+            Secure, instant one-click access. New users will be guided to setup.
+          </p>
         </div>
 
-        {/* Third Party Divider */}
-        <div className="relative flex items-center my-6">
-          <div className="flex-grow border-t border-black/10"></div>
-          <span className="flex-shrink mx-4 text-[#7A7A7A] text-xs uppercase font-bold tracking-wider">Or continue with</span>
-          <div className="flex-grow border-t border-black/10"></div>
-        </div>
-
-        {/* Google Authentication Portal Popup */}
-        <motion.button 
-          onClick={handleGoogleLogin}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          className="relative w-full py-3 px-4 bg-transparent hover:bg-black/5 border border-black/10 rounded-2xl text-[#1F1F1F] font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer overflow-hidden"
-          id="google-login-btn"
-        >
-          <Chrome className="w-5 h-5 text-red-500 fill-current" />
-          <span>Google Access Desk</span>
-          <div 
-            id="google-gsi-button" 
-            className="absolute inset-0 opacity-0 cursor-pointer z-10 [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:!absolute [&_iframe]:!top-0 [&_iframe]:!left-0"
-          />
-        </motion.button>
-
-        {/* Link to SignUp */}
-        <p className="text-center text-sm text-[#7A7A7A] mt-6">
-          New student to Nucleus?{' '}
-          <Link to="/signup" className="text-primary font-bold hover:underline">
-            Register here
-          </Link>
+        {/* Info/Support Text */}
+        <p className="text-center text-sm text-[#7A7A7A] mt-8">
+          Don't have an account yet?{' '}
+          <button 
+            type="button"
+            onClick={handleGoogleLogin}
+            className="text-primary font-bold hover:underline cursor-pointer bg-transparent border-none p-0 inline font-sans"
+          >
+            Create Account
+          </button>
         </p>
 
-        <div className="text-center mt-6 text-[10px] text-[#7A7A7A]">
+        <div className="text-center mt-8 text-[10px] text-[#7A7A7A]">
           © 2026 Nucleus.CC (Coaching Centre managed by IITians and Doctors)
         </div>
       </motion.div>

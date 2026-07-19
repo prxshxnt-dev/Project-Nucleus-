@@ -21,6 +21,7 @@ import { motion } from "motion/react";
 import { ArrowLeft, LockOpen, Check, Flame, ShieldAlert, Video, FileText, Smartphone, History, User, Save, RefreshCw, Sliders, XOctagon, Compass, AlertCircle, Camera, Layers, AlertTriangle, CheckCircle, Send, MessageSquare, Upload, FileUp, X, Paperclip } from "lucide-react";
 import Markdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -203,6 +204,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [editingPhoneUserId, setEditingPhoneUserId] = useState<string | null>(null);
   const [editingPhoneVal, setEditingPhoneVal] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [selectedProfileUser, setSelectedProfileUser] = useState<any | null>(null);
   const [materials, setMaterials] = useState<any[]>([]);
   const [mentors, setMentors] = useState<any[]>([]);
 
@@ -2431,13 +2434,38 @@ export default function AdminDashboard() {
     value: any,
   ) => {
     try {
-      await updateDoc(doc(db, "users", userId), {
+      const updates: any = {
         [field]: value,
         updatedAt: serverTimestamp(),
-      });
+      };
+      if (field === "classGroup") {
+        updates.class = value;
+        updates.selectedClass = value;
+      }
+      await updateDoc(doc(db, "users", userId), updates);
       fetchData();
+      toast.success("User updated successfully!");
     } catch (error) {
       console.error("Error updating user", error);
+      toast.error("Failed to update user.");
+    }
+  };
+
+  const handleSaveFullUserProfile = async (userId: string, updatedFields: any) => {
+    try {
+      const updates = {
+        ...updatedFields,
+        classGroup: updatedFields.class || updatedFields.classGroup || "all",
+        selectedClass: updatedFields.class || updatedFields.selectedClass || "all",
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(doc(db, "users", userId), updates);
+      setSelectedProfileUser(null);
+      toast.success("User profile updated successfully!");
+      fetchData();
+    } catch (err: any) {
+      console.error("Failed to update user profile:", err);
+      toast.error("Failed to save: " + String(err.message || err));
     }
   };
 
@@ -7400,150 +7428,273 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === "users" && (
-        <div className="overflow-x-auto">
-          <div className="mb-4 bg-zinc-900/40 p-4 border border-white/10 rounded-2xl flex justify-between items-center text-left">
+        <div className="space-y-6">
+          <div className="bg-zinc-900/40 p-5 border border-white/10 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-left">
             <div>
-              <h3 className="text-sm font-bold text-[#E5D2A5] uppercase tracking-wider">Student Mobile Directory</h3>
-              <p className="text-xs text-white/50 mt-1">This panel securely lists the full names, email addresses, and registered phone/mobile numbers of all active students.</p>
+              <h3 className="text-base font-bold text-[#E5D2A5] uppercase tracking-wider flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Student Mobile & Academic Directory
+              </h3>
+              <p className="text-xs text-white/50 mt-1">This directory enables complete profile search, detail editing, class/batch assignment, role configuration, and consent tracking.</p>
             </div>
-            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-extrabold px-2.5 py-1 rounded-full border border-emerald-500/20 uppercase font-mono tracking-wider">
-              {users.length} Active Records
+            <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-extrabold px-3 py-1 rounded-full border border-emerald-500/20 uppercase font-mono tracking-wider">
+              {users.length} Registered Accounts
             </span>
           </div>
-          <table className="w-full text-left bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-            <thead className="border-b border-white/10 bg-white/5">
-              <tr>
-                <th className="p-4 font-medium text-white/60">Name</th>
-                <th className="p-4 font-medium text-white/60">Mobile Number</th>
-                <th className="p-4 font-medium text-white/60">Email</th>
-                <th className="p-4 font-medium text-white/60">Streak</th>
-                <th className="p-4 font-medium text-white/60">Role</th>
-                <th className="p-4 font-medium text-white/60">Class / Batch</th>
-                <th className="p-4 font-medium text-white/60">Access</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                  <td className="p-4 font-medium text-white">{u.displayName}</td>
-                  <td className="p-4 font-mono text-emerald-400 text-sm">
-                    {editingPhoneUserId === u.id ? (
-                      <div className="flex items-center gap-1.5" id={`editing-phone-${u.id}`}>
-                        <input
-                          type="text"
-                          className="bg-black/80 border border-emerald-500/50 rounded-lg px-2.5 py-1 text-emerald-400 text-xs font-mono focus:outline-none focus:border-emerald-500 w-36"
-                          value={editingPhoneVal}
-                          onChange={(e) => setEditingPhoneVal(e.target.value)}
-                          placeholder="Enter number..."
-                          autoFocus
-                        />
-                        <button
-                          onClick={async () => {
-                            try {
-                              const val = editingPhoneVal.trim();
-                              await updateDoc(doc(db, "users", u.id), {
-                                phone: val,
-                                mobile: val,
-                                updatedAt: serverTimestamp()
-                              });
-                              setUsers(prev => prev.map(userItem => userItem.id === u.id ? { ...userItem, phone: val, mobile: val } : userItem));
-                              setEditingPhoneUserId(null);
-                            } catch (err) {
-                              console.error("Failed to update mobile number:", err);
-                              alert("Failed to update: " + String(err));
-                            }
-                          }}
-                          className="p-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-md transition-colors"
-                          title="Save"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setEditingPhoneUserId(null)}
-                          className="p-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-md transition-colors"
-                          title="Cancel"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 group justify-between md:justify-start">
-                        <span>{u.phone || u.mobile || "—"}</span>
-                        <button
-                          onClick={() => {
-                            setEditingPhoneUserId(u.id);
-                            setEditingPhoneVal(u.phone || u.mobile || "");
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-opacity"
-                          title="Edit Mobile Number"
-                        >
-                          <Smartphone className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4 text-white/60">{u.email}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-1.5 text-amber-500">
-                      <Flame className="w-4 h-4" />
-                      <span className="font-medium text-sm">
-                        {u.streak || 0}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <select
-                      disabled={user.role !== "superadmin" || u.id === user.uid}
-                      className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-sm text-white disabled:opacity-50"
-                      value={u.role}
-                      onChange={(e) =>
-                        handleUpdateUser(u.id, "role", e.target.value)
-                      }
-                    >
-                      <option value="student">Student</option>
-                      <option value="admin">Admin</option>
-                      {user.role === "superadmin" && (
-                        <option value="superadmin">Superadmin</option>
-                      )}
-                    </select>
-                  </td>
-                  <td className="p-4">
-                    <select
-                      className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-sm text-white"
-                      value={u.classGroup || "all"}
-                      onChange={(e) =>
-                        handleUpdateUser(u.id, "classGroup", e.target.value)
-                      }
-                    >
-                      <option value="all">Any/All Classes</option>
-                      <option value="6">Class 6</option>
-                      <option value="7">Class 7</option>
-                      <option value="8">Class 8</option>
-                      <option value="9">Class 9</option>
-                      <option value="10">Class 10</option>
-                      <option value="11">Class 11</option>
-                      <option value="12">Class 12</option>
-                      <option value="dropper">Dropper</option>
-                    </select>
-                  </td>
-                  <td className="p-4 flex items-center gap-2">
-                    <button
-                      onClick={() => setManagingUser(u)}
-                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-medium transition-colors"
-                    >
-                      Manage Specifics
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(u.id)}
-                      className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </td>
+
+          {/* Search bar and counts */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="Search by name, email, phone number, or UID..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 bg-black/60 border border-white/10 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:border-primary/50 font-sans"
+              />
+              <svg className="w-4 h-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              {userSearchQuery && (
+                <button
+                  onClick={() => setUserSearchQuery("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            
+            <div className="flex gap-2 items-center justify-end">
+              <span className="text-[11px] text-white/50">Matching filters:</span>
+              <span className="text-xs bg-primary/10 text-primary font-bold px-3 py-1 rounded-full border border-primary/20 font-mono">
+                {
+                  users.filter((u) => {
+                    const q = userSearchQuery.toLowerCase().trim();
+                    if (!q) return true;
+                    return (
+                      u.displayName?.toLowerCase().includes(q) ||
+                      u.fullName?.toLowerCase().includes(q) ||
+                      u.email?.toLowerCase().includes(q) ||
+                      (u.phone || u.mobile || u.phoneNumber)?.toLowerCase().includes(q) ||
+                      u.id?.toLowerCase().includes(q)
+                    );
+                  }).length
+                } of {users.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border border-white/10 rounded-2xl">
+            <table className="w-full text-left bg-white/5 border-collapse">
+              <thead className="border-b border-white/10 bg-white/5">
+                <tr>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Profile</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Name</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Email / UID</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Mobile Number</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Batch & Exam</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Role</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60">Verification</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-white/60 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {users
+                  .filter((u) => {
+                    const q = userSearchQuery.toLowerCase().trim();
+                    if (!q) return true;
+                    return (
+                      u.displayName?.toLowerCase().includes(q) ||
+                      u.fullName?.toLowerCase().includes(q) ||
+                      u.email?.toLowerCase().includes(q) ||
+                      (u.phone || u.mobile || u.phoneNumber)?.toLowerCase().includes(q) ||
+                      u.id?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((u) => {
+                    const regDate = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "Pending";
+                    const isGoogleVerified = u.provider === "google" || (u.email && u.emailVerified !== false);
+                    return (
+                      <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                        {/* Profile Photo */}
+                        <td className="p-4">
+                          <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10 shrink-0 bg-black/40">
+                            {u.photoURL ? (
+                              <img src={u.photoURL} alt={u.displayName} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-primary/20 text-primary flex items-center justify-center text-sm font-bold font-display">
+                                {u.displayName?.charAt(0) || "S"}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        
+                        {/* Name */}
+                        <td className="p-4">
+                          <span className="font-semibold text-white block">{u.displayName || u.fullName || "Student"}</span>
+                          <span className="text-[10px] text-white/40 block mt-0.5">Joined: {regDate}</span>
+                        </td>
+                        
+                        {/* Email / UID */}
+                        <td className="p-4">
+                          <span className="text-sm text-white/80 block">{u.email}</span>
+                          <span className="text-[10px] font-mono text-white/40 block mt-0.5">UID: {u.id}</span>
+                        </td>
+
+                        {/* Phone */}
+                        <td className="p-4">
+                          {editingPhoneUserId === u.id ? (
+                            <div className="flex items-center gap-1.5" id={`editing-phone-${u.id}`}>
+                              <input
+                                type="text"
+                                className="bg-black/85 border border-emerald-500/50 rounded-lg px-2 py-1 text-emerald-400 text-xs font-mono focus:outline-none w-32"
+                                value={editingPhoneVal}
+                                onChange={(e) => setEditingPhoneVal(e.target.value)}
+                                placeholder="Enter number..."
+                                autoFocus
+                              />
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const val = editingPhoneVal.trim();
+                                    await updateDoc(doc(db, "users", u.id), {
+                                      phone: val,
+                                      mobile: val,
+                                      phoneNumber: val,
+                                      updatedAt: serverTimestamp()
+                                    });
+                                    setUsers(prev => prev.map(userItem => userItem.id === u.id ? { ...userItem, phone: val, mobile: val, phoneNumber: val } : userItem));
+                                    setEditingPhoneUserId(null);
+                                    toast.success("Phone number successfully updated.");
+                                  } catch (err) {
+                                    console.error("Failed to update mobile number:", err);
+                                    toast.error("Failed to update phone.");
+                                  }
+                                }}
+                                className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-md transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setEditingPhoneUserId(null)}
+                                className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-md transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 group justify-start">
+                              <span className="font-mono text-xs text-white">{u.phone || u.mobile || u.phoneNumber || "—"}</span>
+                              <button
+                                onClick={() => {
+                                  setEditingPhoneUserId(u.id);
+                                  setEditingPhoneVal(u.phone || u.mobile || u.phoneNumber || "");
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-opacity"
+                                title="Edit Mobile Number"
+                              >
+                                <Smartphone className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Batch & Exam */}
+                        <td className="p-4">
+                          <select
+                            className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-xs text-white max-w-[140px]"
+                            value={u.classGroup || "all"}
+                            onChange={(e) =>
+                              handleUpdateUser(u.id, "classGroup", e.target.value)
+                            }
+                          >
+                            <option value="all">Any/All Classes</option>
+                            <option value="6">Class 6</option>
+                            <option value="7">Class 7</option>
+                            <option value="8">Class 8</option>
+                            <option value="9">Class 9</option>
+                            <option value="10">Class 10</option>
+                            <option value="11">Class 11</option>
+                            <option value="12">Class 12</option>
+                            <option value="dropper">Dropper</option>
+                          </select>
+                          <span className="text-[10px] text-primary block mt-1 uppercase font-bold tracking-wide">
+                            {u.targetExam ? u.targetExam.toUpperCase() : "JEE"}
+                          </span>
+                        </td>
+
+                        {/* Role */}
+                        <td className="p-4">
+                          <select
+                            disabled={user.role !== "superadmin" || u.id === user.uid}
+                            className="bg-black/50 border border-white/10 rounded-lg px-2 py-1 text-xs text-white disabled:opacity-50"
+                            value={u.role}
+                            onChange={(e) =>
+                              handleUpdateUser(u.id, "role", e.target.value)
+                            }
+                          >
+                            <option value="student">Student</option>
+                            <option value="admin">Admin</option>
+                            {user.role === "superadmin" && (
+                              <option value="superadmin">Superadmin</option>
+                            )}
+                          </select>
+                        </td>
+
+                        {/* Verification badge */}
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1 items-start">
+                            {u.onboardingCompleted ? (
+                              <span className="text-[9px] bg-emerald-500/10 text-emerald-400 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/20 uppercase font-mono tracking-wider">
+                                Active Profile
+                              </span>
+                            ) : (
+                              <span className="text-[9px] bg-amber-500/10 text-amber-400 font-extrabold px-2 py-0.5 rounded-full border border-amber-500/20 uppercase font-mono tracking-wider animate-pulse">
+                                Setup Pending
+                              </span>
+                            )}
+                            {isGoogleVerified && (
+                              <span className="text-[9px] text-white/50 font-mono">
+                                ✓ Google Auth
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setSelectedProfileUser(u)}
+                              className="px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors"
+                              title="View & Edit User Profile"
+                            >
+                              Profile & Edit
+                            </button>
+                            <button
+                              onClick={() => setManagingUser(u)}
+                              className="px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 text-xs font-medium transition-colors"
+                              title="Manage Specific Material Access"
+                            >
+                              Access
+                            </button>
+                            <button
+                              disabled={u.id === user.uid}
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium transition-colors disabled:opacity-40"
+                              title="Delete Record"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {activeTab === "mentors" && (
@@ -8379,6 +8530,14 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {selectedProfileUser && (
+        <UserProfileEditDialog
+          user={selectedProfileUser}
+          onClose={() => setSelectedProfileUser(null)}
+          onSave={handleSaveFullUserProfile}
+        />
+      )}
+
       {managingUser && (
         <Dialog
           open={!!managingUser}
@@ -8955,6 +9114,223 @@ function YoutubeDiagnosticConsole() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+interface UserProfileEditDialogProps {
+  user: any;
+  onClose: () => void;
+  onSave: (id: string, fields: any) => Promise<void>;
+}
+
+function UserProfileEditDialog({ user: profileUser, onClose, onSave }: UserProfileEditDialogProps) {
+  const [name, setName] = useState(profileUser.displayName || profileUser.fullName || "");
+  const [email, setEmail] = useState(profileUser.email || "");
+  const [phone, setPhone] = useState(profileUser.phoneNumber || profileUser.phone || profileUser.mobile || "");
+  const [targetClass, setTargetClass] = useState(profileUser.class || profileUser.classGroup || "all");
+  const [exam, setExam] = useState(profileUser.targetExam || "jee");
+  const [role, setRole] = useState(profileUser.role || "student");
+  const [onboardingCompleted, setOnboardingCompleted] = useState(profileUser.onboardingCompleted || false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await onSave(profileUser.id, {
+        displayName: name.trim(),
+        fullName: name.trim(),
+        email: email.trim(),
+        phoneNumber: phone.trim(),
+        phone: phone.trim(),
+        mobile: phone.trim(),
+        class: targetClass,
+        classGroup: targetClass,
+        targetExam: exam,
+        role: role,
+        onboardingCompleted: onboardingCompleted,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-[#070709] border border-white/10 w-full max-w-xl rounded-2xl flex flex-col shadow-2xl overflow-hidden text-white font-sans text-left"
+      >
+        <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
+          <h3 className="font-bold text-base flex items-center gap-2 text-[#E5D2A5] uppercase tracking-wide">
+            <User className="w-5 h-5 text-primary" />
+            Complete Student Profile & Edit
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto p-6 space-y-4 max-h-[75vh] scrollbar-thin">
+          {/* Avatar and UID section */}
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="w-16 h-16 rounded-full overflow-hidden border border-white/20 shrink-0 bg-black/30">
+              {profileUser.photoURL ? (
+                <img src={profileUser.photoURL} alt={name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-primary/20 text-primary flex items-center justify-center text-xl font-bold">
+                  {name.charAt(0) || "S"}
+                </div>
+              )}
+            </div>
+            <div>
+              <h4 className="font-bold text-base text-white">{name || "Student"}</h4>
+              <p className="text-xs text-white/40 font-mono mt-0.5">UID: {profileUser.id}</p>
+              <p className="text-[11px] text-emerald-400 font-semibold mt-1">
+                Registered: {profileUser.createdAt ? new Date(profileUser.createdAt).toLocaleString() : "Pending"}
+              </p>
+            </div>
+          </div>
+
+          {/* Core inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-white/60 block mb-1.5 uppercase tracking-wide">Full Name</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-white/60 block mb-1.5 uppercase tracking-wide">Student Email</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-white/60 block mb-1.5 uppercase tracking-wide">Mobile Number</label>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-primary font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-white/60 block mb-1.5 uppercase tracking-wide">Portal Role</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-primary"
+              >
+                <option value="student">Student</option>
+                <option value="admin">Admin</option>
+                <option value="superadmin">Superadmin</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-white/60 block mb-1.5 uppercase tracking-wide">Class / Batch</label>
+              <select
+                value={targetClass}
+                onChange={(e) => setTargetClass(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-primary"
+              >
+                <option value="all">Any/All Classes</option>
+                <option value="6">Class 6</option>
+                <option value="7">Class 7</option>
+                <option value="8">Class 8</option>
+                <option value="9">Class 9</option>
+                <option value="10">Class 10</option>
+                <option value="11">Class 11</option>
+                <option value="12">Class 12</option>
+                <option value="dropper">Dropper</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-white/60 block mb-1.5 uppercase tracking-wide">Target Exam</label>
+              <select
+                value={exam}
+                onChange={(e) => setExam(e.target.value)}
+                className="w-full px-3 py-2 bg-black border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-primary"
+              >
+                <option value="jee">JEE Mains & Advanced</option>
+                <option value="neet">NEET UG</option>
+                <option value="olympiad">NTSE & Olympiads</option>
+                <option value="boards">Board Exams (CBSE/ICSE)</option>
+                <option value="foundation">Foundation Courses</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Verification Indicators */}
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-white/50 border-b border-white/10 pb-2">
+              <span>Verification Status</span>
+              <span>Identity Logs</span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Google Accounts Verification</span>
+              <span className="text-xs bg-emerald-500/10 text-emerald-400 font-extrabold px-2.5 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1 font-mono uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Google Verified
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <label className="text-sm font-medium cursor-pointer" htmlFor="dialog-onboarding-completed">Onboarding Completed</label>
+              <input
+                id="dialog-onboarding-completed"
+                type="checkbox"
+                checked={onboardingCompleted}
+                onChange={(e) => setOnboardingCompleted(e.target.checked)}
+                className="w-4 h-4 text-primary bg-black border border-white/10 rounded focus:ring-primary cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Submit buttons */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl bg-primary hover:bg-[#3730A3] text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+            >
+              {isSubmitting ? "Saving..." : "Save Changes"}
+              <Check className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </form>
+      </motion.div>
     </div>
   );
 }

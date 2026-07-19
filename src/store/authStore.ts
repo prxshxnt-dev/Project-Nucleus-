@@ -17,6 +17,9 @@ interface User {
   privacyAccepted?: boolean;
   termsAccepted?: boolean;
   acceptedAt?: string | null;
+  phoneNumber?: string;
+  class?: string;
+  targetExam?: string;
 }
 
 interface VerifiedGoogleAccount {
