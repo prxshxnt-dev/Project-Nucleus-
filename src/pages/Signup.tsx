@@ -17,8 +17,14 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { signInWithPopup, updateProfile } from 'firebase/auth';
+import { 
+  auth, 
+  googleProvider, 
+  signUpWithEmailAndPassword, 
+  syncUserWithFirestore, 
+  logDetailedAuthError 
+} from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import FloatingLabelInput from '../components/FloatingLabelInput';
@@ -112,9 +118,6 @@ export default function Signup() {
         setLoading(false);
 
         toast.success(`Welcome back, ${data.user.displayName}! Automatically signed in via Google.`);
-        
-        // Asynchronously sign out from Firebase client SDK to keep state clean
-        await auth.signOut();
         navigate('/dashboard', { replace: true });
       } else {
         console.log("[GOOGLE VERIFY] New student found. Opening registration setup wizard.");
@@ -137,9 +140,6 @@ export default function Signup() {
         }
 
         toast.success('Google account verified successfully! Please complete your registration details below.');
-        
-        // Asynchronously sign out from Firebase client SDK to keep state clean
-        await auth.signOut();
       }
     } catch (err: any) {
       console.error('Google verification popup/api error:', err);
@@ -224,70 +224,84 @@ export default function Signup() {
     }
 
     setIsSubmitting(true);
-    const payload = {
-      email: email.toLowerCase().trim(),
-      name: name.trim(),
-      phone: phone.trim(),
-      password: "●●●●●●●●", // Mask password in logs for privacy/security
-      idToken: verificationToken || 'direct',
-      classGroup
-    };
-
-    console.log("[REGISTRATION PROCESS START] Submitting student profile details...");
-    console.log("[REGISTRATION PAYLOAD LOG]", JSON.stringify(payload, null, 2));
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanName = name.trim();
+    const cleanPhone = phone.trim();
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.toLowerCase().trim(),
-          name: name.trim(),
-          phone: phone.trim(),
-          password,
-          idToken: verificationToken || 'direct',
-          classGroup
-        }),
-      });
+      let registeredUser: any = null;
 
-      console.log(`[REGISTRATION NETWORK RESPONSE] HTTP Status: ${response.status} ${response.statusText}`);
+      if (verificationToken) {
+        // --- GOOGLE SIGNUP FLOW ---
+        // Ensure the Google user is still authenticated on client side
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          throw new Error("Your Google session has expired. Please click 'Verify with Google' again.");
+        }
 
-      const responseText = await response.text();
-      console.log(`[REGISTRATION RESPONSE BODY]`, responseText);
+        console.log("[GOOGLE SIGNUP SUBMIT] Authenticated Google user found:", currentUser.uid);
 
-      let data: any;
-      try {
-        data = JSON.parse(responseText);
-      } catch (jsonErr) {
-        console.error("[REGISTRATION JSON PARSING ERROR] Server response was not valid JSON:", jsonErr);
-        throw new Error(`Server returned non-JSON response (Status: ${response.status}). Details: ${responseText.slice(0, 200)}`);
+        // Step 3, 4, 6, 7: Write & Verify Firestore profile under Google UID
+        await syncUserWithFirestore(currentUser, {
+          displayName: cleanName,
+          phone: cleanPhone,
+          classGroup: classGroup,
+          provider: 'google',
+          role: 'student',
+          planId: 'free'
+        });
+
+        console.log("[GOOGLE SIGNUP FIRESTORE SUCCESS] Firestore document created and verified.");
+
+        // Step 5: Update Firebase Auth display name
+        await updateProfile(currentUser, { displayName: cleanName });
+
+        // Synchronize with custom backend
+        try {
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: currentUser.uid,
+              email: cleanEmail,
+              name: cleanName,
+              phone: cleanPhone,
+              password,
+              idToken: verificationToken,
+              classGroup
+            }),
+          });
+          const data = await response.json();
+          if (response.ok && data.token) {
+            localStorage.setItem('accessToken', data.token);
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            localStorage.setItem('isLoggedIn', 'true');
+            setUser(data.user);
+          }
+        } catch (backendErr) {
+          console.warn("[BACKEND SYNC WARNING] Custom backend sync failed but Firestore is successful:", backendErr);
+        }
+
+        registeredUser = currentUser;
+
+      } else {
+        // --- EMAIL PASSWORD FLOW ---
+        registeredUser = await signUpWithEmailAndPassword(cleanEmail, password, cleanName, cleanPhone, classGroup);
       }
-
-      if (!response.ok) {
-        console.error("[REGISTRATION SERVER ERROR]", data.error || 'Failed to complete registration.');
-        throw new Error(data.error || `Server registration endpoint failed with Status ${response.status}`);
-      }
-
-      console.log("[REGISTRATION DATABASE PERSISTENCE VERIFIED] Student user created:", data.user);
-
-      // Save credentials locally
-      localStorage.setItem('currentUser', JSON.stringify(data.user));
-      localStorage.setItem('accessToken', data.token);
-      localStorage.setItem('isLoggedIn', 'true');
-
-      // Update state store
-      setVerifiedGoogleAccount(null);
-      setUser(data.user);
-      setLoading(false);
 
       console.log("[REGISTRATION COMPLETED SUCCESSFULLY] Redirecting to Dashboard...");
-      toast.success(`Welcome to Nucleus Coaching Centre, ${data.user.displayName}!`);
+      toast.success(`Welcome to Nucleus Coaching Centre, ${cleanName}!`);
+      
+      // Update state store
+      setVerifiedGoogleAccount(null);
+      setLoading(false);
       navigate('/dashboard', { replace: true });
+
     } catch (err: any) {
-      console.error("[REGISTRATION FAILED CRITICALLY] Error Trace:", err);
-      if (err.stack) {
-        console.error("Stack trace:", err.stack);
-      }
+      logDetailedAuthError(err, "Signup.handleSubmit", {
+        writeStatus: 'failed',
+        collectionName: 'users'
+      });
       toast.error(err.message || 'An error occurred during registration. Please check the browser console.');
     } finally {
       setIsSubmitting(false);

@@ -11,7 +11,7 @@ import {
   Chrome, 
   RefreshCw
 } from 'lucide-react';
-import { signInWithGoogle, signInWithGoogleToken } from '../lib/firebase';
+import { signInWithGoogle, signInWithGoogleToken, loginWithEmailAndPassword, logDetailedAuthError } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
 import { toast, Toaster } from 'sonner';
 import FloatingLabelInput from '../components/FloatingLabelInput';
@@ -141,35 +141,16 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.toLowerCase().trim(),
-          password
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to authenticate student.');
-      }
-
-      // Store credentials locally
-      localStorage.setItem('currentUser', JSON.stringify(data.user));
-      localStorage.setItem('accessToken', data.token);
-      localStorage.setItem('isLoggedIn', 'true');
-
-      // Update auth store
-      setUser(data.user);
-      setLoading(false);
-
-      toast.success(`Welcome back, ${data.user.displayName}!`);
+      const cleanEmail = email.toLowerCase().trim();
+      const firebaseUser = await loginWithEmailAndPassword(cleanEmail, password);
+      
+      toast.success(`Welcome back, ${firebaseUser.displayName || 'Student'}!`);
       
       const from = (location.state as any)?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
 
     } catch (err: any) {
+      logDetailedAuthError(err, "Login.handleEmailLogin");
       toast.error(err.message || 'Incorrect credentials or connectivity issue.');
     } finally {
       setIsSubmitting(false);

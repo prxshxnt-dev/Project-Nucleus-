@@ -513,13 +513,14 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
   // Endpoint: User Signup / Register (Secure Google Verified Email flow)
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { name, email, phone, password, classGroup, idToken } = req.body;
+      const { name, email, phone, password, classGroup, idToken, uid } = req.body;
       
       console.log("[BACKEND REGISTER] Received signup request payload:", {
         name,
         email,
         phone,
         classGroup,
+        uid,
         idTokenLength: idToken ? idToken.length : 0
       });
 
@@ -604,8 +605,8 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
         console.warn("[BACKEND REGISTER] Error querying users by phone:", userPhoneErr);
       }
 
-      // Determine final UID (use existing or generate a new one)
-      const finalUid = existingUid || ("student-" + Math.random().toString(36).substring(2, 11) + "_" + Date.now().toString().slice(-6));
+      // Determine final UID (use custom passed uid, existing, or generate a new one)
+      const finalUid = uid || existingUid || ("student-" + Math.random().toString(36).substring(2, 11) + "_" + Date.now().toString().slice(-6));
       console.log("[BACKEND REGISTER] Using UID for registration/upsert:", finalUid);
 
       const baseUserDoc = existingUserDoc || {};

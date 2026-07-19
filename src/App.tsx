@@ -27,6 +27,7 @@ import ThemeProvider from './components/ThemeProvider';
 import { SeasonalOverlay } from './components/SeasonalOverlay';
 import ScreenProtector from './components/ScreenProtector';
 import { AIAssistantBot } from './components/AIAssistantBot';
+import DebugPanel from './components/DebugPanel';
 import PwaManager from './components/PwaManager';
 import LiquidGlassDock from './components/LiquidGlassDock';
 import OrbitalLoader from './components/OrbitalLoader';
@@ -222,6 +223,7 @@ function AppContent() {
         </AnimatePresence>
         <LiquidGlassDock />
         <AIAssistantBot />
+        <DebugPanel />
         <Footer />
       </div>
     </>
