@@ -4,8 +4,28 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Safely derive filename and dirname in both ESM (development) and CommonJS (compiled production) environments
+let _derivedFilename = "";
+if (typeof __filename !== "undefined") {
+  _derivedFilename = __filename;
+} else {
+  try {
+    _derivedFilename = fileURLToPath(import.meta.url);
+  } catch (e) {
+    // fallback
+  }
+}
+
+let _derivedDirname = "";
+if (typeof __dirname !== "undefined") {
+  _derivedDirname = __dirname;
+} else if (_derivedFilename) {
+  _derivedDirname = path.dirname(_derivedFilename);
+} else {
+  _derivedDirname = process.cwd();
+}
+
+const safeDirname = _derivedDirname;
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
   getFirestore,
@@ -151,9 +171,9 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
   try {
     const possiblePaths = [
       path.join(process.cwd(), "firebase-applet-config.json"),
-      path.join(__dirname, "firebase-applet-config.json"),
-      path.join(__dirname, "..", "firebase-applet-config.json"),
-      path.join(__dirname, "../..", "firebase-applet-config.json"),
+      path.join(safeDirname, "firebase-applet-config.json"),
+      path.join(safeDirname, "..", "firebase-applet-config.json"),
+      path.join(safeDirname, "../..", "firebase-applet-config.json"),
       path.join(process.cwd(), "dist", "firebase-applet-config.json")
     ];
 
@@ -827,6 +847,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
     let userText = "";
     let provider = "gemini";
     let model = "gemini-3.5-flash";
+    let rateLimitKey = "anonymous";
 
     try {
       const { messages, userEmail: reqEmail, localTime } = req.body;
@@ -840,6 +861,85 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
       const lastMessage = messages[messages.length - 1];
       userText = (lastMessage.content || "").trim();
       const lowerText = userText.toLowerCase();
+
+      // Setup rate limit identifier (email or IP fallback)
+      rateLimitKey = userEmail;
+      if (userEmail === "anonymous" || userEmail === "anonymous_student") {
+        const ip = ((req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "anonymous").split(",")[0].trim();
+        rateLimitKey = `ip_${ip}`;
+      }
+
+      // Check if user is an admin or superadmin to bypass the rate limit
+      let bypassRateLimit = false;
+      if (db && userEmail && userEmail !== "anonymous" && userEmail !== "anonymous_student") {
+        try {
+          const userSnap = await db.collection("users").where("email", "==", userEmail).limit(1).get();
+          if (userSnap && !userSnap.empty) {
+            const userData = userSnap.docs[0].data();
+            if (userData && (userData.role === "admin" || userData.role === "superadmin")) {
+              bypassRateLimit = true;
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to retrieve user role for rate-limit bypass check:", e);
+        }
+      }
+
+      // Enforce 20 messages per user per day rate limit
+      if (db && !bypassRateLimit) {
+        try {
+          const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+          let dailyCount = 0;
+
+          // 1. Fetch logs with matching userEmail
+          const emailLogs = await db.collection("chatbot_logs")
+            .where("userEmail", "==", userEmail)
+            .get();
+
+          if (emailLogs && emailLogs.docs) {
+            for (const doc of emailLogs.docs) {
+              const data = doc.data();
+              if (data && data.timestamp) {
+                const logTime = new Date(data.timestamp).getTime();
+                if (logTime >= oneDayAgo) {
+                  dailyCount++;
+                }
+              }
+            }
+          }
+
+          // 2. Fetch logs with matching rateLimitKey if different
+          if (rateLimitKey !== userEmail) {
+            const ipLogs = await db.collection("chatbot_logs")
+              .where("rateLimitKey", "==", rateLimitKey)
+              .get();
+
+            if (ipLogs && ipLogs.docs) {
+              for (const doc of ipLogs.docs) {
+                const data = doc.data();
+                if (data && data.timestamp) {
+                  const logTime = new Date(data.timestamp).getTime();
+                  if (logTime >= oneDayAgo) {
+                    const alreadyCounted = emailLogs && emailLogs.docs && emailLogs.docs.some(d => d.id === doc.id);
+                    if (!alreadyCounted) {
+                      dailyCount++;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          if (dailyCount >= 20) {
+            return res.status(429).json({
+              error: "Daily rate limit exceeded",
+              response: "You have reached your daily limit of 20 messages. Please try again tomorrow!"
+            });
+          }
+        } catch (err) {
+          console.error("Error performing chatbot rate limit verification:", err);
+        }
+      }
 
       // Rule 1: "Who's your developer/creator?" check on server
       if (
@@ -862,6 +962,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
               query: userText,
               response: devResponse,
               userEmail: userEmail || "anonymous",
+              rateLimitKey,
               timestamp: new Date().toISOString()
             });
           } catch (logErr) {
@@ -886,6 +987,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
               query: userText,
               response: timeResponse,
               userEmail: userEmail || "anonymous",
+              rateLimitKey,
               timestamp: new Date().toISOString()
             });
           } catch (logErr) {
@@ -926,6 +1028,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")
               query: userText,
               response: pureGreetingResponse,
               userEmail: userEmail || "anonymous",
+              rateLimitKey,
               timestamp: new Date().toISOString()
             });
           } catch (logErr) {
@@ -1197,6 +1300,7 @@ IMPORTANT: If anyone asks you who your creator is, who built or made you, or you
           query: userText,
           response: assistantResponse,
           userEmail: userEmail || "anonymous",
+          rateLimitKey,
           provider,
           model,
           timestamp: new Date().toISOString()
@@ -1327,6 +1431,7 @@ Please type out your subject-specific question, and I will formulate a clean, co
             query: userText,
             response: fallbackResponse,
             userEmail: userEmail || "anonymous",
+            rateLimitKey,
             provider: provider || "gemini",
             model: model || "gemini-3.5-flash",
             timestamp: new Date().toISOString(),
