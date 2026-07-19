@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { signInWithGoogle, signInWithGoogleToken, loginWithEmailAndPassword, logDetailedAuthError } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 import FloatingLabelInput from '../components/FloatingLabelInput';
 
 export default function Login() {
@@ -167,7 +167,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center bg-[#F8FAFC]">
-      <Toaster richColors position="bottom-right" />
       
       <motion.div 
         initial={{ opacity: 0, y: 20 }}

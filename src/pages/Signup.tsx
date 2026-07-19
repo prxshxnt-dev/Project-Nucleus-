@@ -231,7 +231,7 @@ export default function Signup() {
     try {
       let registeredUser: any = null;
 
-      if (verificationToken) {
+      if (verificationToken && verificationToken !== "direct") {
         // --- GOOGLE SIGNUP FLOW ---
         // Ensure the Google user is still authenticated on client side
         const currentUser = auth.currentUser;

@@ -33,6 +33,7 @@ import LiquidGlassDock from './components/LiquidGlassDock';
 import OrbitalLoader from './components/OrbitalLoader';
 import LoadingScreen from './components/LoadingScreen';
 import OnboardingWizard from './components/OnboardingWizard';
+import { Toaster } from 'sonner';
 
 function AppContent() {
   const { setUser, setLoading, user, loading } = useAuthStore();
@@ -224,6 +225,7 @@ function AppContent() {
         <LiquidGlassDock />
         <AIAssistantBot />
         <DebugPanel />
+        <Toaster richColors position="bottom-right" />
         <Footer />
       </div>
     </>

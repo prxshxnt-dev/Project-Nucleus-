@@ -25,7 +25,7 @@ import {
   Clock,
   Briefcase
 } from 'lucide-react';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
 
 interface StandardItem {
   name: string;
@@ -189,7 +189,6 @@ export default function SelectStandard() {
 
   return (
     <div className="min-h-screen pt-28 pb-20 px-4 md:px-8 bg-[#F8FAFC] select-none text-[#1F1F1F]">
-      <Toaster richColors position="bottom-right" />
       
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Academic Header */}

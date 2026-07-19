@@ -509,7 +509,7 @@ export const AIAssistantBot: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to make chat completion");
+        throw new Error(errorData.response || errorData.error || "Failed to make chat completion");
       }
 
       const responseData = await response.json();
@@ -528,10 +528,12 @@ export const AIAssistantBot: React.FC = () => {
       });
     } catch (err: any) {
       console.error("AI chatbot query handling error:", err);
+      const isRateLimit = err.message && (err.message.includes("limit") || err.message.includes("exceeded") || err.message.includes("messages") || err.message.includes("20"));
+      const content = isRateLimit ? err.message : `I'm not completely sure, but based on the available information, here's the best explanation: I encountered an error connecting to my AI core. Let's make sure the connection is solid or please try typing your query again!`;
       const friendlyMessage = {
         id: "msg_err_" + Date.now(),
         role: "assistant" as const,
-        content: `I'm not completely sure, but based on the available information, here's the best explanation: I encountered an error connecting to my AI core. Let's make sure the connection is solid or please try typing your query again!`,
+        content: content,
         timestamp: new Date().toISOString(),
         senderName: "Nucleus AI Advisor"
       };
