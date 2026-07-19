@@ -15,8 +15,7 @@ import {
   Check,
   X,
   ExternalLink,
-  Shield,
-  Key
+  Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,7 +56,6 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
 
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpCode, setOtpCode] = useState('');
   const [fullName, setFullName] = useState(user?.displayName || '');
   const [selectedClass, setSelectedClass] = useState('');
   const [targetExam, setTargetExam] = useState('');
@@ -242,23 +240,6 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
             />
           </div>
           <p className="text-[11px] text-muted-foreground mt-1.5">Standard 10-digit mobile number validation is required.</p>
-        </div>
-
-        <div className="p-4 bg-muted/30 border border-border rounded-xl space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wide">
-            <Key className="w-3.5 h-3.5" />
-            <span>Simulated OTP Verification</span>
-          </div>
-          <input
-            type="text"
-            disabled
-            value={otpCode}
-            placeholder="OTP field placeholder (automatic verification active)"
-            className="w-full px-3 py-2 bg-muted/50 border border-border/50 rounded-lg text-xs font-mono text-muted-foreground cursor-not-allowed"
-          />
-          <p className="text-[10px] text-muted-foreground/80 leading-relaxed">
-            OTP validation triggers will be active in production mode. Currently running simulated validation.
-          </p>
         </div>
       </div>
     </motion.div>
