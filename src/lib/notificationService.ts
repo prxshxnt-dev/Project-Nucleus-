@@ -216,7 +216,7 @@ export const NotificationService = {
             title: titleText,
             message: messageText,
             category,
-            actionUrl: content.type === 'video' ? '/library' : '/learn',
+            actionUrl: '/learn',
           });
         }
 

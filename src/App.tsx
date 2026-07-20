@@ -17,7 +17,6 @@ const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const SelectStandard = lazy(() => import('./pages/SelectStandard'));
-const Library = lazy(() => import('./pages/Library'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 
@@ -214,7 +213,7 @@ function AppContent() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/select-standard" element={<SelectStandard />} />
               <Route path="/learn" element={<Learn />} />
-              <Route path="/library" element={<Library />} />
+              <Route path="/library" element={<Navigate to="/" replace />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/admin" element={<AdminDashboard />} />

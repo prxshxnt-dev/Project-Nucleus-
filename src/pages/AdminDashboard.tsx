@@ -42,6 +42,7 @@ import { AdminBatchManagement } from "../components/AdminBatchManagement";
 import { AdminPaymentsManagement } from "../components/AdminPaymentsManagement";
 import { parseYouTubeVideoId } from "../components/CustomVideoPlayer";
 import LegalMarkdownEditor from "../components/LegalMarkdownEditor";
+import { CommunicationCenter } from "../components/CommunicationCenter";
 
 const PRESET_INFO: Record<
   string,
@@ -148,7 +149,7 @@ export default function AdminDashboard() {
     }
   }, [user, authLoading, navigate]);
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management" | "onboarding" | "batches" | "payments"
+    "dashboard" | "materials" | "users" | "mentors" | "settings" | "security" | "syllabus" | "support_chats" | "content_management" | "onboarding" | "batches" | "payments" | "communication"
   >("dashboard");
 
   const [paymentSubTab, setPaymentSubTab] = useState<string>("dashboard");
@@ -2854,6 +2855,20 @@ export default function AdminDashboard() {
             }`}
           >
             👋 Onboarding
+          </button>
+        )}
+
+        {(user?.role === "superadmin" || user?.role === "admin") && (
+          <button
+            id="tab-btn-communication"
+            onClick={() => setActiveTab("communication")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "communication"
+                ? "bg-orange-500 text-zinc-950 shadow-md font-bold scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            📢 Communication Center
           </button>
         )}
       </div>
@@ -8628,6 +8643,10 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === "communication" && (
+        <CommunicationCenter user={user} users={users} />
       )}
 
       {selectedProfileUser && (

@@ -51,13 +51,6 @@ export default function LiquidGlassDock() {
       isAnchor: false,
     },
     {
-      id: 'library',
-      label: 'Library',
-      icon: LibraryIcon,
-      to: '/library',
-      isAnchor: false,
-    },
-    {
       id: 'learn',
       label: currentSettings.syllabusSectionName || 'Syllabus',
       icon: BookOpen,
@@ -145,7 +138,6 @@ export default function LiquidGlassDock() {
               {/* Active Dot under current tab */}
               {((app.to === '/' && location.pathname === '/') || 
                 (app.to === '/learn' && location.pathname === '/learn') ||
-                (app.to === '/library' && location.pathname === '/library') ||
                 (app.to === '/dashboard' && location.pathname === '/dashboard') ||
                 (app.to === '/admin' && location.pathname === '/admin')) && (
                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-accent-primary rounded-full shadow-[0_0_8px_rgba(99, 102, 241,0.8)]" />
